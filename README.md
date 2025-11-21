@@ -17,6 +17,7 @@ Software repository for the University of Leicester UK Lunabotics team.
 ### 1. Clone
 
 ```bash
+sudo apt install git
 git clone https://github.com/tju2025/UK-Lunabotics-Software-Engineers-2025-2026.git
 cd UK-Lunabotics-Software-Engineers-2025-2026
 ```
@@ -33,6 +34,7 @@ source install/setup.bash
 ```bash
 ros2 launch lunabot_simulation test_world.launch.py
 ```
+This may cause your system to lag, or gazebo to become unresponsive. This is due to the complexity of the model, so click wait and give it time to load.
 
 You should see Gazebo open with a ground plane and ELM4 chassis model.
 
