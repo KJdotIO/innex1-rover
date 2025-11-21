@@ -17,7 +17,7 @@ Software repository for the University of Leicester UK Lunabotics team.
 ### 1. Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/UK-Lunabotics-Software-Engineers-2025-2026.git
+git clone https://github.com/tju2025/UK-Lunabotics-Software-Engineers-2025-2026.git
 cd UK-Lunabotics-Software-Engineers-2025-2026
 ```
 
