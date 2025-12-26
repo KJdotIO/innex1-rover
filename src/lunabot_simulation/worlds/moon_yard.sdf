@@ -1,0 +1,292 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="moon_yard">
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+    </include>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
+    </include>
+
+    <!-- Walls -->
+
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 2.25 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>7.9 0.1 0.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>7.9 0.1 0.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -2.25 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>7.9 0.1 0.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>7.9 0.1 0.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>4.0 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.1 4.4 0.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.1 4.4 0.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-4.0 0 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.1 4.4 0.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.1 4.4 0.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Zone markers (visual only, no collision) -->
+
+    <model name="zone_starting">
+      <static>true</static>
+      <pose>-2.95 1.1 0.005 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>2.0 2.0 0.001</size></box>
+          </geometry>
+          <material>
+            <ambient>0.5 0.95 0.5 0.5</ambient>
+            <diffuse>0.6 1.0 0.6 0.5</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="zone_construction">
+      <static>true</static>
+      <pose>-2.65 -1.45 0.005 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>2.6 1.5 0.001</size></box>
+          </geometry>
+          <material>
+            <ambient>0.4 0.7 1.0 0.5</ambient>
+            <diffuse>0.5 0.8 1.0 0.5</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="zone_obstacle">
+      <static>true</static>
+      <pose>-0.375 0 0.005 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>3.15 4.4 0.001</size></box>
+          </geometry>
+          <material>
+            <ambient>0.9 0.9 0.9 0.05</ambient>
+            <diffuse>0.9 0.9 0.9 0.05</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="zone_excavation">
+      <static>true</static>
+      <pose>2.575 0 0.005 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>2.75 4.4 0.001</size></box>
+          </geometry>
+          <material>
+            <ambient>1.0 0.5 0.65 0.5</ambient>
+            <diffuse>1.0 0.6 0.75 0.5</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Rocks -->
+
+    <model name="rock_1">
+      <static>true</static>
+      <pose>-1.0 1.2 0.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere><radius>0.15</radius></sphere>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere><radius>0.15</radius></sphere>
+          </geometry>
+          <material>
+            <ambient>0.4 0.35 0.3 1</ambient>
+            <diffuse>0.5 0.45 0.4 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rock_2">
+      <static>true</static>
+      <pose>0.3 -0.5 0.18 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere><radius>0.18</radius></sphere>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere><radius>0.18</radius></sphere>
+          </geometry>
+          <material>
+            <ambient>0.45 0.4 0.35 1</ambient>
+            <diffuse>0.55 0.5 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rock_3">
+      <static>true</static>
+      <pose>2.8 1.5 0.16 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere><radius>0.16</radius></sphere>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere><radius>0.16</radius></sphere>
+          </geometry>
+          <material>
+            <ambient>0.5 0.45 0.4 1</ambient>
+            <diffuse>0.6 0.55 0.5 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="rock_4">
+      <static>true</static>
+      <pose>3.2 -1.0 0.17 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <sphere><radius>0.17</radius></sphere>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <sphere><radius>0.17</radius></sphere>
+          </geometry>
+          <material>
+            <ambient>0.42 0.38 0.33 1</ambient>
+            <diffuse>0.52 0.48 0.43 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Craters (visual only for now) -->
+
+    <model name="crater_1">
+      <static>true</static>
+      <pose>0.8 0.8 0.003 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>0.002</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.2 0.18 0.15 1</ambient>
+            <diffuse>0.25 0.22 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="crater_2">
+      <static>true</static>
+      <pose>2.2 -0.3 0.003 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.22</radius>
+              <length>0.002</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.18 0.16 0.13 1</ambient>
+            <diffuse>0.23 0.2 0.16 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
