@@ -9,7 +9,7 @@ import os
 def generate_launch_description():
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
     world_path = os.path.join(
-        get_package_share_directory("lunabot_simulation"), "worlds", "test_world.sdf"
+        get_package_share_directory("lunabot_simulation"), "worlds", "moon_yard.sdf"
     )
 
     gz_sim = IncludeLaunchDescription(
