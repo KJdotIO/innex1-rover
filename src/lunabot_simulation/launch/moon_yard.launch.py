@@ -4,13 +4,24 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 import os
+from launch_ros.actions import Node
+import xacro
 
 
 def generate_launch_description():
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
+    pkg_leo_gz_description = get_package_share_directory("leo_description")
     world_path = os.path.join(
         get_package_share_directory("lunabot_simulation"), "worlds", "moon_yard.sdf"
     )
+
+    robot_description = xacro.process(
+        os.path.join(pkg_leo_gz_description, "urdf", "leo_sim.urdf.xacro")
+    )
+
+    spawn_x = "-2.95"
+    spawn_y = "1.1"
+    spawn_z = "0.2"
 
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -19,8 +30,74 @@ def generate_launch_description():
         launch_arguments={"gz_args": f"-r {world_path}"}.items(),
     )
 
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        name="robot_state_publisher",
+        output="screen",
+        parameters=[
+            {"use_sim_time": True},
+            {"robot_description": robot_description},
+        ],
+    )
+
+    spawn_robot = Node(
+        package="ros_gz_sim",
+        executable="create",
+        name="spawn_leo",
+        output="screen",
+        arguments=[
+            "-topic",
+            "robot_description",
+            "-name",
+            "leo_rover",
+            "-x",
+            spawn_x,
+            "-y",
+            spawn_y,
+            "-z",
+            spawn_z,
+        ],
+    )
+
+    clock_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="clock_bridge",
+        arguments=["/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock"],
+        output="screen",
+    )
+
+    robot_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="robot_bridge",
+        arguments=[
+            "/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
+            "/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
+            "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
+            "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
+            "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
+            "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
+        ],
+        output="screen",
+    )
+
+    image_bridge = Node(
+        package="ros_gz_image",
+        executable="image_bridge",
+        name="image_bridge",
+        arguments=["/camera/image_raw"],
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             gz_sim,
+            robot_state_publisher,
+            spawn_robot,
+            clock_bridge,
+            robot_bridge,
+            image_bridge,
         ]
     )
