@@ -39,12 +39,22 @@ jobs:
           rosdep init || true
           rosdep update
           rosdep install --from-paths src -y --ignore-src
+        shell: bash
 
       - name: Build
-        run: colcon build --symlink-install
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --symlink-install
+        shell: bash
 
       - name: Run tests
-        run: colcon test
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test
+        shell: bash
 
       - name: Check test results
-        run: colcon test-result --verbose
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test-result --verbose
+        shell: bash
