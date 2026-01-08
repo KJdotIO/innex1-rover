@@ -10,13 +10,13 @@ import xacro
 
 def generate_launch_description():
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
-    pkg_leo_gz_description = get_package_share_directory("leo_description")
+    pkg_lunabot_description = get_package_share_directory("lunabot_description")
     world_path = os.path.join(
         get_package_share_directory("lunabot_simulation"), "worlds", "moon_yard.sdf"
     )
 
     robot_description = xacro.process(
-        os.path.join(pkg_leo_gz_description, "urdf", "leo_sim.urdf.xacro")
+        os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
     )
 
     spawn_x = "-2.95"
@@ -79,6 +79,7 @@ def generate_launch_description():
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
             "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
+            "/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan",
         ],
         output="screen",
     )
