@@ -19,8 +19,8 @@ def generate_launch_description():
         os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
     )
 
-    spawn_x = "-2.95"
-    spawn_y = "1.1"
+    spawn_x = "0.0"
+    spawn_y = "0.0"
     spawn_z = "0.2"
 
     gz_sim = IncludeLaunchDescription(
