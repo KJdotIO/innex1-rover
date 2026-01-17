@@ -23,11 +23,12 @@ def generate_launch_description():
     spawn_y = "0.0"
     spawn_z = "0.2"
 
+    # we'll run the sim without gazebo gui to save resources for now
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
         ),
-        launch_arguments={"gz_args": f"-r {world_path}"}.items(),
+        launch_arguments={"gz_args": f"-r -s {world_path}"}.items(),
     )
 
     robot_state_publisher = Node(
@@ -83,14 +84,15 @@ def generate_launch_description():
         ],
         output="screen",
     )
+    # camera feed taking up too many resources
 
-    image_bridge = Node(
-        package="ros_gz_image",
-        executable="image_bridge",
-        name="image_bridge",
-        arguments=["/camera/image_raw"],
-        output="screen",
-    )
+    # image_bridge = Node(
+    #     package="ros_gz_image",
+    #     executable="image_bridge",
+    #     name="image_bridge",
+    #     arguments=["/camera/image_raw"],
+    #     output="screen",
+    # )
 
     return LaunchDescription(
         [
@@ -99,6 +101,6 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
-            image_bridge,
+            # image_bridge,
         ]
     )

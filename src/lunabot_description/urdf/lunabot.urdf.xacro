@@ -31,13 +31,13 @@
     <gazebo reference="lidar_link">
     <sensor name="lidar" type="gpu_lidar">
         <always_on>1</always_on>
-        <update_rate>10</update_rate>
+        <update_rate>5</update_rate>
         <topic>scan</topic>
         <gz_frame_id>lidar_link</gz_frame_id>
         <lidar>
         <scan>
             <horizontal>
-            <samples>360</samples>
+            <samples>180</samples>
             <resolution>1</resolution>
             <min_angle>-3.14159</min_angle>
             <max_angle>3.14159</max_angle>
@@ -49,7 +49,7 @@
             <resolution>0.01</resolution>
         </range>
         </lidar>
-        <visualize>true</visualize>
+        <visualize>false</visualize>
     </sensor>
     </gazebo>
 </robot>
