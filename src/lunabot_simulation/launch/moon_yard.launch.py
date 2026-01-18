@@ -81,18 +81,19 @@ def generate_launch_description():
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
             "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
             "/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan",
+            "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
+            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
         ],
         output="screen",
     )
-    # camera feed taking up too many resources
 
-    # image_bridge = Node(
-    #     package="ros_gz_image",
-    #     executable="image_bridge",
-    #     name="image_bridge",
-    #     arguments=["/camera/image_raw"],
-    #     output="screen",
-    # )
+    image_bridge = Node(
+        package="ros_gz_image",
+        executable="image_bridge",
+        name="image_bridge",
+        arguments=["/camera_front/image", "/camera_front/depth_image"],
+        output="screen",
+    )
 
     return LaunchDescription(
         [
@@ -101,6 +102,6 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
-            # image_bridge,
+            image_bridge,
         ]
     )
