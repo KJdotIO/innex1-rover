@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'hazard_detection = lunabot_perception.hazard_detection:main'
         ],
     },
 )
