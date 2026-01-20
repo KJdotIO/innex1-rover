@@ -10,9 +10,9 @@ Run these commands to install ROS 2 Humble, Gazebo Fortress, and required depend
 
 ```bash
 sudo apt update && sudo apt install -y locales curl gnupg2 lsb-release
-sudo locale-gen en_US en_US.UTF-8
-sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-export LANG=en_US.UTF-8
+sudo locale-gen en_GB en_GB.UTF-8
+sudo update-locale LC_ALL=en_GB.UTF-8 LANG=en_GB.UTF-8
+export LANG=en_GB.UTF-8
 sudo add-apt-repository -y universe
 
 # Add ROS 2 repository
@@ -28,7 +28,6 @@ sudo apt update && sudo apt install -y \
   ros-dev-tools \
   python3-rosdep \
   ros-humble-ros-gz \
-  ros-humble-foxglove-bridge \
   ros-humble-teleop-twist-keyboard \
   ignition-fortress \
   ignition-launch-cli
@@ -37,9 +36,13 @@ echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Orbstack with Foxglove (Experimental)
+### Orbstack with Foxglove (Optional)
 
-OrbStack is recommended for macOS users to minimize performance overhead compared to traditional VMs.
+OrbStack is recommended for macOS users to minimise performance overhead compared to traditional VMs. If you intend to use Foxglove Studio for visualisation, install the bridge:
+
+```bash
+sudo apt update && sudo apt install -y ros-humble-foxglove-bridge
+```
 
 1. Install [OrbStack](https://orbstack.dev/).
 2. Create an Ubuntu 22.04 machine: `orb create ubuntu:22.04 rover-sim`
@@ -70,16 +73,16 @@ The simulation runs in headless mode by default to conserve resources.
 ros2 launch lunabot_simulation moon_yard.launch.py
 ```
 
-### Visualization
+### Visualisation
 
 | Tool | Purpose | Command |
 | :--- | :--- | :--- |
-| Foxglove Studio | Sensor data and robot state | `ros2 run foxglove_bridge foxglove_bridge` |
+| Rviz2 | Standard ROS visualisation | `ros2 run rviz2 rviz2` |
 | GZ Web | Arena geometry and world layout | `gzweb` |
-| Rviz2 | Standard ROS visualization | `ros2 run rviz2` |
+| Foxglove Studio | Sensor data and robot state | `ros2 run foxglove_bridge foxglove_bridge` |
 
-For Foxglove Studio, connect to `ws://localhost:8765`.
 For GZ Web, open https://app.gazebosim.org/visualization and connect to `ws://localhost:9002`.
+For Foxglove Studio, connect to `ws://localhost:8765`.
 
 ### Manual Control
 
