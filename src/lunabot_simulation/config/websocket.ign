@@ -1,0 +1,7 @@
+<?xml version='1.0'?>
+<ignition version='1.0'>
+  <plugin name='ignition::launch::WebsocketServer'
+          filename='ignition-launch-websocket-server'>
+    <port>9002</port>
+  </plugin>
+</ignition>
