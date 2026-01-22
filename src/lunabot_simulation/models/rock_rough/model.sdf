@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <model name="rock_rough">
+    <static>true</static>
+    <link name="rock_link">
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://rock_rough/meshes/rock_rough.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://rock_rough/meshes/rock_rough.stl</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.8</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+  </model>
+</sdf>

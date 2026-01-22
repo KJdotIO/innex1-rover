@@ -11,17 +11,23 @@ import xacro
 def generate_launch_description():
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
-    world_path = os.path.join(
-        get_package_share_directory("lunabot_simulation"), "worlds", "moon_yard.sdf"
-    )
+    pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
+    world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
+
+    # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our custom models
+    models_path = os.path.join(pkg_lunabot_simulation, "models")
+    gz_resource_path = os.environ.get("GZ_SIM_RESOURCE_PATH", "")
+    if models_path not in gz_resource_path:
+        os.environ["GZ_SIM_RESOURCE_PATH"] = models_path + ":" + gz_resource_path
 
     robot_description = xacro.process(
         os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
     )
 
+    # Spawn position - surface mesh is at z=0, rover spawns above and drops
     spawn_x = "0.0"
     spawn_y = "0.0"
-    spawn_z = "0.2"
+    spawn_z = "0.5"  # Start above surface, gravity will settle it
 
     # we'll run the sim without gazebo gui to save resources for now
     gz_sim = IncludeLaunchDescription(
