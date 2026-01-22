@@ -27,7 +27,11 @@ install(DIRECTORY
   launch
   worlds
   config
+  models
   DESTINATION share/${PROJECT_NAME}
 )
+
+# Set GZ_SIM_RESOURCE_PATH so Gazebo can find our models
+set(ENV{GZ_SIM_RESOURCE_PATH} "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/models:$ENV{GZ_SIM_RESOURCE_PATH}")
 
 ament_package()
