@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test copyright headers in source files."""
+
 from ament_copyright.main import main
 import pytest
 
