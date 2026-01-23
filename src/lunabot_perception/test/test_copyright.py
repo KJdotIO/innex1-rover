@@ -23,5 +23,6 @@ import pytest
 @pytest.mark.copyright
 @pytest.mark.linter
 def test_copyright():
+    """Test that all source files have proper copyright headers."""
     rc = main(argv=['.', 'test'])
     assert rc == 0, 'Found errors'
