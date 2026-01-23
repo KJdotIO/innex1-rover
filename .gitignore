@@ -3,3 +3,5 @@ install/
 log/
 .vscode/
 .DS_Store
+.envrc
+.dev/
