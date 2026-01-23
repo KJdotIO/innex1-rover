@@ -1,3 +1,5 @@
+"""Package setup for lunabot_perception."""
+
 from setuptools import find_packages, setup
 
 package_name = 'lunabot_perception'
