@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test code follows flake8 style guidelines."""
+
 from ament_flake8.main import main_with_errors
 import pytest
 
@@ -19,6 +21,7 @@ import pytest
 @pytest.mark.flake8
 @pytest.mark.linter
 def test_flake8():
+    """Test that code follows flake8 style guidelines."""
     rc, errors = main_with_errors(argv=[])
     assert rc == 0, \
         'Found %d code style errors / warnings:\n' % len(errors) + \
