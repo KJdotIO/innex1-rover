@@ -1,3 +1,5 @@
+"""Package setup for lunabot_perception."""
+
 from setuptools import find_packages, setup
 
 package_name = 'lunabot_perception'
@@ -24,6 +26,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'hazard_detection = lunabot_perception.hazard_detection:main'
         ],
     },
 )

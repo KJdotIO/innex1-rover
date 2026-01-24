@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test copyright headers in source files."""
+
 from ament_copyright.main import main
 import pytest
 
@@ -21,5 +23,6 @@ import pytest
 @pytest.mark.copyright
 @pytest.mark.linter
 def test_copyright():
+    """Test that all source files have proper copyright headers."""
     rc = main(argv=['.', 'test'])
     assert rc == 0, 'Found errors'
