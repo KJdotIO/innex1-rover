@@ -1,11 +1,14 @@
+import os
+import platform
+import tempfile
+
+import xacro
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.substitutions import FindPackageShare
-from ament_index_python.packages import get_package_share_directory
-import os
 from launch_ros.actions import Node
-import xacro
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -13,6 +16,21 @@ def generate_launch_description():
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
     world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
+
+    # switches to ogre 1 preflight if on mac. doesnt affect linux
+    if platform.system() == "Darwin":
+        with open(world_path, "r") as f:
+            content = f.read()
+        if "<render_engine>ogre2</render_engine>" in content:
+            patched_content = content.replace(
+                "<render_engine>ogre2</render_engine>",
+                "<render_engine>ogre</render_engine>",
+            )
+            tmp_world = os.path.join(tempfile.gettempdir(), "moon_yard_mac.sdf")
+            with open(tmp_world, "w") as f:
+                f.write(patched_content)
+            world_path = tmp_world
+            print(f"macOS detected: Using patched Ogre1 world at {world_path}")
 
     # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our custom models
     models_path = os.path.join(pkg_lunabot_simulation, "models")
