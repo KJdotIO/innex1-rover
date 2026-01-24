@@ -20,7 +20,8 @@ from sensor_msgs.msg import PointCloud2
 
 
 class HazardDetectionNode(Node):
-    """ROS 2 node for detecting hazards from depth camera data.
+    """
+    ROS 2 node for detecting hazards from depth camera data.
 
     Subscribes to depth camera point clouds and publishes filtered
     point clouds for navigation costmap integration.
@@ -40,9 +41,11 @@ class HazardDetectionNode(Node):
         )
 
     def listener_callback(self, msg):
-        """Process incoming point cloud data.
+        """
+        Process incoming point cloud data.
 
         Args:
+        ----
             msg: PointCloud2 message from the depth camera
 
         """
@@ -50,9 +53,11 @@ class HazardDetectionNode(Node):
 
 
 def main(args=None):
-    """Run the hazard detection node.
+    """
+    Run the hazard detection node.
 
     Args:
+    ----
         args: Command line arguments (optional)
 
     """
