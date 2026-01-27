@@ -51,3 +51,10 @@ ekf_filter_node:
                       false, false, false,
                       false, false, true,
                       false, false, false]
+
+        odom1: /rtabmap_odom
+        odom1_config: [false, false, false,
+                      false, false, false,
+                      false, false, false,
+                      false, false, false,
+                      false, false, false]
