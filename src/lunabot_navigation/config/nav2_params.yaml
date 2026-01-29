@@ -44,39 +44,40 @@ global_costmap:
       resolution: 0.05 # spec resolution 
       track_unknown_space: false
       rolling_window: false
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      plugins: ["static_layer", "inflation_layer"]
       
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: True
+        map_subscribe_transient_local: true
 
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
+      # (FOR LIDAR)
+      #obstacle_layer:
+      #  plugin: "nav2_costmap_2d::ObstacleLayer"
+      #  enabled: true
+      #  observation_sources: scan
+      #  scan:
+      #    topic: /scan
+      #    max_obstacle_height: 2.0
+      #    clearing: true
+      #    marking: true
+      #    data_type: "LaserScan"
+      #    raytrace_max_range: 3.0
+      #    raytrace_min_range: 0.0
+      #    obstacle_max_range: 2.5
+      #    obstacle_min_range: 0.0
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.55
       
-      always_send_full_costmap: True
+      always_send_full_costmap: true
 
 # local costmap 
 local_costmap:
   local_costmap:
     ros__parameters:
-      plugins: ["obstacle_layer", "inflation_layer"]
+      plugins: ["inflation_layer"]
 
       # rolling window 
       rolling_window: true
@@ -84,17 +85,17 @@ local_costmap:
       height: 3.0 # 3mx3m as specified in docx 
       resolution: 0.05
       
-      # config for obstacle 
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: scan
-        scan:
-          topic: /scan
-          data_type: LaserScan
-          marking: true
-          clearing: true
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
+      # (FOR LiDAR)
+      #obstacle_layer:
+      #  plugin: "nav2_costmap_2d::ObstacleLayer"
+      #  observation_sources: scan
+      #  scan:
+      #    topic: /scan
+      #    data_type: LaserScan
+      #    marking: true
+      #    clearing: true
+      #    max_obstacle_height: 2.0
+      #    min_obstacle_height: 0.0
       
       # config for inflation 
       inflation_layer:
