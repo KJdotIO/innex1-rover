@@ -52,6 +52,19 @@
         <visualize>false</visualize>
     </sensor>
     </gazebo> -->
+    <gazebo>
+      <plugin
+            filename="ignition-gazebo-pose-publisher-system"
+            name="ignition::gazebo::systems::PosePublisher"
+        >
+        <publish_link_poses>true</publish_link_poses>
+        <publish_sensor_poses>true</publish_sensor_poses>
+        <publish_nested_model_poses>true</publish_nested_model_poses>
+        <use_pose_vector_msg>true</use_pose_vector_msg>
+        <static_publisher>true</static_publisher>
+        <static_update_frequency>1</static_update_frequency>
+      </plugin>
+    </gazebo>
 
     <link name="camera_front_link">
     <visual>
@@ -103,7 +116,7 @@
         </clip>
       </camera>
       <always_on>1</always_on>
-      <update_rate>5</update_rate>
+      <update_rate>10</update_rate>
       <topic>camera_front</topic>
         <gz_frame_id>camera_front_link</gz_frame_id>
       </sensor>
