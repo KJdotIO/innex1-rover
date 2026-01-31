@@ -1,3 +1,4 @@
+"""Setup script for the lunabot_bringup package."""
 import os
 from glob import glob
 from setuptools import find_packages, setup

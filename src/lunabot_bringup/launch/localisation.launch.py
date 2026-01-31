@@ -1,3 +1,4 @@
+"""Launch file for the localisation stack."""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -7,7 +8,8 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     """
-    Launch the localisation stack for the Lunabot.
+    Generate a launch description for the EKF node.
+
     This includes the EKF node which fuses odometry and IMU data.
     """
     # Locate the configuration files
