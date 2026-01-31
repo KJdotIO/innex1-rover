@@ -31,6 +31,11 @@
             name="ignition::gazebo::systems::UserCommands"
         >
     </plugin>
+    <plugin
+            filename="ignition-gazebo-imu-system"
+            name="ignition::gazebo::systems::Imu"
+        >
+    </plugin>
 
     <include>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
