@@ -4,7 +4,6 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
 from launch.substitutions import PathJoinSubstitution
-from launch_ros.actions import SetParameter
 
 # // LAUNCH FUNCTION // 
 def generate_launch_description():
@@ -14,7 +13,7 @@ def generate_launch_description():
     'config',
     'nav2_params.yaml'
     ])
-
+    
     # 2. startup nodes using the official nav2 bringup launch file 
     # (bypasses the need to explicitly load each Nav2 Node)
     # https://github.com/ros-navigation/navigation2/blob/main/nav2_bringup/launch/navigation_launch.py 
