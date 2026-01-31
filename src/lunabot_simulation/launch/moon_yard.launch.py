@@ -100,7 +100,7 @@ def generate_launch_description():
         arguments=[
             "/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
             "/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
-            "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
+            # "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
             "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
