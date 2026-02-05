@@ -1,0 +1,22 @@
+rgbd_odometry:
+  ros__parameters:
+    # Issue #57: EKF handles the main odom transform
+    publish_tf: false 
+    frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    # Strategy for future reversing
+    Odom/Strategy: "1" # Frame-to-Map
+    # Conservative feature detection for sand
+    Vis/MinInliers: "15"
+    Vis/FeatureType: "8" # GFTT/ORB
+
+rtabmap:
+  ros__parameters:
+    # Issue #58: RTAB-Map owns the map -> odom transform
+    publish_tf: true
+    # Mapping resolution (matches Nav2)
+    Grid/CellSize: "0.05"
+    # Search for loops based on physical proximity
+    RGBD/ProximityBySpace: "true"
+    # Optimization for flat arena
+    Optimizer/Slam2D: "true"
