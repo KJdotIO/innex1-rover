@@ -23,7 +23,9 @@ Review PRs for consistency with documented interfaces, but note that contracts m
 - C++: ROS 2 style guide
 - `colcon build` should pass cleanly
 - Appropriate QoS settings
-  Focus Areas
+
+## Focus Areas
+
 - TF frame consistency
 - QoS compatibility between pub/sub
 - Error handling for sensor failures
