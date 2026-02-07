@@ -12,7 +12,7 @@ University of Leicester Lunabotics 2026 lunar rover.
 
 ## Documentation
 
-Architecture and contracts: [https://github.com/KJdotIO/innex1-rover/wiki](https://github.com/KJdotIO/innex1-rover/wiki)
+Architecture and contracts (our source of truth): [https://github.com/KJdotIO/innex1-rover/wiki](https://github.com/KJdotIO/innex1-rover/wiki)
 
 Review PRs for consistency with documented interfaces, but note that contracts may evolve - code can lead, docs can follow.
 
@@ -21,7 +21,7 @@ Review PRs for consistency with documented interfaces, but note that contracts m
 - ROS 2 conventions: snake_case topics/nodes, CamelCase message types
 - Python: PEP 8, docstrings on public functions
 - C++: ROS 2 style guide
-- `colcon build` should pass cleanly
+- `colcon build` and `colcon test` should pass cleanly
 - Appropriate QoS settings
 
 ## Focus Areas
@@ -30,3 +30,11 @@ Review PRs for consistency with documented interfaces, but note that contracts m
 - QoS compatibility between pub/sub
 - Error handling for sensor failures
 - Sim/hardware abstraction (same interfaces, different drivers)
+
+Be direct and helpful. Flag genuine issues - bugs, convention violations, QoS mismatches - but don't nitpick stylistic preferences that don't affect functionality. If something works and follows the documented conventions, it's fine to merge.
+
+## Not Worth Flagging
+
+- Minor whitespace/formatting (let the linters handle it)
+- Personal style preferences that don't violate PEP 8 or ROS 2 conventions
+- "Could be slightly more elegant" suggestions on working code
