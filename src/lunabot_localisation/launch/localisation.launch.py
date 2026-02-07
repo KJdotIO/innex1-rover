@@ -3,10 +3,6 @@ from launch_ros.actions import Node
 from launch.substitutions import PathJoinSubstitution
 from ament_index_python.packages import get_package_share_directory
 
-
-
-
-
 def generate_launch_description():
     ekf_config_path = PathJoinSubstitution([
         get_package_share_directory('lunabot_localisation'),
@@ -23,7 +19,6 @@ def generate_launch_description():
         Node(
             package='robot_localization', executable='ekf_node', output='screen',
             parameters=[ekf_config_path]
-            
         ),
         # 2. SLAM Node
         Node(
