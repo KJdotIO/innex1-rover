@@ -27,29 +27,68 @@ ekf_filter_node:
     #  AX, AY, AZ]
 
     # Wheel Odometry (/odom)
-    # Strategy: Currently trusting Gazebo's absolute position (X, Y) to combat insane drift 
+    # Strategy: Currently trusting Gazebo's absolute position (X, Y) to combat insane drift
     # in simulation. Real-world implementation should set these to false and rely on velocity.
     odom0: /odom
-    odom0_config: [true,  true,  false,
-                  false, false, false,
-                  true,  false, false,
-                  false, false, true,
-                  false, false, false]
+    odom0_config:
+      [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+      ]
 
     # IMU (/imu/data_raw)
     # Strategy: Primary reference for relative Yaw and rotation speed.
     imu0: /imu/data_raw
-    imu0_config: [false, false, false,
-                  false, false, true,
-                  false, false, false,
-                  false, false, true,
-                  true,  false, false]
+    imu0_config:
+      [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+      ]
 
     # Visual Odometry (/visual_odometry)
     # Hotswap point for cuVSLAM or rtabmap_odom.
     odom1: /visual_odometry
-    odom1_config: [true,  true,  false,
-                  false, false, false,
-                  false, false, false,
-                  false, false, false,
-                  false, false, false]
+    odom1_config:
+      [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]
