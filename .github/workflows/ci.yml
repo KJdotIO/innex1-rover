@@ -8,8 +8,8 @@ on:
       - '.rules/**'
       - 'LICENSE'
       - '.gitignore'
-      - '*.pdf'
-      - '*.gv'
+      - '**/*.pdf'
+      - '**/*.gv'
   pull_request:
     branches: [main]
     paths-ignore:
@@ -17,8 +17,8 @@ on:
       - '.rules/**'
       - 'LICENSE'
       - '.gitignore'
-      - '*.pdf'
-      - '*.gv'
+      - '**/*.pdf'
+      - '**/*.gv'
 
 jobs:
   build-and-test:
