@@ -24,6 +24,21 @@ Review PRs for consistency with documented interfaces, but note that contracts m
 - `colcon build` and `colcon test` should pass cleanly
 - Appropriate QoS settings
 
+## Docstring Guidelines
+
+- Use the **title + description** format:
+  ```python
+  """
+  Short title line (what it does).
+
+  Brief description or context (1-2 sentences max).
+  """
+  ```
+- Each line must be under 99 characters (PEP 8 / flake8 E501)
+- Do NOT generate verbose multi-paragraph docstrings
+- Avoid restating parameter names or return types that are obvious from the code
+- Launch files: title = "Generate a launch description for X", description = what nodes/includes
+
 ## Focus Areas
 
 - TF frame consistency

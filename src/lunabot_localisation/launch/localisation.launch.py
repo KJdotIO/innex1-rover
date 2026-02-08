@@ -6,15 +6,9 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     """
-    Create a ROS 2 LaunchDescription that starts and configures localization-related nodes for the lunabot_localisation package.
-    
-    This function resolves the package share directory, loads rtabmap and EKF YAML configuration files, and defines camera topic remappings. It returns a LaunchDescription containing three Node actions:
-    - an RGB-D odometry node (rtabmap_odom/rgbd_odometry) configured with rtabmap.yaml, sim time enabled, camera remappings, and an odom remap to /visual_odometry;
-    - an EKF filter node (robot_localization/ekf_node named ekf_filter_node) configured with ekf.yaml and sim time enabled;
-    - a SLAM node (rtabmap_slam/rtabmap) configured with rtabmap.yaml, sim time enabled, camera remappings, an odom remap to /odometry/filtered, and started with the "-d" argument.
-    
-    Returns:
-        LaunchDescription: A launch description that starts the odometry, EKF, and SLAM nodes with the described configurations.
+    Generate a launch description for the localisation stack.
+
+    Launches visual odometry, EKF fusion, and RTAB-Map SLAM nodes.
     """
     pkg_localisation = get_package_share_directory("lunabot_localisation")
 
@@ -35,7 +29,7 @@ def generate_launch_description():
                 executable="rgbd_odometry",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
-                remappings=camera_remappings + [("odom", "/visual_odometry")],
+                remappings=[*camera_remappings, ("odom", "/visual_odometry")],
             ),
             # ekf fuses wheel odom + IMU + visual odom
             Node(
@@ -51,7 +45,7 @@ def generate_launch_description():
                 executable="rtabmap",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
-                remappings=camera_remappings + [("odom", "/odometry/filtered")],
+                remappings=[*camera_remappings, ("odom", "/odometry/filtered")],
                 arguments=["-d"],
             ),
         ]

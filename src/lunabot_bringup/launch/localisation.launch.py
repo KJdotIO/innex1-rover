@@ -10,15 +10,9 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     """
-    Includes the master localisation launch from the lunabot_localisation package.
-    
-    This assembles the three-node localisation stack:
-    - Visual odometry (`rgbd_odometry`)
-    - EKF fusion (`robot_localization`)
-    - SLAM (`rtabmap`)
-    
-    Returns:
-        LaunchDescription: A launch description that includes the master localisation launch.
+    Generate a launch description for the localisation stack.
+
+    Includes the master localisation launch from lunabot_localisation.
     """
     pkg_localisation = get_package_share_directory("lunabot_localisation")
     localisation_launch = IncludeLaunchDescription(
