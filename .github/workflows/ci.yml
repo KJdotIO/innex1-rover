@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - '**.md'
+      - '**/*.md'
       - '.rules/**'
       - 'LICENSE'
       - '.gitignore'
@@ -13,7 +13,7 @@ on:
   pull_request:
     branches: [main]
     paths-ignore:
-      - '**.md'
+      - '**/*.md'
       - '.rules/**'
       - 'LICENSE'
       - '.gitignore'
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and test
-        uses: ros-tooling/action-ros-ci@v0.4
+        uses: ros-tooling/action-ros-ci@c8bee402c95e6b4a47c9bb5ce69de4c692128d3a # v0.4
         with:
           package-name: >
             lunabot_bringup

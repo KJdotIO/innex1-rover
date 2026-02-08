@@ -1,5 +1,0 @@
-[flake8]
-# Ignore purely stylistic rules that don't catch bugs:
-# - Q000: single vs double quotes preference
-# - I1xx: import ordering (let auto-formatters handle this)
-extend-ignore = Q000, I100, I101, I201, I202
