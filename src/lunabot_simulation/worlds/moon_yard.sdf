@@ -47,6 +47,13 @@
       <pose>2.95 -1.1 0.0 0 0 0</pose>
     </include>
 
+    <include>
+      <uri>model://apriltag_beacon</uri>
+      <name>apriltag_beacon</name>
+      <pose>0 1.08 0.25 0 0 0</pose>
+      <static>true</static>
+    </include>
+
     <!-- Walls -->
     <model name="wall_north">
       <static>true</static>
