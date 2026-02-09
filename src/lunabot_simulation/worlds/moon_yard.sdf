@@ -47,6 +47,13 @@
       <pose>2.95 -1.1 0.0 0 0 0</pose>
     </include>
 
+    <include>
+      <uri>model://apriltag_beacon</uri>
+      <name>apriltag_beacon</name>
+      <pose>1.95 0.1 0.05 0 0 0.5</pose>
+      <static>true</static>
+    </include>
+
     <!-- Walls -->
     <model name="wall_north">
       <static>true</static>
@@ -158,8 +165,8 @@
     </model> -->
 
     <!-- Rocks -->
-    <include><uri>model://rock_rough</uri><name>rock_1</name><pose
-            >1.95 0.1 0.05 0 0 0.5</pose></include>
+    <!-- <include><uri>model://rock_rough</uri><name>rock_1</name><pose
+            >1.95 0.1 0.05 0 0 0.5</pose></include> -->
     <include><uri>model://rock_round</uri><name>rock_2</name><pose
             >3.25 -1.6 0.05 0 0 1.2</pose></include>
     <include><uri>model://rock_rough</uri><name>rock_3</name><pose
