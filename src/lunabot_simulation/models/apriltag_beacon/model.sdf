@@ -7,7 +7,7 @@
       <visual name="tag_visual">
         <geometry>
           <plane>
-            <normal>0 0 1</normal>
+            <normal>0 -1 0</normal>
             <size>0.25 0.25</size>
           </plane>
         </geometry>

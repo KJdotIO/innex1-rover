@@ -50,7 +50,7 @@
     <include>
       <uri>model://apriltag_beacon</uri>
       <name>apriltag_beacon</name>
-      <pose>1.95 0.1 0.05 0 0 0.5</pose>
+      <pose>0 1.08 0.25 0 0 0</pose>
       <static>true</static>
     </include>
 
