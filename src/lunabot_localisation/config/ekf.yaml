@@ -1,34 +1,23 @@
-### EKF Configuration for University of Leicester Lunabotics Rover ###
-# This node fuses sensors to provide a smooth odom -> base_footprint transform.
-# See the Wiki (Localisation.md) for a detailed breakdown of the trust matrices.
+### Dual EKF Configuration ###
+# Local EKF: smooth odom -> base_footprint (continuous, never jumps)
+# Global EKF: map -> odom (jumps when AprilTag seen, corrects drift)
 
-ekf_filter_node:
+ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
     frequency: 50.0
-
-    # Planar environment mode (ignores Z, Roll, and Pitch)
     two_d_mode: true
-
     publish_acceleration: true
     publish_tf: true
 
-    # Coordinate Frames
     map_frame: map
     odom_frame: odom
     base_link_frame: base_footprint
     world_frame: odom
 
-    # Matrix Key:
-    # [X,  Y,  Z,
-    #  Roll, Pitch, Yaw,
-    #  VX, VY, VZ,
-    #  VRoll, VPitch, VYaw,
-    #  AX, AY, AZ]
+    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
 
-    # Wheel Odometry (/odom)
-    # Strategy: Currently trusting Gazebo's absolute position (X, Y) to combat insane drift
-    # in simulation. Real-world implementation should set these to false and rely on velocity.
+    # Wheel odometry: position + velocity
     odom0: /odom
     odom0_config:
       [
@@ -49,8 +38,7 @@ ekf_filter_node:
         false,
       ]
 
-    # IMU (/imu/data_raw)
-    # Strategy: Primary reference for relative Yaw and rotation speed.
+    # IMU: yaw orientation + angular velocity + linear acceleration
     imu0: /imu/data_raw
     imu0_config:
       [
@@ -71,8 +59,7 @@ ekf_filter_node:
         false,
       ]
 
-    # Visual Odometry (/visual_odometry)
-    # Hotswap point for cuVSLAM or rtabmap_odom.
+    # Visual odometry: position only
     odom1: /visual_odometry
     odom1_config:
       [
@@ -92,3 +79,103 @@ ekf_filter_node:
         false,
         false,
       ]
+
+ekf_filter_node_map:
+  ros__parameters:
+    use_sim_time: true
+    frequency: 50.0
+    two_d_mode: true
+    publish_acceleration: false
+    publish_tf: true
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: map
+
+    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
+
+    # Same continuous sources as local EKF
+    odom0: /odom
+    odom0_config:
+      [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+      ]
+
+    imu0: /imu/data_raw
+    imu0_config:
+      [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+      ]
+
+    odom1: /visual_odometry
+    odom1_config:
+      [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]
+
+    # AprilTag pose correction (discontinuous, only in global EKF)
+    pose0: /tag_pose
+    pose0_config:
+      [
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]
+    pose0_differential: false
+    pose0_relative: false
+    pose0_rejection_threshold: 5.0
