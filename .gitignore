@@ -6,3 +6,6 @@ log/
 .envrc
 .dev/
 /innex1_mission_*
+frames_*.gv
+frames_*.pdf
+__pycache__/
