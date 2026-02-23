@@ -1,0 +1,2 @@
+[flake8]
+extend-ignore = Q000, I100, I101, I201, I202
