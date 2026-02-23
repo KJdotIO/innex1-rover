@@ -134,6 +134,15 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
+### CI Interface Contract Checks
+
+CI runs `.github/scripts/check_interface_contracts.py` to catch renamed or missing ROS interfaces early.
+
+- Required topic/action contracts live in `.github/contracts/interface_contracts.json`.
+- Required TF links live in the same contract file under `tf_links`.
+- If you rename a topic, action, or frame link, update that JSON in the same PR.
+- Mission-state topics are listed in `deferred_topics` until the state manager lands in `main`.
+
 ## Troubleshooting
 
 **Launch file not found:**
