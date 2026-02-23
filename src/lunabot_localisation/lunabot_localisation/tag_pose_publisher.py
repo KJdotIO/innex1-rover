@@ -1,85 +1,11 @@
 import math
 import rclpy
 import tf2_ros
+import tf2_geometry_msgs
+from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, TransformStamped
 from rclpy.node import Node
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener
-from geometry_msgs.msg import PoseWithCovarianceStamped
-
-
-def _dot(a, b):
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
-
-def _cross(a, b):
-    return (
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    )
-
-
-def _quat_normalise(q):
-    x, y, z, w = q
-    norm = math.sqrt(x * x + y * y + z * z + w * w)
-    if norm == 0.0:
-        return (0.0, 0.0, 0.0, 1.0)
-    inv = 1.0 / norm
-    return (x * inv, y * inv, z * inv, w * inv)
-
-
-def _quat_conjugate(q):
-    x, y, z, w = q
-    return (-x, -y, -z, w)
-
-
-def _quat_multiply(q1, q2):
-    x1, y1, z1, w1 = q1
-    x2, y2, z2, w2 = q2
-    return (
-        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-    )
-
-
-def _rotate_vector(q, v):
-    x, y, z, w = _quat_normalise(q)
-    u = (x, y, z)
-    uu = _dot(u, u)
-    uv = _dot(u, v)
-    uxv = _cross(u, v)
-    return (
-        2.0 * uv * u[0] + (w * w - uu) * v[0] + 2.0 * w * uxv[0],
-        2.0 * uv * u[1] + (w * w - uu) * v[1] + 2.0 * w * uxv[1],
-        2.0 * uv * u[2] + (w * w - uu) * v[2] + 2.0 * w * uxv[2],
-    )
-
-
-def _transform_components(transform):
-    t = transform.transform.translation
-    q = transform.transform.rotation
-    return (t.x, t.y, t.z), (q.x, q.y, q.z, q.w)
-
-
-def _invert_transform(t_ab, q_ab):
-    q_ba = _quat_conjugate(_quat_normalise(q_ab))
-    t_ba = _rotate_vector(q_ba, (-t_ab[0], -t_ab[1], -t_ab[2]))
-    return t_ba, q_ba
-
-
-def _compose_transform(t_ab, q_ab, t_bc, q_bc):
-    q_ab_n = _quat_normalise(q_ab)
-    q_bc_n = _quat_normalise(q_bc)
-    t_bc_in_a = _rotate_vector(q_ab_n, t_bc)
-    t_ac = (
-        t_ab[0] + t_bc_in_a[0],
-        t_ab[1] + t_bc_in_a[1],
-        t_ab[2] + t_bc_in_a[2],
-    )
-    q_ac = _quat_multiply(q_ab_n, q_bc_n)
-    return t_ac, _quat_normalise(q_ac)
 
 
 class TagPosePublisher(Node):
@@ -115,13 +41,13 @@ class TagPosePublisher(Node):
                 Time(),
                 timeout=rclpy.duration.Duration(seconds=0.0),
             )
-            cam_to_tag = self.tf_buffer.lookup_transform(
-                self.camera_frame,
+            camera_to_detected_tag = self.tf_buffer.lookup_transform(
                 self.detected_tag_frame,
+                self.camera_frame,
                 Time(),
                 timeout=rclpy.duration.Duration(seconds=0.0),
             )
-            cam_to_base = self.tf_buffer.lookup_transform(
+            base_to_camera = self.tf_buffer.lookup_transform(
                 self.camera_frame,
                 self.target_frame,
                 Time(),
@@ -134,19 +60,26 @@ class TagPosePublisher(Node):
         ):
             return
 
-        map_to_tag_t, map_to_tag_q = _transform_components(map_to_tag)
-        cam_to_tag_t, cam_to_tag_q = _transform_components(cam_to_tag)
-        cam_to_base_t, cam_to_base_q = _transform_components(cam_to_base)
+        detected_tag_to_map = TransformStamped()
+        detected_tag_to_map.header = map_to_tag.header
+        detected_tag_to_map.child_frame_id = self.detected_tag_frame
+        detected_tag_to_map.transform = map_to_tag.transform
 
-        tag_to_cam_t, tag_to_cam_q = _invert_transform(cam_to_tag_t, cam_to_tag_q)
-        map_to_cam_t, map_to_cam_q = _compose_transform(
-            map_to_tag_t, map_to_tag_q, tag_to_cam_t, tag_to_cam_q
+        base_origin = Pose()
+        base_origin.orientation.w = 1.0
+        pose_in_camera = tf2_geometry_msgs.do_transform_pose(
+            base_origin, base_to_camera
         )
-        map_to_base_t, map_to_base_q = _compose_transform(
-            map_to_cam_t, map_to_cam_q, cam_to_base_t, cam_to_base_q
+        pose_in_detected_tag = tf2_geometry_msgs.do_transform_pose(
+            pose_in_camera, camera_to_detected_tag
+        )
+        pose_in_map = tf2_geometry_msgs.do_transform_pose(
+            pose_in_detected_tag, detected_tag_to_map
         )
 
-        dx, dy, dz = cam_to_tag_t
+        dx = camera_to_detected_tag.transform.translation.x
+        dy = camera_to_detected_tag.transform.translation.y
+        dz = camera_to_detected_tag.transform.translation.z
         distance = math.sqrt(dx * dx + dy * dy + dz * dz)
 
         # Distance-based covariance: accuracy degrades with range
@@ -154,15 +87,9 @@ class TagPosePublisher(Node):
         cov_yaw = (distance * 0.05) ** 2 + 0.01
 
         msg = PoseWithCovarianceStamped()
-        msg.header.stamp = cam_to_tag.header.stamp
+        msg.header.stamp = camera_to_detected_tag.header.stamp
         msg.header.frame_id = self.map_frame
-        msg.pose.pose.position.x = map_to_base_t[0]
-        msg.pose.pose.position.y = map_to_base_t[1]
-        msg.pose.pose.position.z = map_to_base_t[2]
-        msg.pose.pose.orientation.x = map_to_base_q[0]
-        msg.pose.pose.orientation.y = map_to_base_q[1]
-        msg.pose.pose.orientation.z = map_to_base_q[2]
-        msg.pose.pose.orientation.w = map_to_base_q[3]
+        msg.pose.pose = pose_in_map
 
         # 6x6 covariance matrix (row-major, only diagonal populated)
         cov = [0.0] * 36
