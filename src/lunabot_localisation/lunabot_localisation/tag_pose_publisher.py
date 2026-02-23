@@ -1,5 +1,6 @@
 import math
 import rclpy
+import tf2_ros
 from rclpy.node import Node
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener
@@ -35,7 +36,11 @@ class TagPosePublisher(Node):
                 Time(),
                 timeout=rclpy.duration.Duration(seconds=0.0),
             )
-        except Exception:
+        except (
+            tf2_ros.LookupException,
+            tf2_ros.ConnectivityException,
+            tf2_ros.ExtrapolationException,
+        ):
             return
 
         # Distance from camera to tag for covariance scaling
@@ -46,7 +51,11 @@ class TagPosePublisher(Node):
                 Time(),
                 timeout=rclpy.duration.Duration(seconds=0.0),
             )
-        except Exception:
+        except (
+            tf2_ros.LookupException,
+            tf2_ros.ConnectivityException,
+            tf2_ros.ExtrapolationException,
+        ):
             return
 
         dx = cam_to_tag.transform.translation.x
