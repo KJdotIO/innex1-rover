@@ -64,7 +64,7 @@ class TagPosePublisher(Node):
         distance = math.sqrt(dx * dx + dy * dy + dz * dz)
 
         # Distance-based covariance: accuracy degrades with range
-        cov_xy = (distance * 0.1) ** 2
+        cov_xy = max((distance * 0.1) ** 2, 0.01)
         cov_yaw = (distance * 0.05) ** 2 + 0.01
 
         msg = PoseWithCovarianceStamped()
@@ -93,6 +93,8 @@ class TagPosePublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = TagPosePublisher()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
