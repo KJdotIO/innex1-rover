@@ -30,6 +30,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main',
         ],
     },
 

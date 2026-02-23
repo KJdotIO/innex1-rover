@@ -14,8 +14,8 @@ rgbd_odometry:
 
 rtabmap:
   ros__parameters:
-    # Issue #58: RTAB-Map owns the map -> odom transform
-    publish_tf: true
+    # Global EKF now owns map -> odom; RTAB-Map only builds the map
+    publish_tf: false
     subscribe_depth: true
     approx_sync: true
     # Mapping resolution (matches Nav2)
