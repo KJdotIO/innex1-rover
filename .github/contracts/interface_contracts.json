@@ -1,0 +1,57 @@
+{
+  "topics": [
+    {
+      "name": "/hazards/front",
+      "type": "sensor_msgs/msg/PointCloud2",
+      "kind": "publisher",
+      "source": "src/lunabot_perception/lunabot_perception/hazard_detection.py"
+    },
+    {
+      "name": "/mission/excavate",
+      "type": "lunabot_interfaces/action/Excavate",
+      "kind": "action_server",
+      "source": "src/lunabot_control/lunabot_control/material_action_server.py"
+    },
+    {
+      "name": "/mission/deposit",
+      "type": "lunabot_interfaces/action/Deposit",
+      "kind": "action_server",
+      "source": "src/lunabot_control/lunabot_control/material_action_server.py"
+    }
+  ],
+  "tf_links": [
+    {
+      "parent": "map",
+      "child": "odom",
+      "kind": "ekf_tf",
+      "source": "src/lunabot_localisation/config/ekf.yaml",
+      "node": "ekf_filter_node_map",
+      "parent_param": "map_frame",
+      "child_param": "odom_frame"
+    },
+    {
+      "parent": "odom",
+      "child": "base_footprint",
+      "kind": "ekf_tf",
+      "source": "src/lunabot_localisation/config/ekf.yaml",
+      "node": "ekf_filter_node_odom",
+      "parent_param": "odom_frame",
+      "child_param": "base_link_frame"
+    },
+    {
+      "parent": "base_footprint",
+      "child": "base_link",
+      "kind": "xacro_joint",
+      "source": "src/external/leo_common-ros2/leo_description/urdf/macros.xacro",
+      "parent_pattern": "${link_prefix}base_footprint",
+      "child_pattern": "${link_prefix}base_link"
+    }
+  ],
+  "deferred_topics": [
+    "/mission/state",
+    "/mission/autonomy_mode",
+    "/mission/time_remaining_s",
+    "/mission/cycle_count",
+    "/mission/last_failure_reason"
+  ]
+}

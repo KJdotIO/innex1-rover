@@ -47,6 +47,11 @@ jobs:
           colcon build
         shell: bash
 
+      - name: Check interface contracts
+        run: |
+          python3 .github/scripts/check_interface_contracts.py
+        shell: bash
+
       - name: Run tests
         run: |
           source /opt/ros/humble/setup.bash
