@@ -103,6 +103,7 @@ src/
 ├── lunabot_bringup/         # System launch files
 ├── lunabot_control/         # Control algorithms
 ├── lunabot_description/     # Robot models and meshes
+├── lunabot_interfaces/      # Shared ROS action/message contracts
 ├── lunabot_localisation/    # Localisation and mapping
 ├── lunabot_navigation/      # Path planning
 ├── lunabot_perception/      # Computer vision
