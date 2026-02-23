@@ -5,7 +5,8 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Generate a launch description for material action stubs.
+    """
+    Generate a launch description for material action stubs.
 
     Launches the material action server used for excavation/deposition bench tests.
     """
