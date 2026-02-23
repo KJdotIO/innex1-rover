@@ -23,7 +23,11 @@ class MaterialActionClient(Node):
             Excavate,
             "/mission/excavate",
         )
-        self._deposit_client = ActionClient(self, Deposit, "/mission/deposit")
+        self._deposit_client = ActionClient(
+            self,
+            Deposit,
+            "/mission/deposit",
+        )
 
     def run_sequence(self):
         """Run one excavation request followed by one deposition request."""
@@ -36,7 +40,7 @@ class MaterialActionClient(Node):
             return 1
 
         excavate_goal = Excavate.Goal()
-        excavate_goal.mode = 0
+        excavate_goal.mode = Excavate.Goal.MODE_AUTO
         excavate_goal.timeout_s = float(self.get_parameter("excavate_timeout_s").value)
         excavate_goal.target_fill_fraction = 0.8
         excavate_goal.max_drive_speed_mps = 0.2
@@ -60,7 +64,7 @@ class MaterialActionClient(Node):
             return 1
 
         deposit_goal = Deposit.Goal()
-        deposit_goal.mode = 0
+        deposit_goal.mode = Deposit.Goal.MODE_AUTO
         deposit_goal.timeout_s = float(self.get_parameter("deposit_timeout_s").value)
         deposit_goal.dump_duration_s = float(
             self.get_parameter("dump_duration_s").value
@@ -92,11 +96,13 @@ class MaterialActionClient(Node):
 def main(args=None):
     """Run a one-shot material action sequence and exit with status code."""
     rclpy.init(args=args)
-    node = MaterialActionClient()
+    node = None
     try:
+        node = MaterialActionClient()
         status = node.run_sequence()
     finally:
-        node.destroy_node()
+        if node is not None:
+            node.destroy_node()
         rclpy.shutdown()
 
     if status != 0:

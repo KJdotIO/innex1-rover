@@ -1,13 +1,14 @@
-# Modes
+# Goal
+# Goal modes
 uint8 MODE_AUTO=0
 uint8 MODE_TELEOP_ASSIST=1
 
-# Feedback phases
-uint8 PHASE_PRECHECK=0
-uint8 PHASE_SPINUP=1
-uint8 PHASE_DIGGING=2
-uint8 PHASE_RETRACT=3
-
+uint8 mode
+float64 timeout_s
+float32 target_fill_fraction
+float32 max_drive_speed_mps
+---
+# Result
 # Result reason codes
 uint8 REASON_SUCCESS=0
 uint8 REASON_TIMEOUT=1
@@ -15,23 +16,25 @@ uint8 REASON_ESTOP=2
 uint8 REASON_DRIVER_FAULT=3
 uint8 REASON_JAM_OR_OVERCURRENT=4
 uint8 REASON_INTERLOCK_BLOCKED=5
+uint8 REASON_CANCELED=6
+uint8 REASON_FORCED_FAILURE=7
+uint8 REASON_SHUTDOWN=8
 
-# Goal
-uint8 mode
-float32 timeout_s
-float32 target_fill_fraction
-float32 max_drive_speed_mps
----
-# Result
 bool success
 uint8 reason_code
 string failure_reason
 float32 collected_mass_kg_estimate
-float32 duration_s
+float64 duration_s
 ---
 # Feedback
+# Feedback phases
+uint8 PHASE_PRECHECK=0
+uint8 PHASE_SPINUP=1
+uint8 PHASE_DIGGING=2
+uint8 PHASE_RETRACT=3
+
 uint8 phase
-float32 elapsed_s
+float64 elapsed_s
 float32 fill_fraction_estimate
 float32 excavation_motor_current_a
 bool jam_detected
