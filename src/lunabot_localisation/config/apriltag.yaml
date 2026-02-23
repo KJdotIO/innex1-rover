@@ -10,3 +10,6 @@
       blur: 0.0
       refine: true
       debug: false
+    tag:
+      ids: [0]
+      frames: ["tag36h11:0_detection"]
