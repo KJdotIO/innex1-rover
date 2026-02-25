@@ -1,42 +1,29 @@
 import os
-import platform
-import tempfile
 
 import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import ExecuteProcess, SetEnvironmentVariable, TimerAction
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
     world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
 
-    # switches to ogre 1 preflight if on mac. doesnt affect linux
-    if platform.system() == "Darwin":
-        with open(world_path, "r") as f:
-            content = f.read()
-        if "<render_engine>ogre2</render_engine>" in content:
-            patched_content = content.replace(
-                "<render_engine>ogre2</render_engine>",
-                "<render_engine>ogre</render_engine>",
-            )
-            tmp_world = os.path.join(tempfile.gettempdir(), "moon_yard_mac.sdf")
-            with open(tmp_world, "w") as f:
-                f.write(patched_content)
-            world_path = tmp_world
-            print(f"macOS detected: Using patched Ogre1 world at {world_path}")
-
-    # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our custom models
+    # Set Gazebo Classic model/resource paths so custom models resolve.
     models_path = os.path.join(pkg_lunabot_simulation, "models")
-    gz_resource_path = os.environ.get("GZ_SIM_RESOURCE_PATH", "")
-    if models_path not in gz_resource_path:
-        os.environ["GZ_SIM_RESOURCE_PATH"] = models_path + ":" + gz_resource_path
+    gazebo_model_path = os.environ.get("GAZEBO_MODEL_PATH", "")
+    gazebo_resource_path = os.environ.get("GAZEBO_RESOURCE_PATH", "")
+    model_path_value = (
+        models_path if not gazebo_model_path else f"{models_path}:{gazebo_model_path}"
+    )
+    resource_path_value = (
+        models_path
+        if not gazebo_resource_path
+        else f"{models_path}:{gazebo_resource_path}"
+    )
 
     robot_description = xacro.process(
         os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
@@ -47,12 +34,18 @@ def generate_launch_description():
     spawn_y = "0.0"
     spawn_z = "0.5"  # Start above surface, gravity will settle it
 
-    # we'll run the sim without gazebo gui to save resources for now
-    gz_sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
-        ),
-        launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
+    # Run Gazebo Classic server-only to keep resource usage low.
+    gazebo_server = ExecuteProcess(
+        cmd=[
+            "gzserver",
+            "--verbose",
+            "-s",
+            "libgazebo_ros_init.so",
+            "-s",
+            "libgazebo_ros_factory.so",
+            world_path,
+        ],
+        output="screen",
     )
 
     robot_state_publisher = Node(
@@ -67,14 +60,14 @@ def generate_launch_description():
     )
 
     spawn_robot = Node(
-        package="ros_gz_sim",
-        executable="create",
+        package="gazebo_ros",
+        executable="spawn_entity.py",
         name="spawn_leo",
         output="screen",
         arguments=[
             "-topic",
             "robot_description",
-            "-name",
+            "-entity",
             "leo_rover",
             "-x",
             spawn_x,
@@ -85,41 +78,12 @@ def generate_launch_description():
         ],
     )
 
-    clock_bridge = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        name="clock_bridge",
-        arguments=["/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock"],
-        output="screen",
-    )
-
-    robot_bridge = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        name="robot_bridge",
-        arguments=[
-            "/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
-            "/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
-            # "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
-            "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
-            "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
-            "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan",
-            "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
-            "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/model/leo_rover/pose@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
-        ],
-        output="screen",
-    )
-
     return LaunchDescription(
         [
-            gz_sim,
+            SetEnvironmentVariable("GAZEBO_MODEL_PATH", model_path_value),
+            SetEnvironmentVariable("GAZEBO_RESOURCE_PATH", resource_path_value),
+            gazebo_server,
             robot_state_publisher,
-            spawn_robot,
-            clock_bridge,
-            robot_bridge,
+            TimerAction(period=3.0, actions=[spawn_robot]),
         ]
     )

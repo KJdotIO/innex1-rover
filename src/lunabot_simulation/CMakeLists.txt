@@ -32,7 +32,14 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
-# Set GZ_SIM_RESOURCE_PATH so Gazebo can find our models
-set(ENV{GZ_SIM_RESOURCE_PATH} "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/models:$ENV{GZ_SIM_RESOURCE_PATH}")
+install(PROGRAMS
+  scripts/check_sim_topics.py
+  scripts/check_motion_response.py
+  scripts/smoke_test_classic.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Keep model path available when running Gazebo Classic locally.
+set(ENV{GAZEBO_MODEL_PATH} "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/models:$ENV{GAZEBO_MODEL_PATH}")
 
 ament_package()

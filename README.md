@@ -6,7 +6,7 @@ Software repository for the University of Leicester UK Lunabotics team.
 
 ### Ubuntu 22.04 (Native or OrbStack)
 
-Run these commands to install ROS 2 Humble, Gazebo Fortress, and required dependencies:
+Run these commands to install ROS 2 Humble, Gazebo Classic, and required dependencies:
 
 ```bash
 sudo apt update && sudo apt install -y locales curl gnupg2 lsb-release
@@ -19,18 +19,16 @@ sudo add-apt-repository -y universe
 curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-# Add Gazebo (OSRF) repository
-sudo curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] https://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
-
 sudo apt update && sudo apt install -y \
   ros-humble-desktop \
   ros-dev-tools \
   python3-rosdep \
-  ros-humble-ros-gz \
+  gazebo \
+  ros-humble-gazebo-ros \
+  ros-humble-gazebo-plugins \
+  ros-humble-gazebo-ros-pkgs \
   ros-humble-teleop-twist-keyboard \
-  ignition-fortress \
-  ignition-launch-cli
+  ros-humble-foxglove-bridge
 sudo rosdep init || true && rosdep update
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 source ~/.bashrc
@@ -54,14 +52,12 @@ sudo apt update && sudo apt install -y ros-humble-foxglove-bridge
 ```bash
 git clone https://github.com/KJdotIO/innex1-rover.git
 cd innex1-rover
-rosdep install --from-paths src -y --ignore-src
+rosdep install --from-paths src/lunabot_* src/external/leo_common-ros2 -y --ignore-src
 colcon build --symlink-install
 source install/setup.bash
-
-# Add shortcut for GZ Web
-echo "alias gzweb='ign launch \$(ros2 pkg prefix lunabot_simulation)/share/lunabot_simulation/config/websocket.ign'" >> ~/.bashrc
-source ~/.bashrc
 ```
+
+`src/external/leo_simulator-ros2` is ignored on this branch because it is tied to Gazebo Sim (`ros_gz`).
 
 ## Running the Simulation
 
@@ -73,15 +69,21 @@ The simulation runs in headless mode by default to conserve resources.
 ros2 launch lunabot_simulation moon_yard.launch.py
 ```
 
+### Run Smoke Test (Classic)
+
+```bash
+./src/lunabot_simulation/scripts/smoke_test_classic.sh
+```
+
+This checks Leo + Lunabot core simulation topics and confirms one message is received on each.
+
 ### Visualisation
 
 | Tool | Purpose | Command |
 | :--- | :--- | :--- |
 | Rviz2 | Standard ROS visualisation | `ros2 run rviz2 rviz2` |
-| GZ Web | Arena geometry and world layout | `gzweb` |
 | Foxglove Studio | Sensor data and robot state | `ros2 run foxglove_bridge foxglove_bridge` |
 
-For GZ Web, open https://app.gazebosim.org/visualization and connect to `ws://localhost:9002`.
 For Foxglove Studio, connect to `ws://localhost:8765`.
 
 ### Manual Control
@@ -118,7 +120,7 @@ src/
 With symlink install, you can edit `.sdf` and `.launch.py` files without rebuilding:
 
 1. Edit the file
-2. Kill Gazebo: `pkill -9 -f "gz sim"`
+2. Kill Gazebo: `pkill -9 -f gzserver`
 3. Relaunch: `ros2 launch lunabot_simulation moon_yard.launch.py`
 
 ### When to Rebuild
@@ -149,10 +151,10 @@ CI runs `.github/scripts/check_interface_contracts.py` to catch renamed or missi
 Ensure launch and worlds directories are installed in `CMakeLists.txt`, then rebuild.
 
 **Multiple Gazebo instances:**
-Kill all: `pkill -9 -f "gz sim"`
+Kill all: `pkill -9 -f gzserver`
 
 **Models not loading:**
-First download requires internet. Models cache locally in `~/.gz/fuel/` for offline use.
+First download requires internet. Models cache locally under `~/.gazebo/models`.
 
 ## Contributing
 
@@ -165,6 +167,6 @@ Licensed under Apache-2.0. See [LICENSE](LICENSE) file.
 ## Links
 
 - [ROS 2 Humble Documentation](https://docs.ros.org/en/humble/)
-- [Gazebo Sim Documentation](https://gazebosim.org/docs)
+- [Gazebo Classic with ROS 2](https://classic.gazebosim.org/tutorials?tut=ros2_installing)
 - [Leo Rover Documentation](https://docs.fictionlab.pl/leo-rover)
 - [UK Lunabotics Website](https://uklunabotics.co.uk/)
