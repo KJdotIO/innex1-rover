@@ -541,8 +541,6 @@
         <right_joint>wheel_FR_joint</right_joint>
         <right_joint>wheel_RR_joint</right_joint>
         <wheel_separation>0.358</wheel_separation>
-        <wheel_separation>0.358</wheel_separation>
-        <wheel_diameter>0.125</wheel_diameter>
         <wheel_diameter>0.125</wheel_diameter>
         <max_wheel_torque>2.0</max_wheel_torque>
         <max_wheel_acceleration>3.0</max_wheel_acceleration>

@@ -115,7 +115,6 @@
           <namespace>/</namespace>
           <remapping>camera_front/image_raw:=camera_front/image</remapping>
           <remapping>camera_front/depth/image_raw:=camera_front/depth_image</remapping>
-          <remapping>camera_front/points:=camera_front/points</remapping>
         </ros>
         <camera_name>camera_front</camera_name>
         <frame_name>camera_front_optical_frame</frame_name>
