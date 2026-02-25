@@ -34,6 +34,7 @@ if [[ ! -f "/opt/ros/humble/setup.bash" ]]; then
 fi
 
 source /opt/ros/humble/setup.bash
+# shellcheck source=/dev/null
 source "${WORKSPACE_SETUP}"
 
 LOG_DIR="${ROOT_DIR}/logs"
@@ -73,7 +74,7 @@ declare -a TOPICS=(
 echo "Checking first message on each required topic..."
 for topic in "${TOPICS[@]}"; do
   echo "- ${topic}"
-  timeout 20 ros2 topic echo --once "${topic}" >/dev/null
+  timeout 20 ros2 topic echo --once --qos-reliability best_effort "${topic}" >/dev/null
 done
 
 echo "Checking cmd_vel to odom motion response..."

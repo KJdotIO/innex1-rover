@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--topics",
-        nargs="*",
+        nargs="+",
         default=DEFAULT_TOPICS,
         help="Topic names that must be present",
     )

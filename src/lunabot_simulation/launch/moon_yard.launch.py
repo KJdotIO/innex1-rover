@@ -8,7 +8,8 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Generate a launch description for moon_yard.
+    """
+    Generate a launch description for moon_yard.
 
     Starts Gazebo Classic, runs robot_state_publisher, and spawns the rover.
     """
@@ -88,6 +89,6 @@ def generate_launch_description():
             SetEnvironmentVariable("GAZEBO_RESOURCE_PATH", resource_path_value),
             gazebo_server,
             robot_state_publisher,
-            TimerAction(period=3.0, actions=[spawn_robot]),
+            TimerAction(period=5.0, actions=[spawn_robot]),
         ]
     )
