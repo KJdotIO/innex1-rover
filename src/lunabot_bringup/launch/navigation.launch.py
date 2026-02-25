@@ -13,7 +13,7 @@ def generate_launch_description():
     """
     Generate a launch description for the navigation stack.
 
-    This includes the EKF localisation and the Nav2 servers.
+    This includes EKF localisation, hazard detection, and Nav2 servers.
     """
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
