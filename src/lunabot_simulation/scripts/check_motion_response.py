@@ -8,23 +8,41 @@ import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
 
 class MotionProbe(Node):
+    """Probe node that commands velocity and watches odometry."""
+
     def __init__(self):
+        """Initialise publishers/subscribers for motion checks."""
         super().__init__("sim_motion_probe")
         self._last_odom = None
-        self._odom_sub = self.create_subscription(Odometry, "/odom", self._odom_cb, 10)
-        self._cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
+        odom_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+        )
+        cmd_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self._odom_sub = self.create_subscription(
+            Odometry, "/odom", self._odom_cb, odom_qos
+        )
+        self._cmd_pub = self.create_publisher(Twist, "/cmd_vel", cmd_qos)
 
     def _odom_cb(self, msg: Odometry) -> None:
         self._last_odom = msg
 
     @property
     def last_odom(self):
+        """Return the latest odometry message, if any."""
         return self._last_odom
 
     def send_cmd(self, linear_x: float, angular_z: float) -> None:
+        """Publish a single velocity command."""
         msg = Twist()
         msg.linear.x = linear_x
         msg.angular.z = angular_z
@@ -32,6 +50,7 @@ class MotionProbe(Node):
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI options for the motion check."""
     parser = argparse.ArgumentParser(description="Verify robot moves after /cmd_vel")
     parser.add_argument("--timeout", type=float, default=25.0)
     parser.add_argument("--drive-seconds", type=float, default=3.0)
@@ -42,10 +61,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def odom_xy(odom: Odometry):
+    """Return planar (x, y) position from an odometry message."""
     return odom.pose.pose.position.x, odom.pose.pose.position.y
 
 
 def main() -> int:
+    """Run the motion check and return a shell-friendly exit code."""
     args = parse_args()
     rclpy.init()
     node = MotionProbe()
@@ -85,9 +106,12 @@ def main() -> int:
 
     print(f"Odom distance travelled: {distance:.4f} m")
     if distance < args.min_distance:
-        print(
-            f"Movement check failed (distance {distance:.4f} m < threshold {args.min_distance:.4f} m)"
+        threshold_msg = (
+            "Movement check failed "
+            f"(distance {distance:.4f} m < "
+            f"threshold {args.min_distance:.4f} m)"
         )
+        print(threshold_msg)
         return 1
 
     print("Movement check passed")

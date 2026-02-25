@@ -8,6 +8,10 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    """Generate a launch description for moon_yard.
+
+    Starts Gazebo Classic, runs robot_state_publisher, and spawns the rover.
+    """
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
     world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")

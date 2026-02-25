@@ -17,8 +17,13 @@ sudo apt install -y \
 
 ```bash
 ros2 launch lunabot_simulation moon_yard.launch.py
-ros2 run gazebo_ros spawn_entity.py -topic robot_description -entity leo_rover
 ./src/lunabot_simulation/scripts/smoke_test_classic.sh
+```
+
+Manual spawn (only if you are not using `moon_yard.launch.py`):
+
+```bash
+ros2 run gazebo_ros spawn_entity.py -topic robot_description -entity leo_rover
 ```
 
 `moon_yard.launch.py` starts `gzserver` with:

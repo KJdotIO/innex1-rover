@@ -23,11 +23,15 @@ DEFAULT_TOPICS = [
 
 
 class TopicProbe(Node):
+    """Small node used for topic-discovery checks."""
+
     def __init__(self):
+        """Initialise the topic probe node."""
         super().__init__("sim_topic_probe")
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI options for topic-discovery checks."""
     parser = argparse.ArgumentParser(
         description="Check required ROS topics are present"
     )
@@ -47,6 +51,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run topic checks and return a shell-friendly exit code."""
     args = parse_args()
     deadline = time.time() + args.timeout
 
