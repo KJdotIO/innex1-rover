@@ -85,16 +85,18 @@ Any abnormal behavior (e.g., unexpected node shutdown, sensor data failure) shou
 
 Review the data and determine if the anomaly is critical (requires abort) or non-critical (can be resolved with minor adjustments).
 
-Team members should report findings via the designated communication channels.
+Anomaly should be documented, fixing steps noted.
 
 ### Recovery Plan
 
+For dry-runs:
 Attempt soft recovery (e.g., restarting a node, re-sending a command):
 
 `ros2 node restart <node_name>`
 `ros2 service call /restart_task <parameters>`
 
-If recovery fails, initiate hard recovery or abort procedure.
+Otherwise:
+If recovery fails, manual control is authorised given detrimental anomalies.
 
 ## Abort Handling Procedure
 
