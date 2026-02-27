@@ -17,8 +17,15 @@ sudo apt install -y \
 
 ```bash
 ros2 launch lunabot_simulation moon_yard.launch.py
+ros2 launch lunabot_simulation moon_yard.launch.py gui:=true
 ./src/lunabot_simulation/scripts/smoke_test_classic.sh
 ```
+
+Useful launch options:
+
+- `gui:=true` starts `gzclient` to view the arena.
+- `spawn_delay:=<seconds>` adjusts the delay before `spawn_entity.py` runs.
+- `spawn_timeout:=<seconds>` adjusts service wait timeout for robot spawn.
 
 Manual spawn (only if you are not using `moon_yard.launch.py`):
 

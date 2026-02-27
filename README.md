@@ -69,6 +69,12 @@ The simulation runs in headless mode by default to conserve resources.
 ros2 launch lunabot_simulation moon_yard.launch.py
 ```
 
+To open the Gazebo Classic GUI (arena view):
+
+```bash
+ros2 launch lunabot_simulation moon_yard.launch.py gui:=true
+```
+
 ### Run Smoke Test (Classic)
 
 ```bash

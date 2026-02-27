@@ -2,8 +2,15 @@ import os
 
 import xacro
 from ament_index_python.packages import get_package_share_directory
+from launch.conditions import IfCondition
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, SetEnvironmentVariable, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    SetEnvironmentVariable,
+    TimerAction,
+)
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -16,6 +23,9 @@ def generate_launch_description():
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
     world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
+    gui = LaunchConfiguration("gui")
+    spawn_delay = LaunchConfiguration("spawn_delay")
+    spawn_timeout = LaunchConfiguration("spawn_timeout")
 
     # Set Gazebo Classic model/resource paths so custom models resolve.
     models_path = os.path.join(pkg_lunabot_simulation, "models")
@@ -53,6 +63,12 @@ def generate_launch_description():
         output="screen",
     )
 
+    gazebo_client = ExecuteProcess(
+        cmd=["gzclient"],
+        output="screen",
+        condition=IfCondition(gui),
+    )
+
     robot_state_publisher = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
@@ -74,6 +90,8 @@ def generate_launch_description():
             "robot_description",
             "-entity",
             "leo_rover",
+            "-timeout",
+            spawn_timeout,
             "-x",
             spawn_x,
             "-y",
@@ -85,10 +103,26 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "gui",
+                default_value="false",
+                description="Start Gazebo Classic client (gzclient)",
+            ),
+            DeclareLaunchArgument(
+                "spawn_delay",
+                default_value="5.0",
+                description="Delay in seconds before running spawn_entity",
+            ),
+            DeclareLaunchArgument(
+                "spawn_timeout",
+                default_value="120.0",
+                description="Timeout in seconds for spawn_entity service wait",
+            ),
             SetEnvironmentVariable("GAZEBO_MODEL_PATH", model_path_value),
             SetEnvironmentVariable("GAZEBO_RESOURCE_PATH", resource_path_value),
             gazebo_server,
+            gazebo_client,
             robot_state_publisher,
-            TimerAction(period=5.0, actions=[spawn_robot]),
+            TimerAction(period=spawn_delay, actions=[spawn_robot]),
         ]
     )
