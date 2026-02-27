@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="lunabot">
 <xacro:include filename="$(find leo_description)/urdf/leo_sim.urdf.xacro" />
 
-  <!-- <link name="lidar_link">
+  <link name="lidar_link">
     <visual>
       <geometry>
         <cylinder length="0.05" radius="0.03"/>
@@ -28,13 +28,11 @@
     <origin xyz="0.1 0.0 0.03" rpy="0 0 0"/>
   </joint>
 
-    <gazebo reference="lidar_link">
-    <sensor name="lidar" type="gpu_lidar">
+  <gazebo reference="lidar_link">
+    <sensor name="lidar" type="ray">
         <always_on>1</always_on>
-        <update_rate>5</update_rate>
-        <topic>scan</topic>
-        <gz_frame_id>lidar_link</gz_frame_id>
-        <lidar>
+        <update_rate>10</update_rate>
+        <ray>
         <scan>
             <horizontal>
             <samples>180</samples>
@@ -48,23 +46,18 @@
             <max>10.0</max>
             <resolution>0.01</resolution>
         </range>
-        </lidar>
+        </ray>
         <visualize>false</visualize>
+        <plugin name="lidar_plugin" filename="libgazebo_ros_ray_sensor.so">
+          <ros>
+            <namespace>/</namespace>
+            <remapping>~/out:=scan</remapping>
+          </ros>
+          <output_type>sensor_msgs/LaserScan</output_type>
+          <frame_name>lidar_link</frame_name>
+        </plugin>
     </sensor>
-    </gazebo> -->
-    <gazebo>
-      <plugin
-            filename="ignition-gazebo-pose-publisher-system"
-            name="ignition::gazebo::systems::PosePublisher"
-        >
-        <publish_link_poses>true</publish_link_poses>
-        <publish_sensor_poses>true</publish_sensor_poses>
-        <publish_nested_model_poses>true</publish_nested_model_poses>
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-        <static_publisher>true</static_publisher>
-        <static_update_frequency>1</static_update_frequency>
-      </plugin>
-    </gazebo>
+  </gazebo>
 
     <link name="camera_front_link">
     <visual>
@@ -103,7 +96,7 @@
 
 
     <gazebo reference="camera_front_link">
-      <sensor name="camera_front" type="rgbd_camera">
+      <sensor name="camera_front" type="depth">
       <camera>
         <horizontal_fov>1.57</horizontal_fov>
         <image>
@@ -117,8 +110,15 @@
       </camera>
       <always_on>1</always_on>
       <update_rate>10</update_rate>
-      <topic>camera_front</topic>
-        <gz_frame_id>camera_front_link</gz_frame_id>
+      <plugin name="camera_front_plugin" filename="libgazebo_ros_camera.so">
+        <ros>
+          <namespace>/</namespace>
+          <remapping>camera_front/image_raw:=camera_front/image</remapping>
+          <remapping>camera_front/depth/image_raw:=camera_front/depth_image</remapping>
+        </ros>
+        <camera_name>camera_front</camera_name>
+        <frame_name>camera_front_optical_frame</frame_name>
+      </plugin>
       </sensor>
     </gazebo>
 </robot>
