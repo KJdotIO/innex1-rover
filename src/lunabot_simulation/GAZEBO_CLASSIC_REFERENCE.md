@@ -69,3 +69,4 @@ The smoke script also runs a movement check by publishing `/cmd_vel` and confirm
 
 - Gazebo Classic is EOL upstream. This branch is a practical fallback for local stability.
 - The vendor package `src/external/leo_simulator-ros2` is disabled here using `COLCON_IGNORE` because it is Gazebo Sim / `ros_gz` specific.
+- Gazebo Classic uses OGRE-based rendering. On macOS, the Classic docs rely on Homebrew plus XQuartz for GUI support.
