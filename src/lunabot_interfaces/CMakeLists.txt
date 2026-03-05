@@ -7,6 +7,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Excavate.action"
   "action/Deposit.action"
+  "srv/GetReadiness.srv"
 )
 
 ament_export_dependencies(rosidl_default_runtime)
