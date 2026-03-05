@@ -179,3 +179,11 @@ ekf_filter_node_map:
     pose0_differential: false
     pose0_relative: false
     pose0_rejection_threshold: 5.0
+    
+    readiness_gate:
+      ros__parameters:
+        max_position_variance: 0.0625
+        max_yaw_variance: 0.002
+        topic_timeout: 3.0
+        required_frames: ["map", "odom", "base_link"]
+    
