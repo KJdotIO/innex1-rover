@@ -41,7 +41,7 @@ class HazardDetectionNode(Node):
         self.declare_parameter("min_points_per_cloud", 20)
 
         input_topic = self._param_str("input_topic")
-        positive_topic = self._param_str("positive_topic")
+        configured_positive_topic = self._param_str("positive_topic")
         negative_topic = self._param_str("negative_topic")
 
         self.publish_debug_images = self._param_bool("publish_debug_images")
@@ -61,7 +61,17 @@ class HazardDetectionNode(Node):
         self.negative_min_row_ratio = self._param_float("negative_min_row_ratio")
         self.min_points_per_cloud = self._param_int("min_points_per_cloud")
 
-        self.positive_publisher = self.create_publisher(PointCloud2, positive_topic, 10)
+        if configured_positive_topic != "/hazards/front":
+            self.get_logger().warn(
+                "positive_topic is overridden but interface contract requires "
+                "publishing on /hazards/front"
+            )
+
+        self.positive_publisher = self.create_publisher(
+            PointCloud2,
+            "/hazards/front",
+            10,
+        )
         self.negative_publisher = self.create_publisher(PointCloud2, negative_topic, 10)
 
         self.mask_publisher = None
