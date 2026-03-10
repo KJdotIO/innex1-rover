@@ -2,9 +2,10 @@
 """Rover doctor: setup and runtime preflight checks.
 
 Usage:
-  python3 tools/doctor.py
+  python3 tools/doctor.py                 # setup checks by default
   python3 tools/doctor.py --mode setup
   python3 tools/doctor.py --mode runtime
+  python3 tools/doctor.py --mode all      # setup + runtime (runtime auto-skips if stack is not up)
 """
 
 from __future__ import annotations
@@ -32,7 +33,15 @@ class CheckResult:
 
 
 def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        return subprocess.CompletedProcess(
+            cmd,
+            returncode=124,
+            stdout=exc.stdout or "",
+            stderr=(exc.stderr or "") + "\ncommand timed out",
+        )
 
 
 def check_python_version() -> CheckResult:
@@ -204,12 +213,32 @@ def final_exit_code(results: List[CheckResult]) -> int:
     return 0
 
 
+def should_run_runtime_checks() -> bool:
+    """Decide whether runtime checks are meaningful right now.
+
+    Runtime checks are intended for a launched stack. If nothing relevant is up,
+    we skip them in default/all mode to avoid noisy false alarms.
+    """
+    proc = run_cmd(["ros2", "node", "list"], timeout=8)
+    if proc.returncode != 0:
+        return False
+
+    nodes = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
+    runtime_markers = {
+        "/bt_navigator",
+        "/planner_server",
+        "/controller_server",
+        "/hazard_detection",
+    }
+    return any(marker in nodes for marker in runtime_markers)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Lunabotics rover doctor checks")
     parser.add_argument(
         "--mode",
         choices=["setup", "runtime", "all"],
-        default="all",
+        default="setup",
         help="Which checks to run",
     )
     args = parser.parse_args()
@@ -248,10 +277,24 @@ def main() -> int:
         print_results(setup_results, "Setup checks")
         all_results.extend(setup_results)
 
-    if args.mode in {"runtime", "all"}:
+    if args.mode == "runtime":
         runtime_results = run_checks(runtime_checks)
         print_results(runtime_results, "Runtime checks")
         all_results.extend(runtime_results)
+    elif args.mode == "all":
+        if should_run_runtime_checks():
+            runtime_results = run_checks(runtime_checks)
+            print_results(runtime_results, "Runtime checks")
+            all_results.extend(runtime_results)
+        else:
+            skip_msg = CheckResult(
+                "PASS",
+                "Runtime checks",
+                "Skipped (no active nav/runtime nodes detected)",
+                "Run with '--mode runtime' after bringup to validate live graph health.",
+            )
+            print_results([skip_msg], "Runtime checks")
+            all_results.append(skip_msg)
 
     exit_code = final_exit_code(all_results)
     summary = "PASS" if exit_code == 0 else "WARN" if exit_code == 1 else "FAIL"
