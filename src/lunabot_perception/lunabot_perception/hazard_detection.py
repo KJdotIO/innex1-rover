@@ -198,12 +198,35 @@ class HazardDetectionNode(Node):
             field_names=("x", "y", "z"),
             skip_nans=True,
         )
-        points = np.asarray(list(generator), dtype=np.float64)
-        if points.size == 0:
+        rows = list(generator)
+        if not rows:
             return np.empty((0, 3), dtype=np.float64)
 
-        if points.ndim == 1:
-            points = points.reshape((-1, 3))
+        first = rows[0]
+        if isinstance(first, np.void) and getattr(first, "dtype", None):
+            if first.dtype.names and all(
+                name in first.dtype.names for name in ("x", "y", "z")
+            ):
+                x_vals = np.asarray(
+                    [row["x"] for row in rows], dtype=np.float64
+                )
+                y_vals = np.asarray(
+                    [row["y"] for row in rows], dtype=np.float64
+                )
+                z_vals = np.asarray(
+                    [row["z"] for row in rows], dtype=np.float64
+                )
+                points = np.column_stack([x_vals, y_vals, z_vals])
+            else:
+                points = np.asarray(
+                    [[row[0], row[1], row[2]] for row in rows],
+                    dtype=np.float64,
+                )
+        else:
+            points = np.asarray(
+                [[row[0], row[1], row[2]] for row in rows],
+                dtype=np.float64,
+            )
 
         finite_mask = np.all(np.isfinite(points), axis=1)
         return points[finite_mask]
