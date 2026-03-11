@@ -1,8 +1,21 @@
 <root BTCPP_format="4" main_tree_to_execute="MissionNavigateToPoseShell">
   <BehaviorTree ID="MissionNavigateToPoseShell">
     <Sequence name="MissionShellSequence">
-      <!-- TODO(issue#107): Replace this placeholder with a real readiness condition node/service check. -->
-      <AlwaysSuccess name="ReadinessPlaceholder"/>
+      <!-- Readiness gate: all checks must pass before autonomy starts -->
+      <Sequence name="ReadinessGate">
+        <RosTopicSubscriberCheck
+          topic="/odometry/filtered"
+          timeout="5.0"
+          name="CheckOdometry"/>
+        <RosTopicSubscriberCheck
+          topic="/hazards/front"
+          timeout="5.0"
+          name="CheckHazards"/>
+        <RosTopicSubscriberCheck
+          topic="/camera_front/points"
+          timeout="5.0"
+          name="CheckCamera"/>
+      </Sequence>
 
       <RecoveryNode number_of_retries="3" name="NavigateRecoveryShell">
         <PipelineSequence name="NavigateWithReplanning">
