@@ -72,7 +72,36 @@
         </ReactiveFallback>
       </RecoveryNode>
 
-      <!-- TODO(issue#107): Add mission-level branches (excavate/deposit/cycle) as BT subtrees. -->
+      <!-- Mission loop: navigate → excavate → navigate → deposit → repeat -->
+      <RepeatUntilFailure name="MissionCycleLoop">
+        <Sequence name="MissionCycle">
+
+          <!-- Step 1: Navigate to dig site -->
+          <!-- TODO: Replace x/y/z/qw with real dig site coordinates from field map -->
+          <NavigateToPose
+            name="NavigateToDigSite"
+            goal="{dig_site_pose}"/>
+
+          <!-- Step 2: Excavate -->
+          <ExecuteAction
+            name="Excavate"
+            action_name="/mission/excavate"
+            timeout="30.0"/>
+
+          <!-- Step 3: Navigate to dump site -->
+          <!-- TODO: Replace x/y/z/qw with real dump site coordinates from field map -->
+          <NavigateToPose
+            name="NavigateToDumpSite"
+            goal="{dump_site_pose}"/>
+
+          <!-- Step 4: Deposit -->
+          <ExecuteAction
+            name="Deposit"
+            action_name="/mission/deposit"
+            timeout="15.0"/>
+
+        </Sequence>
+      </RepeatUntilFailure>
     </Sequence>
   </BehaviorTree>
 </root>
