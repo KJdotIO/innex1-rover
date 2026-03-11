@@ -70,7 +70,7 @@ global_costmap:
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: hazards_front front_points_clear
+        observation_sources: hazards_front hazards_front_negative front_points_clear
         hazards_front:
           # Produced by lunabot_perception/hazard_detection
           topic: /hazards/front
@@ -81,6 +81,21 @@ global_costmap:
           expected_update_rate: 5.0
           max_obstacle_height: 0.50
           min_obstacle_height: 0.10
+          obstacle_max_range: 3.0
+          obstacle_min_range: 0.1
+          raytrace_max_range: 2.5
+          raytrace_min_range: 0.5
+
+        hazards_front_negative:
+          # Crater-edge / negative hazards from perception pipeline.
+          topic: /hazards/front_negative
+          data_type: "PointCloud2"
+          marking: true
+          clearing: false
+          observation_persistence: 0.7
+          expected_update_rate: 5.0
+          max_obstacle_height: 0.50
+          min_obstacle_height: -0.50
           obstacle_max_range: 3.0
           obstacle_min_range: 0.1
           raytrace_max_range: 2.5
@@ -124,7 +139,7 @@ local_costmap:
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: hazards_front front_points_clear
+        observation_sources: hazards_front hazards_front_negative front_points_clear
         hazards_front:
           # Produced by lunabot_perception/hazard_detection
           topic: /hazards/front
@@ -135,6 +150,21 @@ local_costmap:
           expected_update_rate: 5.0
           max_obstacle_height: 0.50
           min_obstacle_height: 0.10
+          obstacle_max_range: 3.0
+          obstacle_min_range: 0.1
+          raytrace_max_range: 2.5
+          raytrace_min_range: 0.5
+
+        hazards_front_negative:
+          # Crater-edge / negative hazards from perception pipeline.
+          topic: /hazards/front_negative
+          data_type: "PointCloud2"
+          marking: true
+          clearing: false
+          observation_persistence: 0.7
+          expected_update_rate: 5.0
+          max_obstacle_height: 0.50
+          min_obstacle_height: -0.50
           obstacle_max_range: 3.0
           obstacle_min_range: 0.1
           raytrace_max_range: 2.5

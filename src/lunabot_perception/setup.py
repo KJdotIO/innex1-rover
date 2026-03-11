@@ -12,12 +12,12 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "numpy"],
     zip_safe=True,
     maintainer="drkwonk",
     maintainer_email="drkwonk@todo.todo",
-    description="TODO: Package description",
-    license="TODO: License declaration",
+    description="Hazard detection and obstacle processing nodes",
+    license="Apache-2.0",
     extras_require={
         "test": [
             "pytest",

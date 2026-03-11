@@ -36,6 +36,24 @@ Examples:
 - [ ] Changes tested in simulation
 - [ ] Documentation updated
 - [ ] Debug statements removed
+- [ ] Interface contracts pass: `python3 .github/scripts/check_interface_contracts.py`
+
+## Interface Contracts (CI)
+
+This repo enforces required ROS interfaces in CI via:
+
+```bash
+python3 .github/scripts/check_interface_contracts.py
+```
+
+Important: the checker parses Python AST and matches literal topic names in calls like
+`create_publisher(...)` and `create_subscription(...)`.
+
+- Use literal topic strings for contracted interfaces (example: `"/hazards/front"`).
+- If a topic must be configurable, keep the contracted interface as a literal and add
+  additional configurable publishers/subscribers separately.
+- If an interface intentionally changes, update `.github/contracts/interface_contracts.json`
+  in the same PR.
 
 ## Adding Code
 
