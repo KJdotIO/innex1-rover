@@ -55,6 +55,7 @@ jobs:
       - name: Run tests
         run: |
           source /opt/ros/humble/setup.bash
+          source install/setup.bash
           colcon test
         shell: bash
 
