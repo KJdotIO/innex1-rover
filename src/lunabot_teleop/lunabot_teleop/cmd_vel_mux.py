@@ -58,9 +58,9 @@ class CmdVelMux(Node):
     @staticmethod
     def _is_nonzero(msg: Twist) -> bool:
         """Return True if any velocity component is non-zero."""
-        l = msg.linear
-        a = msg.angular
-        return any(v != 0.0 for v in (l.x, l.y, l.z, a.x, a.y, a.z))
+        lin = msg.linear
+        ang = msg.angular
+        return any(v != 0.0 for v in (lin.x, lin.y, lin.z, ang.x, ang.y, ang.z))
 
     def _teleop_cb(self, msg: Twist) -> None:
         """Record teleop arrival time and forward if operator is active."""
@@ -79,6 +79,7 @@ class CmdVelMux(Node):
         self._publish_mode(MODE_AUTONOMY)
 
     def _publish_mode(self, mode: str) -> None:
+        """Publish the current autonomy mode string."""
         mode_msg = String()
         mode_msg.data = mode
         self._pub_mode.publish(mode_msg)
