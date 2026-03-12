@@ -29,6 +29,7 @@ setup(
     entry_points={
         "console_scripts": [
             "readiness_gate = lunabot_mission.readiness_gate:main",
+            "mission_state_publisher = lunabot_mission.mission_state_publisher:main",
         ],
     },
 )

@@ -72,33 +72,53 @@
         </ReactiveFallback>
       </RecoveryNode>
 
-      <!-- Mission loop: navigate → excavate → navigate → deposit → repeat -->
+      <!-- Mission loop: navigate → excavate → navigate → deposit → repeat
+           Each step has bounded retries and a hard timeout.
+           When retries are exhausted the Sequence returns FAILURE,
+           RepeatUntilFailure stops, and mission_state_publisher
+           transitions to SAFE_STOP via the aborted action status. -->
       <RepeatUntilFailure name="MissionCycleLoop">
         <Sequence name="MissionCycle">
 
-          <!-- Step 1: Navigate to dig site -->
-          <!-- TODO: Replace x/y/z/qw with real dig site coordinates from field map -->
-          <NavigateToPose
-            name="NavigateToDigSite"
-            goal="{dig_site_pose}"/>
+          <!-- Step 1: Navigate to dig site (2 attempts, 60 s hard cap each) -->
+          <!-- TODO: Replace dig_site_pose with real field coordinates -->
+          <RetryUntilSuccessful num_attempts="2" name="NavToDigRetry">
+            <Timeout msec="60000" name="NavToDigTimeout">
+              <NavigateToPose
+                name="NavigateToDigSite"
+                goal="{dig_site_pose}"/>
+            </Timeout>
+          </RetryUntilSuccessful>
 
-          <!-- Step 2: Excavate -->
-          <ExecuteAction
-            name="Excavate"
-            action_name="/mission/excavate"
-            timeout="30.0"/>
+          <!-- Step 2: Excavate (2 attempts, 45 s hard cap each) -->
+          <RetryUntilSuccessful num_attempts="2" name="ExcavateRetry">
+            <Timeout msec="45000" name="ExcavateTimeout">
+              <ExecuteAction
+                name="Excavate"
+                action_name="/mission/excavate"
+                timeout="30.0"/>
+            </Timeout>
+          </RetryUntilSuccessful>
 
-          <!-- Step 3: Navigate to dump site -->
-          <!-- TODO: Replace x/y/z/qw with real dump site coordinates from field map -->
-          <NavigateToPose
-            name="NavigateToDumpSite"
-            goal="{dump_site_pose}"/>
+          <!-- Step 3: Navigate to dump site (2 attempts, 60 s hard cap each) -->
+          <!-- TODO: Replace dump_site_pose with real field coordinates -->
+          <RetryUntilSuccessful num_attempts="2" name="NavToDumpRetry">
+            <Timeout msec="60000" name="NavToDumpTimeout">
+              <NavigateToPose
+                name="NavigateToDumpSite"
+                goal="{dump_site_pose}"/>
+            </Timeout>
+          </RetryUntilSuccessful>
 
-          <!-- Step 4: Deposit -->
-          <ExecuteAction
-            name="Deposit"
-            action_name="/mission/deposit"
-            timeout="15.0"/>
+          <!-- Step 4: Deposit (2 attempts, 30 s hard cap each) -->
+          <RetryUntilSuccessful num_attempts="2" name="DepositRetry">
+            <Timeout msec="30000" name="DepositTimeout">
+              <ExecuteAction
+                name="Deposit"
+                action_name="/mission/deposit"
+                timeout="15.0"/>
+            </Timeout>
+          </RetryUntilSuccessful>
 
         </Sequence>
       </RepeatUntilFailure>
