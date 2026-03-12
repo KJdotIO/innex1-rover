@@ -31,6 +31,8 @@ setup(
     entry_points={
         'console_scripts': [
             'tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main',
+            'stereo_camera_info_publisher = lunabot_localisation.stereo_camera_info_publisher:main',
+            'visual_odometry_gate = lunabot_localisation.visual_odometry_gate:main',
         ],
     },
 

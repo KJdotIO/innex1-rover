@@ -59,8 +59,8 @@ ekf_filter_node_odom:
         false,
       ]
 
-    # Visual odometry: position only
-    odom1: /visual_odometry
+    # Visual odometry is gated before it reaches the filter.
+    odom1: /visual_odometry/gated
     odom1_config:
       [
         true,
@@ -79,6 +79,9 @@ ekf_filter_node_odom:
         false,
         false,
       ]
+    odom1_queue_size: 5
+    odom1_nodelay: true
+    odom1_pose_rejection_threshold: 2.0
 
 ekf_filter_node_map:
   ros__parameters:
@@ -136,7 +139,7 @@ ekf_filter_node_map:
         false,
       ]
 
-    odom1: /visual_odometry
+    odom1: /visual_odometry/gated
     odom1_config:
       [
         true,
@@ -155,6 +158,9 @@ ekf_filter_node_map:
         false,
         false,
       ]
+    odom1_queue_size: 5
+    odom1_nodelay: true
+    odom1_pose_rejection_threshold: 2.0
 
     # AprilTag pose correction (discontinuous, only in global EKF)
     pose0: /tag_pose

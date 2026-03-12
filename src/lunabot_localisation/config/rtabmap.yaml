@@ -1,23 +1,55 @@
-rgbd_odometry:
+stereo_odometry:
   ros__parameters:
-    # Issue #57: EKF handles the main odom transform
+    # The EKF owns odom -> base_footprint. Stereo odometry only publishes
+    # the visual estimate and OdomInfo telemetry.
     publish_tf: false
     frame_id: "base_footprint"
     odom_frame_id: "odom"
-    subscribe_depth: true
-    approx_sync: true
-    # Strategy for future reversing
+    subscribe_rgb: false
+    subscribe_stereo: true
+    subscribe_depth: false
+    subscribe_rgbd: false
+    approx_sync: false
+    topic_queue_size: 10
+    sync_queue_size: 10
+    wait_for_transform: 0.2
+    wait_imu_to_init: false
+    subscribe_odom_info: true
+    # Frame-to-map is more tolerant of drift than frame-to-frame in this sim.
     Odom/Strategy: "1" # Frame-to-Map
-    # Conservative feature detection for sand
+    # Sim is still flaky, so reset quickly instead of staying lost forever.
+    Odom/ResetCountdown: "2"
+    # Conservative feature detection for sand and repetitive terrain.
     Vis/MinInliers: "15"
     Vis/FeatureType: "8" # GFTT/ORB
+    GFTT/MinDistance: "10"
+    GFTT/QualityLevel: "0.00001"
+
+rgbd_odometry:
+  ros__parameters:
+    publish_tf: false
+    frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    subscribe_depth: false
+    subscribe_rgbd: true
+    approx_sync: false
+    Odom/Strategy: "1"
+    Vis/MinInliers: "15"
+    Vis/FeatureType: "8"
 
 rtabmap:
   ros__parameters:
     # Global EKF now owns map -> odom; RTAB-Map only builds the map
     publish_tf: false
-    subscribe_depth: true
-    approx_sync: true
+    subscribe_rgb: false
+    subscribe_stereo: true
+    subscribe_depth: false
+    subscribe_rgbd: false
+    approx_sync: false
+    subscribe_odom_info: true
+    topic_queue_size: 10
+    sync_queue_size: 10
+    wait_for_transform: 0.2
     # Mapping resolution (matches Nav2)
     Grid/CellSize: "0.05"
     # Search for loops based on physical proximity
