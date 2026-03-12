@@ -1,8 +1,21 @@
 <root BTCPP_format="4" main_tree_to_execute="MissionNavigateToPoseShell">
   <BehaviorTree ID="MissionNavigateToPoseShell">
     <Sequence name="MissionShellSequence">
-      <!-- TODO(issue#107): Replace this placeholder with a real readiness condition node/service check. -->
-      <AlwaysSuccess name="ReadinessPlaceholder"/>
+      <!-- Readiness gate: all checks must pass before autonomy starts -->
+      <Sequence name="ReadinessGate">
+        <RosTopicSubscriberCheck
+          topic="/odometry/filtered"
+          timeout="5.0"
+          name="CheckOdometry"/>
+        <RosTopicSubscriberCheck
+          topic="/hazards/front"
+          timeout="5.0"
+          name="CheckHazards"/>
+        <RosTopicSubscriberCheck
+          topic="/camera_front/points"
+          timeout="5.0"
+          name="CheckCamera"/>
+      </Sequence>
 
       <RecoveryNode number_of_retries="3" name="NavigateRecoveryShell">
         <PipelineSequence name="NavigateWithReplanning">
@@ -59,7 +72,56 @@
         </ReactiveFallback>
       </RecoveryNode>
 
-      <!-- TODO(issue#107): Add mission-level branches (excavate/deposit/cycle) as BT subtrees. -->
+      <!-- Mission loop: navigate → excavate → navigate → deposit → repeat
+           Each step has bounded retries and a hard timeout.
+           When retries are exhausted the Sequence returns FAILURE,
+           RepeatUntilFailure stops, and mission_state_publisher
+           transitions to SAFE_STOP via the aborted action status. -->
+      <RepeatUntilFailure name="MissionCycleLoop">
+        <Sequence name="MissionCycle">
+
+          <!-- Step 1: Navigate to dig site (2 attempts, 60 s hard cap each) -->
+          <!-- TODO: Replace dig_site_pose with real field coordinates -->
+          <RetryUntilSuccessful num_attempts="2" name="NavToDigRetry">
+            <Timeout msec="60000" name="NavToDigTimeout">
+              <NavigateToPose
+                name="NavigateToDigSite"
+                goal="{dig_site_pose}"/>
+            </Timeout>
+          </RetryUntilSuccessful>
+
+          <!-- Step 2: Excavate (2 attempts, 45 s hard cap each) -->
+          <RetryUntilSuccessful num_attempts="2" name="ExcavateRetry">
+            <Timeout msec="45000" name="ExcavateTimeout">
+              <ExecuteAction
+                name="Excavate"
+                action_name="/mission/excavate"
+                timeout="30.0"/>
+            </Timeout>
+          </RetryUntilSuccessful>
+
+          <!-- Step 3: Navigate to dump site (2 attempts, 60 s hard cap each) -->
+          <!-- TODO: Replace dump_site_pose with real field coordinates -->
+          <RetryUntilSuccessful num_attempts="2" name="NavToDumpRetry">
+            <Timeout msec="60000" name="NavToDumpTimeout">
+              <NavigateToPose
+                name="NavigateToDumpSite"
+                goal="{dump_site_pose}"/>
+            </Timeout>
+          </RetryUntilSuccessful>
+
+          <!-- Step 4: Deposit (2 attempts, 30 s hard cap each) -->
+          <RetryUntilSuccessful num_attempts="2" name="DepositRetry">
+            <Timeout msec="30000" name="DepositTimeout">
+              <ExecuteAction
+                name="Deposit"
+                action_name="/mission/deposit"
+                timeout="15.0"/>
+            </Timeout>
+          </RetryUntilSuccessful>
+
+        </Sequence>
+      </RepeatUntilFailure>
     </Sequence>
   </BehaviorTree>
 </root>

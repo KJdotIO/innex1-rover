@@ -15,6 +15,8 @@ controller_server:
     use_sim_time: true
     controller_frequency: 20.0
     controller_plugins: ["FollowPath"]
+    # Redirected to /nav2/cmd_vel so cmd_vel_mux arbitrates before wheels
+    cmd_vel_topic: /nav2/cmd_vel
 
     # choosing RPP
     FollowPath:

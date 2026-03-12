@@ -11,6 +11,12 @@
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>launch_ros</test_depend>
+  <test_depend>lunabot_control</test_depend>
+  <test_depend>lunabot_interfaces</test_depend>
+  <test_depend>lunabot_mission</test_depend>
+  <test_depend>python3-pytest</test_depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
 

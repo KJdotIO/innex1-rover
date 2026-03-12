@@ -17,6 +17,36 @@
       "type": "lunabot_interfaces/action/Deposit",
       "kind": "action_server",
       "source": "src/lunabot_control/lunabot_control/material_action_server.py"
+    },
+    {
+      "name": "/mission/state",
+      "type": "std_msgs/msg/String",
+      "kind": "publisher",
+      "source": "src/lunabot_mission/lunabot_mission/mission_state_publisher.py"
+    },
+    {
+      "name": "/mission/autonomy_mode",
+      "type": "std_msgs/msg/String",
+      "kind": "publisher",
+      "source": "src/lunabot_mission/lunabot_mission/mission_state_publisher.py"
+    },
+    {
+      "name": "/mission/time_remaining_s",
+      "type": "std_msgs/msg/Float32",
+      "kind": "publisher",
+      "source": "src/lunabot_mission/lunabot_mission/mission_state_publisher.py"
+    },
+    {
+      "name": "/mission/cycle_count",
+      "type": "std_msgs/msg/Int32",
+      "kind": "publisher",
+      "source": "src/lunabot_mission/lunabot_mission/mission_state_publisher.py"
+    },
+    {
+      "name": "/mission/last_failure_reason",
+      "type": "std_msgs/msg/String",
+      "kind": "publisher",
+      "source": "src/lunabot_mission/lunabot_mission/mission_state_publisher.py"
     }
   ],
   "tf_links": [
@@ -47,11 +77,5 @@
       "child_pattern": "${link_prefix}base_link"
     }
   ],
-  "deferred_topics": [
-    "/mission/state",
-    "/mission/autonomy_mode",
-    "/mission/time_remaining_s",
-    "/mission/cycle_count",
-    "/mission/last_failure_reason"
-  ]
+  "deferred_topics": []
 }

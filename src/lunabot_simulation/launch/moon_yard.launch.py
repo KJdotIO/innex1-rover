@@ -17,8 +17,16 @@ def generate_launch_description():
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
     world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
 
-    # switches to ogre 1 preflight if on mac. doesnt affect linux
-    if platform.system() == "Darwin":
+    # switches to ogre 1 if on mac or virtualbox/vm (ogre2 causes rendering issues)
+    import subprocess
+    is_virtualbox = False
+    try:
+        result = subprocess.run(["systemd-detect-virt", "--quiet"], capture_output=True)
+        is_virtualbox = result.returncode == 0
+    except FileNotFoundError:
+        pass
+
+    if platform.system() == "Darwin" or is_virtualbox:
         with open(world_path, "r") as f:
             content = f.read()
         if "<render_engine>ogre2</render_engine>" in content:
@@ -26,11 +34,11 @@ def generate_launch_description():
                 "<render_engine>ogre2</render_engine>",
                 "<render_engine>ogre</render_engine>",
             )
-            tmp_world = os.path.join(tempfile.gettempdir(), "moon_yard_mac.sdf")
+            tmp_world = os.path.join(tempfile.gettempdir(), "moon_yard_patched.sdf")
             with open(tmp_world, "w") as f:
                 f.write(patched_content)
             world_path = tmp_world
-            print(f"macOS detected: Using patched Ogre1 world at {world_path}")
+            print(f"VM/macOS detected: Using patched Ogre1 world at {world_path}")
 
     # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our custom models
     models_path = os.path.join(pkg_lunabot_simulation, "models")
@@ -52,7 +60,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
         ),
-        launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
+        launch_arguments={"gz_args": f"-r '{world_path}'"}.items(),
     )
 
     robot_state_publisher = Node(
