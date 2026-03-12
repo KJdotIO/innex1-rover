@@ -1,3 +1,5 @@
+"""Gate visual odometry before it is fused into the EKFs."""
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -13,6 +15,8 @@ from geometry_msgs.msg import Twist
 
 @dataclass
 class HealthSnapshot:
+    """Compact snapshot of the latest odometry health decision."""
+
     healthy: bool
     reason: str
     inliers: int
@@ -24,6 +28,8 @@ class HealthSnapshot:
 
 
 class VisualOdometryGate(Node):
+    """Republish visual odometry only when OdomInfo says tracking is healthy."""
+
     def __init__(self) -> None:
         super().__init__("visual_odometry_gate")
 
@@ -49,7 +55,9 @@ class VisualOdometryGate(Node):
         self.min_matches = int(self.get_parameter("min_matches").value)
         self.max_position_variance = float(self.get_parameter("max_position_variance").value)
         self.max_yaw_variance = float(self.get_parameter("max_yaw_variance").value)
-        self.odom_info_timeout = Duration(seconds=float(self.get_parameter("odom_info_timeout_sec").value))
+        self.odom_info_timeout = Duration(
+            seconds=float(self.get_parameter("odom_info_timeout_sec").value)
+        )
         self.transition_log_interval = Duration(
             seconds=float(self.get_parameter("transition_log_interval_sec").value)
         )
@@ -91,6 +99,7 @@ class VisualOdometryGate(Node):
         self.create_timer(0.2, self.on_timer)
 
     def on_cmd_vel(self, msg: Twist) -> None:
+        """Track whether the rover is currently being commanded to move."""
         self.is_moving = any(
             abs(value) > 1e-3
             for value in (
@@ -104,6 +113,7 @@ class VisualOdometryGate(Node):
         )
 
     def on_odom_info(self, msg: OdomInfo) -> None:
+        """Update the current health state from RTAB-Map odometry telemetry."""
         self.latest_info = msg
         snapshot = self.evaluate_health(msg)
         self.publish_health(snapshot.healthy)
@@ -111,7 +121,10 @@ class VisualOdometryGate(Node):
         if self.should_log_transition(snapshot):
             motion_state = "moving" if snapshot.moving else "stationary"
             self.get_logger().warn(
-                "VO %s: reason=%s inliers=%d matches=%d features=%d pos_var=%.3f yaw_var=%.3f cmd=%s"
+                (
+                    "VO %s: reason=%s inliers=%d matches=%d features=%d "
+                    "pos_var=%.3f yaw_var=%.3f cmd=%s"
+                )
                 % (
                     "HEALTHY" if snapshot.healthy else "UNHEALTHY",
                     snapshot.reason,
@@ -128,10 +141,12 @@ class VisualOdometryGate(Node):
         self.latest_health = snapshot
 
     def on_odom(self, msg: Odometry) -> None:
+        """Republish visual odometry only while the health state is good."""
         if self.latest_health and self.latest_health.healthy:
             self.odom_pub.publish(msg)
 
     def on_timer(self) -> None:
+        """Mark odometry unhealthy if fresh OdomInfo stops arriving."""
         if not self.latest_info:
             return
 
@@ -163,6 +178,7 @@ class VisualOdometryGate(Node):
             self.publish_health(False)
 
     def evaluate_health(self, msg: OdomInfo) -> HealthSnapshot:
+        """Classify the odometry output using inliers, matches, and covariance."""
         position_variance = msg.covariance[0]
         yaw_variance = msg.covariance[35]
 
@@ -197,6 +213,7 @@ class VisualOdometryGate(Node):
         )
 
     def should_log_transition(self, snapshot: HealthSnapshot) -> bool:
+        """Log state changes and throttle repeated messages."""
         if self.latest_health is None:
             return True
         if (
@@ -206,15 +223,20 @@ class VisualOdometryGate(Node):
             return True
         if self.last_transition_log_time is None:
             return True
-        return self.get_clock().now() - self.last_transition_log_time >= self.transition_log_interval
+        return (
+            self.get_clock().now() - self.last_transition_log_time
+            >= self.transition_log_interval
+        )
 
     def publish_health(self, healthy: bool) -> None:
+        """Publish the current boolean health state for downstream consumers."""
         msg = Bool()
         msg.data = healthy
         self.health_pub.publish(msg)
 
 
 def main(args=None) -> None:
+    """Run the visual odometry gate node."""
     rclpy.init(args=args)
     node = VisualOdometryGate()
     try:

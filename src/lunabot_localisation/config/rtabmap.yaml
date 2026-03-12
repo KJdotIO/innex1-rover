@@ -16,7 +16,7 @@ stereo_odometry:
     wait_imu_to_init: false
     subscribe_odom_info: true
     # Frame-to-map is more tolerant of drift than frame-to-frame in this sim.
-    Odom/Strategy: "1" # Frame-to-Map
+    Odom/Strategy: "0" # Frame-to-Map
     # Sim is still flaky, so reset quickly instead of staying lost forever.
     Odom/ResetCountdown: "2"
     # Conservative feature detection for sand and repetitive terrain.
@@ -33,7 +33,7 @@ rgbd_odometry:
     subscribe_depth: false
     subscribe_rgbd: true
     approx_sync: false
-    Odom/Strategy: "1"
+    Odom/Strategy: "0"
     Vis/MinInliers: "15"
     Vis/FeatureType: "8"
 

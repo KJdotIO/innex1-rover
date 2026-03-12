@@ -1,3 +1,5 @@
+"""Publish deterministic stereo CameraInfo messages for the sim cameras."""
+
 import math
 
 import rclpy
@@ -7,6 +9,8 @@ from sensor_msgs.msg import CameraInfo, Image
 
 
 class StereoCameraInfoPublisher(Node):
+    """Publish synthetic left/right camera intrinsics aligned to image stamps."""
+
     def __init__(self):
         super().__init__("stereo_camera_info_publisher")
 
@@ -64,6 +68,7 @@ class StereoCameraInfoPublisher(Node):
         self.cy = (self.height - 1) / 2.0
 
     def make_camera_info(self, header, frame_id: str, tx: float) -> CameraInfo:
+        """Create a CameraInfo message matching the configured stereo geometry."""
         msg = CameraInfo()
         msg.header = header
         msg.header.frame_id = frame_id
@@ -110,9 +115,11 @@ class StereoCameraInfoPublisher(Node):
         return msg
 
     def on_left_image(self, msg: Image) -> None:
+        """Publish the left CameraInfo with the same timestamp as the image."""
         self.left_pub.publish(self.make_camera_info(msg.header, self.left_frame_id, 0.0))
 
     def on_right_image(self, msg: Image) -> None:
+        """Publish the right CameraInfo using the stereo projection offset."""
         self.right_pub.publish(
             self.make_camera_info(
                 msg.header,
@@ -123,6 +130,7 @@ class StereoCameraInfoPublisher(Node):
 
 
 def main(args=None):
+    """Run the stereo CameraInfo publisher node."""
     rclpy.init(args=args)
     node = StereoCameraInfoPublisher()
     try:
