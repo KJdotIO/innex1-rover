@@ -11,6 +11,9 @@
   <xacro:property name="oak_mono_width" value="640" />
   <xacro:property name="oak_mono_height" value="400" />
   <xacro:property name="oak_mono_rate" value="15" />
+  <xacro:property name="front_rgbd_width" value="320" />
+  <xacro:property name="front_rgbd_height" value="240" />
+  <xacro:property name="front_rgbd_rate" value="5" />
   <xacro:property name="oak_clip_near" value="0.10" />
   <xacro:property name="oak_clip_far" value="12.0" />
 
@@ -148,7 +151,28 @@
     </joint>
 
     <!-- Keep a dedicated centre frame in the model for later RGB/tag work,
-         but render the active odometry stream from the stereo pair. -->
+         but render the active odometry stream from the stereo pair.
+         A lightweight RGB-D sensor is kept for legacy point-cloud consumers. -->
+    <gazebo reference="camera_front_rgb_link">
+      <sensor name="camera_front" type="rgbd_camera">
+        <camera>
+          <horizontal_fov>${oak_rgb_hfov}</horizontal_fov>
+          <image>
+            <width>${front_rgbd_width}</width>
+            <height>${front_rgbd_height}</height>
+          </image>
+          <clip>
+            <near>${oak_clip_near}</near>
+            <far>${oak_clip_far}</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>${front_rgbd_rate}</update_rate>
+        <topic>camera_front</topic>
+        <gz_frame_id>camera_front_optical_frame</gz_frame_id>
+      </sensor>
+    </gazebo>
+
     <gazebo reference="camera_front_left_link">
       <sensor name="camera_front_left" type="camera">
         <camera>
