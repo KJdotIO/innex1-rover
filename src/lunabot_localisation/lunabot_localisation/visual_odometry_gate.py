@@ -31,6 +31,7 @@ class VisualOdometryGate(Node):
     """Republish visual odometry only when OdomInfo says tracking is healthy."""
 
     def __init__(self) -> None:
+        """Initialise subscriptions, gating thresholds, and health publishers."""
         super().__init__("visual_odometry_gate")
 
         self.declare_parameter("odom_topic", "/visual_odometry")

@@ -12,6 +12,7 @@ class StereoCameraInfoPublisher(Node):
     """Publish synthetic left/right camera intrinsics aligned to image stamps."""
 
     def __init__(self):
+        """Initialise publishers, subscriptions, and synthetic camera intrinsics."""
         super().__init__("stereo_camera_info_publisher")
 
         self.declare_parameter("width", 640)
