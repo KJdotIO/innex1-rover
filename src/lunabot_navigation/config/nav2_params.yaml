@@ -5,9 +5,7 @@
 bt_navigator:
   ros__parameters:
     use_sim_time: true
-    # BT shell for mission orchestration bootstrap.
-    # TODO(issue#107, @junaid): evolve this tree with readiness check node + mission subtrees.
-    default_nav_to_pose_bt_xml: "$(find-pkg-share lunabot_navigation)/behavior_trees/mission_navigate_to_pose_bt.xml"
+    default_bt_xml_filename: "navigate_to_pose_w_replanning_and_recovery.xml"
 
 # controller server with RPP
 controller_server:
@@ -51,10 +49,10 @@ global_costmap:
       use_sim_time: true
       update_frequency: 1.0
       publish_frequency: 1.0
-      global_frame: map # changed to map as rtab map added
+      global_frame: map
       robot_base_frame: base_footprint
-      robot_radius: 0.25 # tuned to robot radius of 0.25m
-      resolution: 0.05 # spec resolution
+      robot_radius: 0.28
+      resolution: 0.05
       track_unknown_space: false
       rolling_window: true
       width: 12
@@ -62,48 +60,26 @@ global_costmap:
       origin_x: -5.0
       origin_y: -8.0
       plugins: ["obstacle_layer", "inflation_layer"]
-      # plugins: ["static_layer", "inflation_layer"]
-
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: true
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: hazards_front front_points_clear
-        hazards_front:
-          # Produced by lunabot_perception/hazard_detection
-          topic: /hazards/front
-          data_type: "PointCloud2"
-          marking: true
-          clearing: false
-          observation_persistence: 0.7
-          expected_update_rate: 5.0
-          max_obstacle_height: 0.50
-          min_obstacle_height: 0.10
-          obstacle_max_range: 3.0
-          obstacle_min_range: 0.1
-          raytrace_max_range: 2.5
-          raytrace_min_range: 0.5
-
-        # Use full depth cloud for clearing raytraces.
-        front_points_clear:
+        observation_sources: front_points
+        front_points:
           topic: /camera_front/points
           data_type: "PointCloud2"
-          marking: false
+          marking: true
           clearing: true
-          expected_update_rate: 5.0
-          max_obstacle_height: 0.50
+          max_obstacle_height: 0.45
           min_obstacle_height: 0.10
           obstacle_max_range: 3.0
           obstacle_min_range: 0.1
           raytrace_max_range: 2.5
-          raytrace_min_range: 0.5
+          raytrace_min_range: 0.1
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.50
+        cost_scaling_factor: 3.5
+        inflation_radius: 0.55
 
       always_send_full_costmap: true
 
@@ -114,48 +90,36 @@ local_costmap:
       use_sim_time: true
       global_frame: odom
       robot_base_frame: base_footprint
+      robot_radius: 0.28
       plugins: ["obstacle_layer", "inflation_layer"]
 
-      # rolling window
+      # Center the local window around the rover so the forward camera origin
+      # stays inside bounds for obstacle raytracing while navigating.
       rolling_window: true
-      width: 3 # robot vision has radius of 1.5m
-      height: 3 # 3mx3m as specified in docx
+      width: 4
+      height: 4
+      origin_x: -2.0
+      origin_y: -2.0
       resolution: 0.05
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
-        observation_sources: hazards_front front_points_clear
-        hazards_front:
-          # Produced by lunabot_perception/hazard_detection
-          topic: /hazards/front
-          data_type: "PointCloud2"
-          marking: true
-          clearing: false
-          observation_persistence: 0.7
-          expected_update_rate: 5.0
-          max_obstacle_height: 0.50
-          min_obstacle_height: 0.10
-          obstacle_max_range: 3.0
-          obstacle_min_range: 0.1
-          raytrace_max_range: 2.5
-          raytrace_min_range: 0.5
-
-        # Use full depth cloud for clearing raytraces.
-        front_points_clear:
+        observation_sources: front_points
+        front_points:
           topic: /camera_front/points
           data_type: "PointCloud2"
-          marking: false
+          marking: true
           clearing: true
-          expected_update_rate: 5.0
-          max_obstacle_height: 0.50
+          max_obstacle_height: 0.45
           min_obstacle_height: 0.10
           obstacle_max_range: 3.0
           obstacle_min_range: 0.1
           raytrace_max_range: 2.5
-          raytrace_min_range: 0.5
+          raytrace_min_range: 0.1
 
-      # config for inflation
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.50
-        cost_scaling_factor: 3.0
+        inflation_radius: 0.60
+        cost_scaling_factor: 3.5
+
+      always_send_full_costmap: true

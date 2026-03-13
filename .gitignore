@@ -9,3 +9,5 @@ log/
 frames_*.gv
 frames_*.pdf
 __pycache__/
+*.pyc
+research/

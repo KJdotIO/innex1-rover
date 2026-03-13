@@ -150,26 +150,25 @@
       <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
     </joint>
 
-    <!-- Keep a dedicated centre frame in the model for later RGB/tag work,
-         but render the active odometry stream from the stereo pair.
-         A lightweight RGB-D sensor is kept for legacy point-cloud consumers. -->
-    <gazebo reference="camera_front_rgb_link">
+    <!-- Keep the centre RGB-D camera aligned with the original sim frame so the
+         point cloud and costmaps stay in the known-good orientation. -->
+    <gazebo reference="camera_front_link">
       <sensor name="camera_front" type="rgbd_camera">
         <camera>
-          <horizontal_fov>${oak_rgb_hfov}</horizontal_fov>
+          <horizontal_fov>1.57</horizontal_fov>
           <image>
-            <width>${front_rgbd_width}</width>
-            <height>${front_rgbd_height}</height>
+            <width>640</width>
+            <height>480</height>
           </image>
           <clip>
-            <near>${oak_clip_near}</near>
-            <far>${oak_clip_far}</far>
+            <near>0.1</near>
+            <far>10</far>
           </clip>
         </camera>
         <always_on>1</always_on>
-        <update_rate>${front_rgbd_rate}</update_rate>
+        <update_rate>10</update_rate>
         <topic>camera_front</topic>
-        <gz_frame_id>camera_front_optical_frame</gz_frame_id>
+        <gz_frame_id>camera_front_link</gz_frame_id>
       </sensor>
     </gazebo>
 
