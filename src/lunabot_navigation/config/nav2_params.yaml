@@ -5,7 +5,7 @@
 bt_navigator:
   ros__parameters:
     use_sim_time: true
-    default_bt_xml_filename: "navigate_to_pose_w_replanning_and_recovery.xml"
+    default_nav_to_pose_bt_xml: "navigate_to_pose_w_replanning_and_recovery.xml"
 
 # controller server with RPP
 controller_server:

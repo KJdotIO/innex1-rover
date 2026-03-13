@@ -11,9 +11,12 @@
   <xacro:property name="oak_mono_width" value="640" />
   <xacro:property name="oak_mono_height" value="400" />
   <xacro:property name="oak_mono_rate" value="15" />
-  <xacro:property name="front_rgbd_width" value="320" />
-  <xacro:property name="front_rgbd_height" value="240" />
-  <xacro:property name="front_rgbd_rate" value="5" />
+  <xacro:property name="front_rgbd_hfov" value="1.57" />
+  <xacro:property name="front_rgbd_width" value="640" />
+  <xacro:property name="front_rgbd_height" value="480" />
+  <xacro:property name="front_rgbd_rate" value="10" />
+  <xacro:property name="front_rgbd_clip_near" value="0.10" />
+  <xacro:property name="front_rgbd_clip_far" value="10.0" />
   <xacro:property name="oak_clip_near" value="0.10" />
   <xacro:property name="oak_clip_far" value="12.0" />
 
@@ -155,18 +158,18 @@
     <gazebo reference="camera_front_link">
       <sensor name="camera_front" type="rgbd_camera">
         <camera>
-          <horizontal_fov>1.57</horizontal_fov>
+          <horizontal_fov>${front_rgbd_hfov}</horizontal_fov>
           <image>
-            <width>640</width>
-            <height>480</height>
+            <width>${front_rgbd_width}</width>
+            <height>${front_rgbd_height}</height>
           </image>
           <clip>
-            <near>0.1</near>
-            <far>10</far>
+            <near>${front_rgbd_clip_near}</near>
+            <far>${front_rgbd_clip_far}</far>
           </clip>
         </camera>
         <always_on>1</always_on>
-        <update_rate>10</update_rate>
+        <update_rate>${front_rgbd_rate}</update_rate>
         <topic>camera_front</topic>
         <gz_frame_id>camera_front_link</gz_frame_id>
       </sensor>
