@@ -1,7 +1,20 @@
 ### Dual EKF Configuration ###
-# Local EKF: smooth odom -> base_footprint (continuous, never jumps)
-# Global EKF: map -> odom (jumps when AprilTag seen, corrects drift)
+# ─────────────────────────────────────────────────────────────────────
+# DESIGN:
+#   Local  EKF  → odom → base_footprint  (smooth, never jumps)
+#   Global EKF  → map  → odom            (jumps when AprilTag seen)
+#
+# PHILOSOPHY:
+#   Wheel odometry + IMU are the BACKBONE.  They always work.
+#   Visual odometry is SUPPLEMENTARY — gated, with tight rejection.
+#   AprilTag provides absolute corrections in the global EKF only.
+# ─────────────────────────────────────────────────────────────────────
 
+# [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
+
+# ═══════════════════════════════════════════════════════════════════════
+# LOCAL EKF — smooth, continuous odom → base_footprint
+# ═══════════════════════════════════════════════════════════════════════
 ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
@@ -9,80 +22,115 @@ ekf_filter_node_odom:
     two_d_mode: true
     publish_acceleration: true
     publish_tf: true
+    print_diagnostics: true
 
     map_frame: map
     odom_frame: odom
     base_link_frame: base_footprint
     world_frame: odom
 
-    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
-
-    # Wheel odometry: position + velocity
+    # ── Wheel odometry (PRIMARY position + heading + velocity) ──
+    # This is the most reliable continuous source. Leo diff-drive
+    # publishes at 20 Hz. We trust X, Y positions AND Yaw heading
+    # from the encoders as the primary fix.
     odom0: /odom
     odom0_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
+        true,   # X
+        true,   # Y
+        false,  # Z
+        false,  # Roll
+        false,  # Pitch
+        true,   # Yaw   — wheel odometry heading is reasonably good
+        true,   # VX    — forward velocity from encoders
+        false,  # VY
+        false,  # VZ
+        false,  # VRoll
+        false,  # VPitch
+        true,   # VYaw  — angular velocity from encoders
+        false,  # AX
+        false,  # AY
+        false   # AZ
       ]
+    odom0_differential: false
 
-    # IMU: yaw orientation + angular velocity + linear acceleration
+    # ── IMU (PRIMARY orientation + angular rate + acceleration) ──
+    # 100 Hz. We fuse yaw DIFFERENTIALLY so IMU drift doesn't
+    # accumulate a bias over wheel odom's yaw.
     imu0: /imu/data_raw
     imu0_config:
       [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
+        false,  # X
+        false,  # Y
+        false,  # Z
+        false,  # Roll
+        false,  # Pitch
+        true,   # Yaw
+        false,  # VX
+        false,  # VY
+        false,  # VZ
+        false,  # VRoll
+        false,  # VPitch
+        true,   # VYaw  — angular velocity (excellent from IMU)
+        true,   # AX    — linear acceleration
+        false,  # AY
+        false   # AZ
       ]
+    imu0_differential: true
+    imu0_remove_gravitational_acceleration: true
 
-    # Visual odometry is gated before it reaches the filter.
+    # ── Visual odometry (SUPPLEMENTARY — gated, position only) ──
+    # Only arrives when the VO gate passes quality thresholds.
+    # We fuse ONLY position, DIFFERENTIALLY, so a VO reset doesn't
+    # cause the EKF to jump. Tight rejection threshold.
     odom1: /visual_odometry/gated
     odom1_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true,   # X
+        true,   # Y
+        false,  # Z
+        false,  # Roll
+        false,  # Pitch
+        false,  # Yaw — don't trust VO yaw (noisy in sim), wheels+IMU own it
+        false,  # VX
+        false,  # VY
+        false,  # VZ
+        false,  # VRoll
+        false,  # VPitch
+        false,  # VYaw
+        false,  # AX
+        false,  # AY
+        false   # AZ
       ]
+    odom1_differential: true
     odom1_queue_size: 5
     odom1_nodelay: true
-    odom1_pose_rejection_threshold: 2.0
+    odom1_pose_rejection_threshold: 1.0
 
+    # ── Process noise ──
+    # Slightly bumped to account for regolith wheel slip.
+    process_noise_covariance:
+      [
+        0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025,0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.04, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.015
+      ]
+
+# ═══════════════════════════════════════════════════════════════════════
+# GLOBAL EKF — map → odom (jumps when AprilTag is seen)
+# ═══════════════════════════════════════════════════════════════════════
 ekf_filter_node_map:
   ros__parameters:
     use_sim_time: true
@@ -90,97 +138,63 @@ ekf_filter_node_map:
     two_d_mode: true
     publish_acceleration: false
     publish_tf: true
+    print_diagnostics: true
 
     map_frame: map
     odom_frame: odom
     base_link_frame: base_footprint
     world_frame: map
 
-    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
-
-    # Same continuous sources as local EKF
+    # ── Same continuous sources as local EKF ──
     odom0: /odom
     odom0_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
+        true, true, false,
+        false, false, true,
+        true, false, false,
+        false, false, true,
+        false, false, false
       ]
+    odom0_differential: false
 
     imu0: /imu/data_raw
     imu0_config:
       [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
+        false, false, false,
+        false, false, true,
+        false, false, false,
+        false, false, true,
+        true, false, false
       ]
+    imu0_differential: true
+    imu0_remove_gravitational_acceleration: true
 
     odom1: /visual_odometry/gated
     odom1_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true, true, false,
+        false, false, false,
+        false, false, false,
+        false, false, false,
+        false, false, false
       ]
+    odom1_differential: true
     odom1_queue_size: 5
     odom1_nodelay: true
-    odom1_pose_rejection_threshold: 2.0
+    odom1_pose_rejection_threshold: 1.0
 
-    # AprilTag pose correction (discontinuous, only in global EKF)
+    # ── AprilTag absolute pose correction ──
+    # Only in global EKF. Not differential — these are absolute map-frame
+    # measurements. Generous rejection threshold because tag accuracy
+    # degrades at range.
     pose0: /tag_pose
     pose0_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true, true, false,
+        false, false, true,
+        false, false, false,
+        false, false, false,
+        false, false, false
       ]
     pose0_differential: false
     pose0_relative: false

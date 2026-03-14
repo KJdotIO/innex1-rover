@@ -93,6 +93,7 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Core robot bridge: cmd_vel, odom, IMU, joint_states, pose
     robot_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -100,20 +101,23 @@ def generate_launch_description():
         arguments=[
             "/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
             "/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
-            # "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
-            "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan",
+            "/model/leo_rover/pose@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
+        ],
+        output="screen",
+    )
+
+    # Dedicated RGB-D bridge: keep image/depth/info separate from point cloud
+    # conversion to reduce bridge contention and frame starvation.
+    camera_rgbd_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_rgbd_bridge",
+        arguments=[
             "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/camera_front_left/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front_left@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/camera_front_right/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front_right@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/model/leo_rover/pose@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
         ],
         output="screen",
     )
@@ -125,5 +129,6 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
+            camera_rgbd_bridge,
         ]
     )

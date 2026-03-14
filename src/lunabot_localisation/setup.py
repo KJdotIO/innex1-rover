@@ -33,7 +33,13 @@ setup(
             'tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main',
             'stereo_camera_info_publisher = '
             'lunabot_localisation.stereo_camera_info_publisher:main',
+            'camera_info_sync_republisher = '
+            'lunabot_localisation.camera_info_sync_republisher:main',
+            'rgbd_stream_republisher = '
+            'lunabot_localisation.rgbd_stream_republisher:main',
             'visual_odometry_gate = lunabot_localisation.visual_odometry_gate:main',
+            'topic_health_watchdog = '
+            'lunabot_localisation.topic_health_watchdog:main',
         ],
     },
 

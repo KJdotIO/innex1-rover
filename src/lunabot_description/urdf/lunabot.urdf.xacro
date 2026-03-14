@@ -3,18 +3,18 @@
 <xacro:include filename="$(find leo_description)/urdf/leo_sim.urdf.xacro" />
 
   <!-- OAK-D Pro-inspired front camera rig.
-       Keep the physical geometry OAK-like, but drive sim odometry from a
-       lighter stereo pair instead of a single RGB-D sensor. -->
+       For this comparison branch, keep the physical geometry OAK-like but use
+       a single stable RGB-D stream as the localisation control experiment. -->
   <xacro:property name="oak_stereo_baseline" value="0.075" />
   <xacro:property name="oak_rgb_hfov" value="1.151917306" />
   <xacro:property name="oak_mono_hfov" value="1.396263402" />
   <xacro:property name="oak_mono_width" value="640" />
   <xacro:property name="oak_mono_height" value="400" />
   <xacro:property name="oak_mono_rate" value="15" />
-  <xacro:property name="front_rgbd_hfov" value="1.57" />
-  <xacro:property name="front_rgbd_width" value="640" />
-  <xacro:property name="front_rgbd_height" value="480" />
-  <xacro:property name="front_rgbd_rate" value="10" />
+  <xacro:property name="front_rgbd_hfov" value="${oak_rgb_hfov}" />
+  <xacro:property name="front_rgbd_width" value="320" />
+  <xacro:property name="front_rgbd_height" value="180" />
+  <xacro:property name="front_rgbd_rate" value="5" />
   <xacro:property name="front_rgbd_clip_near" value="0.10" />
   <xacro:property name="front_rgbd_clip_far" value="10.0" />
   <xacro:property name="oak_clip_near" value="0.10" />
@@ -175,43 +175,4 @@
       </sensor>
     </gazebo>
 
-    <gazebo reference="camera_front_left_link">
-      <sensor name="camera_front_left" type="camera">
-        <camera>
-          <horizontal_fov>${oak_mono_hfov}</horizontal_fov>
-          <image>
-            <width>${oak_mono_width}</width>
-            <height>${oak_mono_height}</height>
-          </image>
-          <clip>
-            <near>${oak_clip_near}</near>
-            <far>${oak_clip_far}</far>
-          </clip>
-        </camera>
-        <always_on>1</always_on>
-        <update_rate>${oak_mono_rate}</update_rate>
-        <topic>camera_front_left</topic>
-        <gz_frame_id>camera_front_left_optical_frame</gz_frame_id>
-      </sensor>
-    </gazebo>
-
-    <gazebo reference="camera_front_right_link">
-      <sensor name="camera_front_right" type="camera">
-        <camera>
-          <horizontal_fov>${oak_mono_hfov}</horizontal_fov>
-          <image>
-            <width>${oak_mono_width}</width>
-            <height>${oak_mono_height}</height>
-          </image>
-          <clip>
-            <near>${oak_clip_near}</near>
-            <far>${oak_clip_far}</far>
-          </clip>
-        </camera>
-        <always_on>1</always_on>
-        <update_rate>${oak_mono_rate}</update_rate>
-        <topic>camera_front_right</topic>
-        <gz_frame_id>camera_front_right_optical_frame</gz_frame_id>
-      </sensor>
-    </gazebo>
 </robot>

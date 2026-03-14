@@ -5,52 +5,87 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
+    """Launch localisation: EKF backbone + supplementary RGB-D VO + AprilTag."""
     pkg_localisation = get_package_share_directory("lunabot_localisation")
 
     rtabmap_yaml = os.path.join(pkg_localisation, "config", "rtabmap.yaml")
     ekf_yaml = os.path.join(pkg_localisation, "config", "ekf.yaml")
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
 
-    stereo_remappings = [
-        ("left/image_rect", "/camera_front_left"),
-        ("right/image_rect", "/camera_front_right"),
-        ("left/camera_info", "/camera_front_left/camera_info_synthetic"),
-        ("right/camera_info", "/camera_front_right/camera_info_synthetic"),
-    ]
-
     return LaunchDescription(
         [
+            # ──────────────────────────────────────────────────────────
+            # RGB-D stream republisher
+            # Gazebo bridge can deliver delayed / out-of-order timestamps.
+            # Re-stamp streams with monotonic "now" and drop stale frames.
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="lunabot_localisation",
-                executable="stereo_camera_info_publisher",
+                executable="rgbd_stream_republisher",
                 output="screen",
                 parameters=[
                     {
                         "use_sim_time": True,
-                        "width": 640,
-                        "height": 400,
-                        "hfov": 1.396263402,
-                        "baseline": 0.075,
-                        "left_image_topic": "/camera_front_left",
-                        "right_image_topic": "/camera_front_right",
-                        "left_camera_info_topic": "/camera_front_left/camera_info_synthetic",
-                        "right_camera_info_topic": "/camera_front_right/camera_info_synthetic",
-                        "left_frame_id": "camera_front_left_optical_frame",
-                        "right_frame_id": "camera_front_right_optical_frame",
+                        "input_image_topic": "/camera_front/image",
+                        "input_depth_topic": "/camera_front/depth_image",
+                        "input_camera_info_topic": "/camera_front/camera_info",
+                        "output_image_topic": "/camera_front/image_sync",
+                        "output_depth_topic": "/camera_front/depth_image_sync",
+                        "output_camera_info_topic": "/camera_front/camera_info_sync",
+                        "max_input_age_sec": 0.0,
+                        "publish_info_on_depth": True,
                     }
                 ],
             ),
-            # Visual odometry
+            # ──────────────────────────────────────────────────────────
+            # Depth -> PointCloud for Nav2 obstacle layers
+            # The native Gazebo /camera_front/points bridge is bursty.
+            # Build a dense, stable cloud directly from depth + intrinsics.
+            # ──────────────────────────────────────────────────────────
+            Node(
+                package="rtabmap_util",
+                executable="point_cloud_xyz",
+                output="screen",
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "approx_sync": True,
+                        "approx_sync_max_interval": 0.25,
+                        "topic_queue_size": 20,
+                        "sync_queue_size": 20,
+                        "decimation": 2,
+                        "voxel_size": 0.03,
+                        "min_depth": 0.15,
+                        "max_depth": 4.0,
+                        "filter_nans": True,
+                    }
+                ],
+                remappings=[
+                    ("depth/image", "/camera_front/depth_image_sync"),
+                    ("depth/camera_info", "/camera_front/camera_info_sync"),
+                    ("cloud", "/camera_front/points_nav"),
+                ],
+            ),
+            # ──────────────────────────────────────────────────────────
+            # RGB-D Visual Odometry (supplementary)
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="rtabmap_odom",
-                executable="stereo_odometry",
+                executable="rgbd_odometry",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
                 remappings=[
-                    *stereo_remappings,
+                    ("rgb/image", "/camera_front/image_sync"),
+                    ("depth/image", "/camera_front/depth_image_sync"),
+                    ("rgb/camera_info", "/camera_front/camera_info_sync"),
                     ("odom", "/visual_odometry"),
                 ],
             ),
+            # ──────────────────────────────────────────────────────────
+            # Visual Odometry Gate
+            # Only passes VO to EKF when tracking is healthy.
+            # Sensor contract health is also required (published by watchdog).
+            # ──────────────────────────────────────────────────────────────────
             Node(
                 package="lunabot_localisation",
                 executable="visual_odometry_gate",
@@ -63,16 +98,22 @@ def generate_launch_description():
                         "cmd_vel_topic": "/cmd_vel",
                         "gated_odom_topic": "/visual_odometry/gated",
                         "health_topic": "/visual_odometry/healthy",
-                        "min_inliers": 20,
-                        "min_matches": 40,
-                        "max_position_variance": 0.25,
-                        "max_yaw_variance": 0.25,
-                        "odom_info_timeout_sec": 3.0,
-                        "transition_log_interval_sec": 2.0,
+                        "sensor_health_topic": "/diagnostics/topics_healthy",
+                        "require_sensor_health": False,
+                        "min_inliers": 10,
+                        "min_matches": 20,
+                        "max_position_variance": 1.0,
+                        "max_yaw_variance": 1.0,
+                        "odom_info_timeout_sec": 6.0,
+                        "sensor_health_timeout_sec": 12.0,
+                        "transition_log_interval_sec": 5.0,
                     }
                 ],
             ),
-            # Local EKF: odom -> base_footprint (smooth, continuous)
+            # ──────────────────────────────────────────────────────────
+            # Local EKF: odom → base_footprint (smooth, continuous)
+            # BACKBONE: wheel odom + IMU. VO is supplementary.
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="robot_localization",
                 executable="ekf_node",
@@ -80,7 +121,9 @@ def generate_launch_description():
                 output="screen",
                 parameters=[ekf_yaml, {"use_sim_time": True}],
             ),
-            # Global EKF: map -> odom (corrects drift when tag seen)
+            # ──────────────────────────────────────────────────────────
+            # Global EKF: map → odom (jumps when AprilTag seen)
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="robot_localization",
                 executable="ekf_node",
@@ -89,30 +132,43 @@ def generate_launch_description():
                 parameters=[ekf_yaml, {"use_sim_time": True}],
                 remappings=[("odometry/filtered", "/odometry/global")],
             ),
+            # ──────────────────────────────────────────────────────────
             # RTAB-Map SLAM (map building only, no TF publishing)
+            # Fed the EKF-fused odometry so it gets a stable odom source
+            # even when VO is lost.
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="rtabmap_slam",
                 executable="rtabmap",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
                 remappings=[
-                    *stereo_remappings,
+                    ("rgb/image", "/camera_front/image_sync"),
+                    ("depth/image", "/camera_front/depth_image_sync"),
+                    ("rgb/camera_info", "/camera_front/camera_info_sync"),
                     ("odom", "/odometry/filtered"),
                 ],
                 arguments=["-d"],
             ),
+            # ──────────────────────────────────────────────────────────
             # AprilTag detector
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="apriltag_ros",
                 executable="apriltag_node",
                 output="screen",
                 parameters=[apriltag_yaml, {"use_sim_time": True}],
                 remappings=[
-                    ("image_rect", "/camera_front_left"),
-                    ("camera_info", "/camera_front_left/camera_info_synthetic"),
+                    ("image_rect", "/camera_front/image_sync"),
+                    ("camera_info", "/camera_front/camera_info_sync"),
+                    ("/camera_front/camera_info", "/camera_front/camera_info_sync"),
+                    ("image_rect/camera_info", "/camera_front/camera_info_sync"),
+                    ("/camera_front/image_sync/camera_info", "/camera_front/camera_info_sync"),
                 ],
             ),
-            # Known position of tag 0 in the map frame
+            # ──────────────────────────────────────────────────────────
+            # Static TF: known position of tag 0 in the map frame
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
@@ -127,7 +183,9 @@ def generate_launch_description():
                     "--child-frame-id", "tag36h11:0",
                 ],
             ),
-            # Converts apriltag TF into PoseWithCovarianceStamped for global EKF
+            # ──────────────────────────────────────────────────────────
+            # AprilTag → PoseWithCovarianceStamped for global EKF
+            # ──────────────────────────────────────────────────────────
             Node(
                 package="lunabot_localisation",
                 executable="tag_pose_publisher",
@@ -135,7 +193,22 @@ def generate_launch_description():
                 parameters=[
                     {
                         "use_sim_time": True,
-                        "camera_frame": "camera_front_left_optical_frame",
+                        "camera_frame": "camera_front_link",
+                    }
+                ],
+            ),
+            # ──────────────────────────────────────────────────────────
+            # Topic Health Watchdog
+            # Monitors key topic rates and logs warnings when any
+            # critical source drops below threshold.
+            # ──────────────────────────────────────────────────────────
+            Node(
+                package="lunabot_localisation",
+                executable="topic_health_watchdog",
+                output="screen",
+                parameters=[
+                    {
+                        "use_sim_time": True,
                     }
                 ],
             ),
