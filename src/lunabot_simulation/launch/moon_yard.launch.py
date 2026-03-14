@@ -118,6 +118,7 @@ def generate_launch_description():
             "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
+            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
         ],
         output="screen",
     )

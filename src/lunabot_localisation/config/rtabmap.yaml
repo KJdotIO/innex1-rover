@@ -1,64 +1,13 @@
 # ── RTAB-Map Configuration ────────────────────────────────────────────
-# Design: visual odometry is supplementary. The EKF carries navigation.
-# RTAB-Map's job is: (1) produce the best VO it can for EKF fusion,
-# and (2) build a 2D occupancy map for Nav2.
+# Design: No visual odometry. EKF (wheel odom + IMU) carries navigation.
+# RTAB-Map's job is: build a 2D occupancy map for Nav2 and perform
+# loop closure from images. Fed the EKF-fused odom directly.
 #
 # KEY: use bounded approximate sync in sim:
 #  - too tight starves callbacks,
-#  - unlimited allows stale pairings that hurt VO.
+#  - unlimited allows stale pairings that hurt matching.
 # 0.20s is a compromise for Gazebo bridge jitter.
 # ──────────────────────────────────────────────────────────────────────
-
-rgbd_odometry:
-  ros__parameters:
-    # TF: EKF owns odom→base_footprint. VO only publishes estimate.
-    publish_tf: false
-    frame_id: "base_footprint"
-    odom_frame_id: "odom"
-
-    # ── Subscription mode ──
-    subscribe_depth: true
-    subscribe_rgb: true
-    subscribe_rgbd: false
-    approx_sync: true
-    approx_sync_max_interval: 0.20
-
-    # ── Queues ──
-    # Smaller queues = synchroniser picks fresher data.
-    topic_queue_size: 8
-    sync_queue_size: 8
-    wait_for_transform: 0.3
-
-    # ── Odometry info for the gate node ──
-    subscribe_odom_info: true
-
-    # ── Visual odometry strategy ──
-    # 0 = Frame-to-Map (more robust than frame-to-frame)
-    Odom/Strategy: "0"
-    Odom/Holonomic: "false"
-
-    # Auto-reset after 2 consecutive lost frames so VO doesn't stay dead
-    Odom/ResetCountdown: "2"
-
-    # ── Feature detection ──
-    # FeatureType 8 = ORB (fast, works on low-texture scenes)
-    Vis/FeatureType: "8"
-    Vis/MaxFeatures: "600"
-    Vis/MinInliers: "10"
-
-    # GFTT detector tuning for regolith (low-texture)
-    GFTT/MinDistance: "5"
-    GFTT/QualityLevel: "0.00001"
-
-    # ── Guess from motion model ──
-    # Use the previous motion as initial guess — helps a LOT when
-    # the camera stream hiccups because VO has a warm-start.
-    Odom/GuessMotion: "true"
-
-    # ── Key-frame spacing ──
-    # Lower threshold = new keyframe more often = better tracking
-    # under Gazebo's low effective frame rate (~3-5 Hz actual).
-    Odom/KeyFrameThr: "0.5"
 
 rtabmap:
   ros__parameters:
@@ -75,7 +24,7 @@ rtabmap:
     subscribe_rgbd: false
     approx_sync: true
     approx_sync_max_interval: 0.20
-    subscribe_odom_info: true
+    subscribe_odom_info: false
 
     # ── Queues ──
     topic_queue_size: 8

@@ -93,10 +93,15 @@ class VisualOdometryGate(Node):
             self.get_parameter("gated_odom_topic").value,
             sensor_qos,
         )
+        control_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
         self.health_pub = self.create_publisher(
             Bool,
             self.get_parameter("health_topic").value,
-            sensor_qos,
+            control_qos,
         )
 
         self.create_subscription(

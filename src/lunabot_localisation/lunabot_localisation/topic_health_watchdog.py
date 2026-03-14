@@ -41,14 +41,11 @@ class TopicHealthWatchdog(Node):
             "min_hz": 2.0,
             "critical": True,
         },
-        # Needed for costmaps, but not part of VO contract health.
-        "/camera_front/points_nav": {
+        "/camera_front/points": {
             "type": PointCloud2,
             "min_hz": 3.0,
             "critical": False,
         },
-        # Monitor VO rate for diagnostics only (avoids circular dependency).
-        "/visual_odometry": {"type": Odometry, "min_hz": 1.0, "critical": False},
     }
 
     def __init__(self) -> None:
