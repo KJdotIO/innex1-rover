@@ -226,7 +226,7 @@
     <include>
       <uri>model://apriltag_beacon</uri>
       <name>apriltag_beacon</name>
-      <pose>-3.85 0 0.12 0 0 0</pose>
+      <pose>-2.95 2.15 0.12 0 0 0</pose>
       <static>true</static>
     </include>
 
