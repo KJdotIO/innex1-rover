@@ -6,15 +6,11 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """
-    Generate a launch description for the navigation stack.
-
-    This includes EKF localisation and Nav2 servers.
-    """
-    # Locate the configuration files
+    """Launch localisation + Nav2 + costmap readiness gate."""
     pkg_bringup = get_package_share_directory("lunabot_bringup")
     pkg_nav = get_package_share_directory("lunabot_navigation")
     pkg_nav2_bringup = get_package_share_directory("nav2_bringup")
@@ -38,4 +34,14 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([localisation_launch, nav2_launch])
+    # Gate that publishes /nav/costmap_ready once point cloud data has
+    # populated the costmap. Check this before sending navigation goals
+    # to prevent driving blind through obstacles.
+    costmap_gate = Node(
+        package="lunabot_navigation",
+        executable="costmap_ready_gate",
+        output="screen",
+        parameters=[{"use_sim_time": True, "min_messages": 3}],
+    )
+
+    return LaunchDescription([localisation_launch, nav2_launch, costmap_gate])

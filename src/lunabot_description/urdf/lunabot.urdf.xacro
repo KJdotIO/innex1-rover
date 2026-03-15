@@ -11,15 +11,21 @@
   <xacro:property name="oak_mono_width" value="640" />
   <xacro:property name="oak_mono_height" value="400" />
   <xacro:property name="oak_mono_rate" value="15" />
-  <xacro:arg name="front_rgbd_width" default="640" />
-  <xacro:arg name="front_rgbd_height" default="400" />
-  <xacro:arg name="front_rgbd_rate" default="15" />
+  <!-- Post-VO-removal: depth is only for costmap obstacles, not feature
+       tracking. 240x150 at 2Hz minimises GPU depth rendering load (the
+       main sim bottleneck). Boulders (30cm) are 15px at 3m, enough for
+       costmap. AprilTag 0.15m tag is 31px at 1m, reliable detection.
+       On real OAK-D Pro these will be separate high-res streams. -->
+  <xacro:arg name="front_rgbd_width" default="240" />
+  <xacro:arg name="front_rgbd_height" default="150" />
+  <xacro:arg name="front_rgbd_rate" default="2" />
   <xacro:property name="front_rgbd_hfov" value="${oak_rgb_hfov}" />
   <xacro:property name="front_rgbd_width" value="$(arg front_rgbd_width)" />
   <xacro:property name="front_rgbd_height" value="$(arg front_rgbd_height)" />
   <xacro:property name="front_rgbd_rate" value="$(arg front_rgbd_rate)" />
   <xacro:property name="front_rgbd_clip_near" value="0.10" />
-  <xacro:property name="front_rgbd_clip_far" value="10.0" />
+  <!-- 4m is plenty for a 7.9m arena and reduces depth rendering load -->
+  <xacro:property name="front_rgbd_clip_far" value="4.0" />
   <xacro:property name="oak_clip_near" value="0.10" />
   <xacro:property name="oak_clip_far" value="12.0" />
 

@@ -29,6 +29,7 @@ def generate_launch_description():
                 package="lunabot_localisation",
                 executable="rgbd_stream_republisher",
                 output="screen",
+                arguments=["--ros-args", "--log-level", "rgbd_stream_republisher:=warn"],
                 parameters=[
                     {
                         "use_sim_time": True,
@@ -81,7 +82,7 @@ def generate_launch_description():
                     ("rgb/camera_info", "/camera_front/camera_info_sync"),
                     ("odom", "/odometry/filtered"),
                 ],
-                arguments=["-d"],
+                arguments=["-d", "--ros-args", "--log-level", "rtabmap:=warn"],
             ),
             # ──────────────────────────────────────────────────────────
             # AprilTag detector
@@ -106,8 +107,8 @@ def generate_launch_description():
                 package="tf2_ros",
                 executable="static_transform_publisher",
                 arguments=[
-                    "--x", "0",
-                    "--y", "1.08",
+                    "--x", "-3.85",
+                    "--y", "0",
                     "--z", "0.12",
                     "--roll", "0",
                     "--pitch", "0",
@@ -131,17 +132,30 @@ def generate_launch_description():
                 ],
             ),
             # ──────────────────────────────────────────────────────────
-            # Topic Health Watchdog
-            # Monitors key topic rates and logs warnings when any
-            # critical source drops below threshold.
+            # Topic Health Watchdog (WARN-only: silent unless degraded)
             # ──────────────────────────────────────────────────────────
             Node(
                 package="lunabot_localisation",
                 executable="topic_health_watchdog",
                 output="screen",
+                arguments=["--ros-args", "--log-level", "topic_health_watchdog:=warn"],
                 parameters=[
                     {
                         "use_sim_time": True,
+                    }
+                ],
+            ),
+            # ──────────────────────────────────────────────────────────
+            # Status Dashboard: compact one-line periodic summary
+            # ──────────────────────────────────────────────────────────
+            Node(
+                package="lunabot_localisation",
+                executable="status_dashboard",
+                output="screen",
+                parameters=[
+                    {
+                        "use_sim_time": True,
+                        "period_sec": 5.0,
                     }
                 ],
             ),

@@ -42,10 +42,10 @@ def generate_launch_description():
         os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
     )
 
-    # Spawn position - surface mesh is at z=0, rover spawns above and drops
-    spawn_x = "0.0"
-    spawn_y = "0.0"
-    spawn_z = "0.5"  # Start above surface, gravity will settle it
+    # Spawn in the Starting Zone (top-left of arena, centered at -2.95, 1.1)
+    spawn_x = "-2.95"
+    spawn_y = "1.1"
+    spawn_z = "0.3"
 
     # we'll run the sim without gazebo gui to save resources for now
     gz_sim = IncludeLaunchDescription(
@@ -108,16 +108,25 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Dedicated RGB-D bridge: keep image/depth/info separate from point cloud
-    # conversion to reduce bridge contention and frame starvation.
-    camera_rgbd_bridge = Node(
+    # Split camera bridges: point cloud on its own process to avoid
+    # contention with image streams (the main cause of point cloud starvation).
+    camera_image_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        name="camera_rgbd_bridge",
+        name="camera_image_bridge",
         arguments=[
             "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
+        ],
+        output="screen",
+    )
+
+    camera_pointcloud_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_pointcloud_bridge",
+        arguments=[
             "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
         ],
         output="screen",
@@ -130,6 +139,7 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
-            camera_rgbd_bridge,
+            camera_image_bridge,
+            camera_pointcloud_bridge,
         ]
     )

@@ -138,9 +138,13 @@ global_costmap:
           data_type: "PointCloud2"
           marking: true
           clearing: true
-          observation_persistence: 0.3
+          # Camera at 2Hz, bridge overhead means ~1Hz actual delivery.
+          # Keep obstacles 3s so costmap stays populated across gaps.
+          # expected_update_rate=0 disables the "not updated" warnings.
+          observation_persistence: 3.0
+          expected_update_rate: 0.0
           max_obstacle_height: 0.50
-          min_obstacle_height: 0.10
+          min_obstacle_height: 0.08
           obstacle_max_range: 3.5
           obstacle_min_range: 0.15
           raytrace_max_range: 4.0
@@ -148,8 +152,6 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        # 0.80 m keeps the rover ~0.46 m from obstacle edges (robot_radius=0.34).
-        # Comparable to CoD (0.8 m) and closer to Purdue (1.5 m).
         inflation_radius: 0.80
         cost_scaling_factor: 4.0
 
@@ -182,9 +184,10 @@ local_costmap:
           data_type: "PointCloud2"
           marking: true
           clearing: true
-          observation_persistence: 0.3
+          observation_persistence: 3.0
+          expected_update_rate: 0.0
           max_obstacle_height: 0.50
-          min_obstacle_height: 0.10
+          min_obstacle_height: 0.08
           obstacle_max_range: 3.5
           obstacle_min_range: 0.15
           raytrace_max_range: 4.0

@@ -2,13 +2,14 @@
 """Automated nav stability test harness.
 
 Sends a sequence of goals through the Nav2 action server, records
-per-goal success/fail, time-to-goal, recovery count, and prints a
-pass/fail summary.
+per-goal success/fail, time-to-goal, and prints a pass/fail summary.
+
+Waits for costmap readiness (/nav/costmap_ready) before sending the
+first goal to prevent driving blind through obstacles.
 
 Usage:
-    # First launch sim + navigation in another terminal:
-    #   ros2 launch lunabot_simulation moon_yard.launch.py
-    #   ros2 launch lunabot_bringup navigation.launch.py
+    # Launch everything first:
+    #   ros2 launch lunabot_bringup simulation.launch.py
     # Then run this test:
     python3 tools/nav_stability_test.py
 """
@@ -27,19 +28,22 @@ from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool
 
-# Arena-aware goals: verified clear of all rocks in moon_yard.sdf
-# Rocks at: (1.95,0.1) (3.25,-1.6) (2.1,-2.5) (3.8,0.5) (5.75,0.4) (6.15,-2.1) (5.2,-0.8)
-# Rover spawns at (0, 0, 0.5)
+# Arena: 7.9x4.4m centered at (0,0). X: -3.95..3.95, Y: -2.2..2.2
+# Start zone: top-left around (-2.95, 1.1)
+# Obstacle zone: roughly X -1.95 to 1.20
+# Excavation zone: X > 1.20
+# Goals traverse the arena through the obstacle slalom
 GOALS = [
-    {"name": "start_zone_south", "x": 0.5, "y": -1.0, "yaw": -math.pi / 2},
-    {"name": "obstacle_passage", "x": 2.8, "y": -0.5, "yaw": 0.0},
-    {"name": "deep_obstacle_zone", "x": 4.5, "y": -1.8, "yaw": math.pi},
-    {"name": "return_mid", "x": 1.5, "y": -1.2, "yaw": math.pi},
-    {"name": "back_to_start", "x": 0.3, "y": -0.3, "yaw": math.pi / 2},
+    {"name": "start_zone_edge",    "x": -2.0, "y":  0.5, "yaw": 0.0},
+    {"name": "obstacle_entry",     "x": -1.0, "y": -0.2, "yaw": 0.0},
+    {"name": "obstacle_mid",       "x":  0.0, "y":  0.5, "yaw": 0.0},
+    {"name": "excavation_entry",   "x":  1.5, "y":  0.0, "yaw": 0.0},
+    {"name": "return_to_start",    "x": -2.5, "y":  1.0, "yaw": math.pi},
 ]
 
 GOAL_TIMEOUT_SEC = 120.0
-SETTLE_WAIT_SEC = 25.0
+COSTMAP_WAIT_SEC = 60.0
+SETTLE_WAIT_SEC = 10.0
 
 
 @dataclass
@@ -48,8 +52,6 @@ class GoalResult:
     success: bool = False
     elapsed_sec: float = 0.0
     status: int = 0
-    vo_samples: int = 0
-    vo_healthy_samples: int = 0
     error: str = ""
 
 
@@ -70,20 +72,27 @@ class NavStabilityTest(Node):
             depth=5,
             reliability=ReliabilityPolicy.BEST_EFFORT,
         )
-        self._vo_healthy = False
-        self._vo_samples = 0
-        self._vo_healthy_count = 0
+        self._costmap_ready = False
         self.create_subscription(
-            Bool, "/visual_odometry/healthy", self._on_vo_health, sensor_qos
+            Bool, "/nav/costmap_ready", self._on_costmap_ready, sensor_qos
         )
-
         self.results: list[GoalResult] = []
 
-    def _on_vo_health(self, msg: Bool):
-        self._vo_samples += 1
-        if msg.data:
-            self._vo_healthy_count += 1
-        self._vo_healthy = msg.data
+    def _on_costmap_ready(self, msg: Bool):
+        self._costmap_ready = msg.data
+
+    def wait_for_costmap(self) -> bool:
+        self.get_logger().info("Waiting for costmap to populate...")
+        deadline = time.monotonic() + COSTMAP_WAIT_SEC
+        while not self._costmap_ready and time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=1.0)
+        if self._costmap_ready:
+            self.get_logger().info("Costmap ready")
+        else:
+            self.get_logger().warn(
+                f"Costmap not ready after {COSTMAP_WAIT_SEC}s, proceeding anyway"
+            )
+        return self._costmap_ready
 
     def wait_for_server(self, timeout_sec=30.0) -> bool:
         self.get_logger().info("Waiting for navigate_to_pose action server...")
@@ -91,8 +100,6 @@ class NavStabilityTest(Node):
 
     def send_goal_and_wait(self, goal_dict: dict) -> GoalResult:
         result = GoalResult(name=goal_dict["name"])
-        self._vo_samples = 0
-        self._vo_healthy_count = 0
 
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
@@ -127,8 +134,6 @@ class NavStabilityTest(Node):
 
         elapsed = time.monotonic() - t0
         result.elapsed_sec = elapsed
-        result.vo_samples = self._vo_samples
-        result.vo_healthy_samples = self._vo_healthy_count
 
         if result_future.done():
             nav_result = result_future.result()
@@ -158,8 +163,10 @@ class NavStabilityTest(Node):
             self.get_logger().fatal("Action server not available, aborting")
             return False
 
+        self.wait_for_costmap()
+
         self.get_logger().info(
-            f"Settling for {SETTLE_WAIT_SEC}s to let EKF/VO stabilize..."
+            f"Settling for {SETTLE_WAIT_SEC}s to let EKF stabilize..."
         )
         t_settle = time.monotonic() + SETTLE_WAIT_SEC
         while time.monotonic() < t_settle:
@@ -168,7 +175,6 @@ class NavStabilityTest(Node):
         for goal in GOALS:
             result = self.send_goal_and_wait(goal)
             self.results.append(result)
-            # Brief pause between goals
             t_pause = time.monotonic() + 3.0
             while time.monotonic() < t_pause:
                 rclpy.spin_once(self, timeout_sec=0.5)
@@ -176,36 +182,27 @@ class NavStabilityTest(Node):
         return self.print_summary()
 
     def print_summary(self) -> bool:
-        print("\n" + "=" * 72)
+        print("\n" + "=" * 60)
         print("NAV STABILITY TEST RESULTS")
-        print("=" * 72)
-        print(
-            f"{'Goal':<25} {'Result':<10} {'Time(s)':<10} "
-            f"{'VO Pass%':<10} {'Error'}"
-        )
-        print("-" * 72)
+        print("=" * 60)
+        print(f"{'Goal':<25} {'Result':<10} {'Time(s)':<10} {'Error'}")
+        print("-" * 60)
 
         all_pass = True
         for r in self.results:
-            vo_pct = (
-                f"{100.0 * r.vo_healthy_samples / r.vo_samples:.0f}%"
-                if r.vo_samples > 0
-                else "N/A"
-            )
             status = "PASS" if r.success else "FAIL"
             if not r.success:
                 all_pass = False
             print(
-                f"{r.name:<25} {status:<10} {r.elapsed_sec:<10.1f} "
-                f"{vo_pct:<10} {r.error}"
+                f"{r.name:<25} {status:<10} {r.elapsed_sec:<10.1f} {r.error}"
             )
 
-        print("-" * 72)
+        print("-" * 60)
         passed = sum(1 for r in self.results if r.success)
         total = len(self.results)
         verdict = "PASS" if all_pass else "FAIL"
         print(f"Overall: {passed}/{total} goals succeeded -- {verdict}")
-        print("=" * 72 + "\n")
+        print("=" * 60 + "\n")
         return all_pass
 
 

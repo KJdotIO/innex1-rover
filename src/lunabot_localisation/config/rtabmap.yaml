@@ -33,7 +33,7 @@ rtabmap:
 
     # ── Mapping ──
     Grid/CellSize: "0.05"
-    Grid/RangeMax: "4.0"
+    Grid/RangeMax: "3.5"
     Grid/RangeMin: "0.15"
     Grid/MaxGroundAngle: "30"
     Grid/MaxObstacleHeight: "0.6"

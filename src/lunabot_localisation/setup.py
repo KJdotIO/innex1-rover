@@ -39,6 +39,8 @@ setup(
             'lunabot_localisation.rgbd_stream_republisher:main',
             'topic_health_watchdog = '
             'lunabot_localisation.topic_health_watchdog:main',
+            'status_dashboard = '
+            'lunabot_localisation.status_dashboard:main',
         ],
     },
 

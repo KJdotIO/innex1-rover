@@ -34,16 +34,16 @@ class TopicHealthWatchdog(Node):
     MONITORED_TOPICS = {
         "/odom": {"type": Odometry, "min_hz": 10.0, "critical": True},
         "/imu/data_raw": {"type": Imu, "min_hz": 50.0, "critical": True},
-        "/camera_front/image_sync": {"type": Image, "min_hz": 2.0, "critical": True},
-        "/camera_front/depth_image_sync": {"type": Image, "min_hz": 2.0, "critical": True},
+        "/camera_front/image_sync": {"type": Image, "min_hz": 1.0, "critical": True},
+        "/camera_front/depth_image_sync": {"type": Image, "min_hz": 1.0, "critical": True},
         "/camera_front/camera_info_sync": {
             "type": CameraInfo,
-            "min_hz": 2.0,
+            "min_hz": 1.0,
             "critical": True,
         },
         "/camera_front/points": {
             "type": PointCloud2,
-            "min_hz": 3.0,
+            "min_hz": 0.5,
             "critical": False,
         },
     }
