@@ -6,6 +6,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -36,6 +37,14 @@ def generate_launch_description():
             "params_file": nav_params_path,
             "autostart": "true",
         }.items(),
+    )
+
+    hazard_detection_node = Node(
+        package="lunabot_perception",
+        executable="hazard_detection",
+        name="hazard_detection",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
     )
 
     cmd_vel_mux_node = Node(
