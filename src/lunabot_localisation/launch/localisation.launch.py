@@ -92,11 +92,9 @@ def generate_launch_description():
                 output="screen",
                 parameters=[apriltag_yaml, {"use_sim_time": True}],
                 remappings=[
-                    ("image_rect", "/camera_front/image_sync"),
-                    ("camera_info", "/camera_front/camera_info_sync"),
-                    ("/camera_front/camera_info", "/camera_front/camera_info_sync"),
-                    ("image_rect/camera_info", "/camera_front/camera_info_sync"),
-                    ("/camera_front/image_sync/camera_info", "/camera_front/camera_info_sync"),
+                    # Use native camera topic pair for robust image_transport sync.
+                    ("image_rect", "/camera_front/image"),
+                    ("camera_info", "/camera_front/camera_info"),
                 ],
             ),
             # ──────────────────────────────────────────────────────────

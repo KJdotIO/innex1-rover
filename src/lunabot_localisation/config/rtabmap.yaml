@@ -53,5 +53,11 @@ rtabmap:
     Mem/IncrementalMemory: "true"
     Mem/STMSize: "30"
 
+    # ── Cloud and storage tuning for low-res RGB-D sim ──
+    # 240x150 depth does not support decimation 4 cleanly; clamp to 3.
+    Cloud/Decimation: "3"
+    # Suppress RVL/16-bit compatibility warning by using PNG compression.
+    Mem/DepthCompressionFormat: ".png"
+
     # ── Feature matching for loop closure ──
     Kp/MaxFeatures: "400"

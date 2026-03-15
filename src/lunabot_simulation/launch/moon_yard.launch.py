@@ -12,7 +12,8 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    """Generate a launch description for moon yard simulation.
+    """
+    Generate a launch description for moon yard simulation.
 
     Includes Gazebo startup, rover spawn, state publishing, and bridge nodes.
     """
@@ -115,16 +116,19 @@ def generate_launch_description():
     # Split camera bridges: point cloud on its own process to avoid
     # contention with image streams (the main cause of point cloud starvation).
     camera_qos_overrides = {
-        "qos_overrides./camera_front/camera_info.publisher.reliability": "best_effort",
+        # Keep camera topics RViz-compatible (RViz defaults to reliable).
+        # Reliable publishers still satisfy best-effort subscribers used by
+        # internal perception/localisation nodes.
+        "qos_overrides./camera_front/camera_info.publisher.reliability": "reliable",
         "qos_overrides./camera_front/camera_info.publisher.history": "keep_last",
         "qos_overrides./camera_front/camera_info.publisher.depth": 5,
-        "qos_overrides./camera_front/image.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/image.publisher.reliability": "reliable",
         "qos_overrides./camera_front/image.publisher.history": "keep_last",
         "qos_overrides./camera_front/image.publisher.depth": 5,
-        "qos_overrides./camera_front/depth_image.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/depth_image.publisher.reliability": "reliable",
         "qos_overrides./camera_front/depth_image.publisher.history": "keep_last",
         "qos_overrides./camera_front/depth_image.publisher.depth": 5,
-        "qos_overrides./camera_front/points.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/points.publisher.reliability": "reliable",
         "qos_overrides./camera_front/points.publisher.history": "keep_last",
         "qos_overrides./camera_front/points.publisher.depth": 5,
     }
