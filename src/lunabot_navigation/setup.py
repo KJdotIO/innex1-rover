@@ -30,6 +30,9 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "nav_diagnostics_publisher = lunabot_navigation.nav_diagnostics_publisher:main",
+            "costmap_ready_gate = lunabot_navigation.costmap_ready_gate:main",
+        ],
     },
 )

@@ -1,0 +1,104 @@
+<?xml version="1.0" ?>
+<!--
+  Crater obstacle: ~45cm diameter raised octagonal ring.
+  8 box segments form a closed ring visible to the depth camera from
+  any approach angle. 10cm tall rim so the point cloud marks it as
+  an obstacle. Colour matches surrounding sand with slight darkening.
+-->
+<sdf version="1.8">
+  <model name="crater">
+    <static>true</static>
+
+    <!-- Rim geometry: 8 boxes arranged in an octagon.
+         Radius ~0.20m center-to-segment, box length ~0.17m to close gaps.
+         Each segment: 0.17 x 0.06 x 0.10 (length x thickness x height) -->
+
+    <!-- N  (0 deg) -->
+    <link name="rim_0">
+      <pose>0 0.20 0.05 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- NE (45 deg) -->
+    <link name="rim_1">
+      <pose>0.1414 0.1414 0.05 0 0 0.7854</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- E  (90 deg) -->
+    <link name="rim_2">
+      <pose>0.20 0 0.05 0 0 1.5708</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- SE (135 deg) -->
+    <link name="rim_3">
+      <pose>0.1414 -0.1414 0.05 0 0 2.3562</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- S  (180 deg) -->
+    <link name="rim_4">
+      <pose>0 -0.20 0.05 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- SW (225 deg) -->
+    <link name="rim_5">
+      <pose>-0.1414 -0.1414 0.05 0 0 0.7854</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- W  (270 deg) -->
+    <link name="rim_6">
+      <pose>-0.20 0 0.05 0 0 1.5708</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- NW (315 deg) -->
+    <link name="rim_7">
+      <pose>-0.1414 0.1414 0.05 0 0 2.3562</pose>
+      <visual name="v"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <material><ambient>0.50 0.42 0.28 1</ambient><diffuse>0.55 0.45 0.30 1</diffuse></material>
+      </visual>
+      <collision name="c"><geometry><box><size>0.17 0.06 0.10</size></box></geometry>
+        <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+      </collision>
+    </link>
+  </model>
+</sdf>

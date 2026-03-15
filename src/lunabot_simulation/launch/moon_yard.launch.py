@@ -12,6 +12,11 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    """
+    Generate a launch description for moon yard simulation.
+
+    Includes Gazebo startup, rover spawn, state publishing, and bridge nodes.
+    """
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
@@ -42,10 +47,10 @@ def generate_launch_description():
         os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
     )
 
-    # Spawn position - surface mesh is at z=0, rover spawns above and drops
-    spawn_x = "0.0"
-    spawn_y = "0.0"
-    spawn_z = "0.5"  # Start above surface, gravity will settle it
+    # Spawn in the Starting Zone (top-left of arena, centered at -2.95, 1.1)
+    spawn_x = "-2.95"
+    spawn_y = "1.1"
+    spawn_z = "0.3"
 
     # we'll run the sim without gazebo gui to save resources for now
     gz_sim = IncludeLaunchDescription(
@@ -93,6 +98,7 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Core robot bridge: cmd_vel, odom, IMU, joint_states, pose
     robot_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -100,21 +106,54 @@ def generate_launch_description():
         arguments=[
             "/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
             "/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
-            # "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
-            "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan",
+            "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
+        ],
+        output="screen",
+    )
+
+    # Split camera bridges: point cloud on its own process to avoid
+    # contention with image streams (the main cause of point cloud starvation).
+    camera_qos_overrides = {
+        # Keep camera topics RViz-compatible (RViz defaults to reliable).
+        # Reliable publishers still satisfy best-effort subscribers used by
+        # internal perception/localisation nodes.
+        "qos_overrides./camera_front/camera_info.publisher.reliability": "reliable",
+        "qos_overrides./camera_front/camera_info.publisher.history": "keep_last",
+        "qos_overrides./camera_front/camera_info.publisher.depth": 5,
+        "qos_overrides./camera_front/image.publisher.reliability": "reliable",
+        "qos_overrides./camera_front/image.publisher.history": "keep_last",
+        "qos_overrides./camera_front/image.publisher.depth": 5,
+        "qos_overrides./camera_front/depth_image.publisher.reliability": "reliable",
+        "qos_overrides./camera_front/depth_image.publisher.history": "keep_last",
+        "qos_overrides./camera_front/depth_image.publisher.depth": 5,
+        "qos_overrides./camera_front/points.publisher.reliability": "reliable",
+        "qos_overrides./camera_front/points.publisher.history": "keep_last",
+        "qos_overrides./camera_front/points.publisher.depth": 5,
+    }
+
+    camera_image_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_image_bridge",
+        arguments=[
             "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/camera_front_left/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front_left@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/camera_front_right/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front_right@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/model/leo_rover/pose@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
         ],
+        parameters=[camera_qos_overrides],
+        output="screen",
+    )
+
+    camera_pointcloud_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_pointcloud_bridge",
+        arguments=[
+            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
+        ],
+        parameters=[camera_qos_overrides],
         output="screen",
     )
 
@@ -125,5 +164,7 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
+            camera_image_bridge,
+            camera_pointcloud_bridge,
         ]
     )

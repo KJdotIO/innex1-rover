@@ -1,7 +1,20 @@
 ### Dual EKF Configuration ###
-# Local EKF: smooth odom -> base_footprint (continuous, never jumps)
-# Global EKF: map -> odom (jumps when AprilTag seen, corrects drift)
+# ─────────────────────────────────────────────────────────────────────
+# DESIGN:
+#   Local  EKF  → odom → base_footprint  (smooth, never jumps)
+#   Global EKF  → map  → odom            (jumps when AprilTag seen)
+#
+# PHILOSOPHY:
+#   Wheel odometry + IMU are the BACKBONE.  They always work.
+#   No visual odometry — it adds complexity and failure modes.
+#   AprilTag provides absolute corrections in the global EKF only.
+# ─────────────────────────────────────────────────────────────────────
 
+# [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
+
+# ═══════════════════════════════════════════════════════════════════════
+# LOCAL EKF — smooth, continuous odom → base_footprint
+# ═══════════════════════════════════════════════════════════════════════
 ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
@@ -9,80 +22,110 @@ ekf_filter_node_odom:
     two_d_mode: true
     publish_acceleration: true
     publish_tf: true
+    print_diagnostics: false
 
     map_frame: map
     odom_frame: odom
     base_link_frame: base_footprint
     world_frame: odom
 
-    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
-
-    # Wheel odometry: position + velocity
+    # ── Wheel odometry (PRIMARY position + heading + velocity) ──
     odom0: /odom
     odom0_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
+        true,   # X
+        true,   # Y
+        false,  # Z
+        false,  # Roll
+        false,  # Pitch
+        true,   # Yaw
+        true,   # VX
+        false,  # VY
+        false,  # VZ
+        false,  # VRoll
+        false,  # VPitch
+        true,   # VYaw
+        false,  # AX
+        false,  # AY
+        false   # AZ
       ]
+    odom0_differential: false
 
-    # IMU: yaw orientation + angular velocity + linear acceleration
+    # ── IMU (orientation + angular rate + acceleration) ──
     imu0: /imu/data_raw
     imu0_config:
       [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
+        false,  # X
+        false,  # Y
+        false,  # Z
+        false,  # Roll
+        false,  # Pitch
+        true,   # Yaw
+        false,  # VX
+        false,  # VY
+        false,  # VZ
+        false,  # VRoll
+        false,  # VPitch
+        true,   # VYaw
+        true,   # AX
+        false,  # AY
+        false   # AZ
       ]
+    # Keep absolute (not differential) because we have only one
+    # orientation source. Differential would double-count yaw rate
+    # since we also fuse VYaw from the same IMU.
+    imu0_differential: false
+    imu0_remove_gravitational_acceleration: true
 
-    # Visual odometry is gated before it reaches the filter.
-    odom1: /visual_odometry/gated
-    odom1_config:
+    # ── Process noise ──
+    # Tuned for 4-wheel skid-steer on sand: high lateral slip means
+    # wheel odom drifts significantly on turns. Elevated X/Y/Yaw noise
+    # makes the EKF trust AprilTag corrections more when available.
+    # Reference: Purdue Lunabotics relies on SLAM corrections for slip.
+    process_noise_covariance:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        0.10, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.10, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.10, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.04, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.04, 0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.015
       ]
-    odom1_queue_size: 5
-    odom1_nodelay: true
-    odom1_pose_rejection_threshold: 2.0
 
+    # Large initial covariance: with random start position/direction
+    # (per rulebook), the EKF must accept the first AprilTag correction
+    # without fighting. 1.0 for X/Y, 0.5 for Yaw.
+    initial_estimate_covariance:
+      [
+        1.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  1.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9
+      ]
+
+# ═══════════════════════════════════════════════════════════════════════
+# GLOBAL EKF — map → odom (jumps when AprilTag is seen)
+# ═══════════════════════════════════════════════════════════════════════
 ekf_filter_node_map:
   ros__parameters:
     use_sim_time: true
@@ -90,98 +133,71 @@ ekf_filter_node_map:
     two_d_mode: true
     publish_acceleration: false
     publish_tf: true
+    print_diagnostics: false
 
     map_frame: map
     odom_frame: odom
     base_link_frame: base_footprint
     world_frame: map
 
-    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
-
-    # Same continuous sources as local EKF
+    # ── Same continuous sources as local EKF ──
     odom0: /odom
     odom0_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
+        true, true, false,
+        false, false, true,
+        true, false, false,
+        false, false, true,
+        false, false, false
       ]
+    odom0_differential: false
 
     imu0: /imu/data_raw
     imu0_config:
       [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
+        false, false, false,
+        false, false, true,
+        false, false, false,
+        false, false, true,
+        true, false, false
       ]
+    imu0_differential: false
+    imu0_remove_gravitational_acceleration: true
 
-    odom1: /visual_odometry/gated
-    odom1_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-      ]
-    odom1_queue_size: 5
-    odom1_nodelay: true
-    odom1_pose_rejection_threshold: 2.0
-
-    # AprilTag pose correction (discontinuous, only in global EKF)
+    # ── AprilTag absolute pose correction ──
+    # Not differential — these are absolute map-frame measurements.
+    # High rejection threshold (10.0) because with random start
+    # position/direction, the first correction can have large
+    # Mahalanobis distance. Rejecting it means never getting localized.
     pose0: /tag_pose
     pose0_config:
       [
-        true,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
+        true, true, false,
+        false, false, true,
+        false, false, false,
+        false, false, false,
+        false, false, false
       ]
     pose0_differential: false
     pose0_relative: false
-    pose0_rejection_threshold: 5.0
+    pose0_rejection_threshold: 10.0
+
+    # Large initial covariance for global EKF too
+    initial_estimate_covariance:
+      [
+        1.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  1.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,
+        0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9
+      ]

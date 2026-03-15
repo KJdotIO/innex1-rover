@@ -1,184 +1,263 @@
 <?xml version="1.0" ?>
+<!--
+  UK Lunabotics 2026 Moon Yard Arena
+  Rulebook v0.3: 7.9m x 4.4m, builder's sand, indoor lighting
+  Zones: Start (2m, top-left), Build (2.6m x 1.5m, bottom-left),
+         Obstacle (5.39m, middle), Excavation (2.75m, right, 30cm deeper)
+  Beacon mount: wall near start zone, facing construction zone
+-->
 <sdf version="1.8">
   <world name="moon_yard">
 
     <gravity>0 0 -9.81</gravity>
 
-    <physics name="1ms" type="ode">
-      <max_step_size>0.002</max_step_size>
+    <!-- 4ms step (250Hz) is sufficient for a 0.2 m/s rover and frees
+         CPU for depth camera rendering (the main bottleneck). -->
+    <physics name="4ms" type="ode">
+      <max_step_size>0.004</max_step_size>
       <real_time_factor>1.0</real_time_factor>
-      <real_time_update_rate>500</real_time_update_rate>
+      <real_time_update_rate>250</real_time_update_rate>
     </physics>
 
-    <plugin
-            filename="ignition-gazebo-physics-system"
-            name="ignition::gazebo::systems::Physics"
-        >
+    <plugin filename="ignition-gazebo-physics-system"
+            name="ignition::gazebo::systems::Physics">
     </plugin>
-    <plugin
-            filename="ignition-gazebo-sensors-system"
-            name="ignition::gazebo::systems::Sensors"
-        >
+    <plugin filename="ignition-gazebo-sensors-system"
+            name="ignition::gazebo::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
-    <plugin
-            filename="ignition-gazebo-scene-broadcaster-system"
-            name="ignition::gazebo::systems::SceneBroadcaster"
-        >
+    <plugin filename="ignition-gazebo-scene-broadcaster-system"
+            name="ignition::gazebo::systems::SceneBroadcaster">
     </plugin>
-    <plugin
-            filename="ignition-gazebo-user-commands-system"
-            name="ignition::gazebo::systems::UserCommands"
-        >
+    <plugin filename="ignition-gazebo-user-commands-system"
+            name="ignition::gazebo::systems::UserCommands">
     </plugin>
-    <plugin
-            filename="ignition-gazebo-imu-system"
-            name="ignition::gazebo::systems::Imu"
-        >
+    <plugin filename="ignition-gazebo-imu-system"
+            name="ignition::gazebo::systems::Imu">
     </plugin>
 
-    <include>
-      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
-    </include>
+    <!-- ════════════════════════════════════════════════════════════
+         Indoor lighting (warehouse/fluorescent, no harsh shadows)
+         ════════════════════════════════════════════════════════════ -->
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.2 0.2 0.2 1</background>
+      <shadows>false</shadows>
+      <grid>false</grid>
+    </scene>
 
+    <light name="overhead_1" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>2.0 0 5 0 0 0</pose>
+      <diffuse>0.6 0.58 0.55 1</diffuse>
+      <specular>0.15 0.15 0.15 1</specular>
+      <attenuation>
+        <range>20</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.1 -0.1 -1.0</direction>
+    </light>
+
+    <light name="overhead_2" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>5.0 -1.0 5 0 0 0</pose>
+      <diffuse>0.5 0.48 0.45 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0.1 0.05 -1.0</direction>
+    </light>
+
+    <!-- ════════════════════════════════════════════════════════════
+         Arena ground: lightweight textured plane (replaces 13MB mesh)
+         Arena origin (0,0) = center of the 7.9x4.4 arena
+         ════════════════════════════════════════════════════════════ -->
     <include>
       <uri>model://lunar_surface</uri>
       <name>lunar_surface</name>
-      <pose>2.95 -1.1 0.0 0 0 0</pose>
+      <pose>0 0 0 0 0 0</pose>
     </include>
 
-    <include>
-      <uri>model://apriltag_beacon</uri>
-      <name>apriltag_beacon</name>
-      <pose>0 1.08 0.25 0 0 0</pose>
+    <!-- ════════════════════════════════════════════════════════════
+         Zone overlays (thin colored planes for visual reference)
+         Arena coords: X runs 0..7.9 (left to right), Y runs -2.2..2.2
+         But we center at 0,0 so X: -3.95..3.95, Y: -2.2..2.2
+         ════════════════════════════════════════════════════════════ -->
+
+    <!-- Starting zone: 2m x ~2.2m, top-left corner -->
+    <model name="zone_start">
       <static>true</static>
-    </include>
+      <pose>-2.95 1.1 0.002 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>2.0 2.2 0.001</size></box></geometry>
+          <material>
+            <ambient>0.3 0.7 0.3 0.3</ambient>
+            <diffuse>0.3 0.8 0.3 0.3</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
 
-    <!-- Walls -->
+    <!-- Construction/Build zone: 2.6m x 1.5m, bottom-left -->
+    <model name="zone_build">
+      <static>true</static>
+      <pose>-2.65 -1.45 0.002 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>2.6 1.5 0.001</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.8 0.3</ambient>
+            <diffuse>0.3 0.4 0.9 0.3</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Berm target area: 1.5m x 0.9m inside build zone -->
+    <model name="berm_target">
+      <static>true</static>
+      <pose>-2.65 -1.45 0.003 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>1.5 0.9 0.001</size></box></geometry>
+          <material>
+            <ambient>0.8 0.2 0.2 0.4</ambient>
+            <diffuse>0.9 0.3 0.3 0.4</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Excavation zone: 2.75m, right side (pink overlay) -->
+    <model name="zone_excavation">
+      <static>true</static>
+      <pose>2.575 0 0.002 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry><box><size>2.75 4.4 0.001</size></box></geometry>
+          <material>
+            <ambient>0.8 0.4 0.5 0.2</ambient>
+            <diffuse>0.9 0.5 0.6 0.2</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ════════════════════════════════════════════════════════════
+         Walls: plywood-colored, mu=0.3, 0.5m high
+         ════════════════════════════════════════════════════════════ -->
     <model name="wall_north">
       <static>true</static>
-      <pose>2.95 1.15 0.25 0 0 0</pose>
+      <pose>0 2.25 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
+          <surface><friction><ode><mu>0.3</mu><mu2>0.3</mu2></ode></friction></surface>
         </collision>
         <visual name="visual">
           <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
-          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
-                        >0.6 0.6 0.6 1</diffuse></material>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.65 0.50 0.35 1</diffuse>
+          </material>
         </visual>
       </link>
     </model>
 
     <model name="wall_south">
       <static>true</static>
-      <pose>2.95 -3.35 0.25 0 0 0</pose>
+      <pose>0 -2.25 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
+          <surface><friction><ode><mu>0.3</mu><mu2>0.3</mu2></ode></friction></surface>
         </collision>
         <visual name="visual">
           <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
-          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
-                        >0.6 0.6 0.6 1</diffuse></material>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.65 0.50 0.35 1</diffuse>
+          </material>
         </visual>
       </link>
     </model>
 
     <model name="wall_east">
       <static>true</static>
-      <pose>6.95 -1.1 0.25 0 0 0</pose>
+      <pose>3.95 0 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
+          <surface><friction><ode><mu>0.3</mu><mu2>0.3</mu2></ode></friction></surface>
         </collision>
         <visual name="visual">
           <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
-          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
-                        >0.6 0.6 0.6 1</diffuse></material>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.65 0.50 0.35 1</diffuse>
+          </material>
         </visual>
       </link>
     </model>
 
     <model name="wall_west">
       <static>true</static>
-      <pose>-1.05 -1.1 0.25 0 0 0</pose>
+      <pose>-3.95 0 0.25 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
+          <surface><friction><ode><mu>0.3</mu><mu2>0.3</mu2></ode></friction></surface>
         </collision>
         <visual name="visual">
           <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
-          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
-                        >0.6 0.6 0.6 1</diffuse></material>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.65 0.50 0.35 1</diffuse>
+          </material>
         </visual>
       </link>
     </model>
 
-    <!-- Zone markers -->
-    <!-- <model name="zone_starting">
+    <!-- ════════════════════════════════════════════════════════════
+         AprilTag beacon: on wall near start zone, facing construction zone
+         Mounted on the west wall (start side), facing east toward build zone
+         ════════════════════════════════════════════════════════════ -->
+    <include>
+      <uri>model://apriltag_beacon</uri>
+      <name>apriltag_beacon</name>
+      <pose>-2.95 2.15 0.12 0 0 0</pose>
       <static>true</static>
-      <pose>0 0 0.01 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry><box><size>2.0 2.0 0.01</size></box></geometry>
-          <material><ambient>0.2 0.8 0.2 0.4</ambient><diffuse
-                        >0.3 0.9 0.3 0.4</diffuse></material>
-        </visual>
-      </link>
-    </model>
+    </include>
 
-    <model name="zone_construction">
-      <static>true</static>
-      <pose>0.3 -2.55 0.01 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry><box><size>2.6 1.5 0.01</size></box></geometry>
-          <material><ambient>0.2 0.5 0.9 0.4</ambient><diffuse
-                        >0.3 0.6 1.0 0.4</diffuse></material>
-        </visual>
-      </link>
-    </model>
+    <!-- ════════════════════════════════════════════════════════════
+         Obstacle zone boulders: slalom pattern in the middle band
+         Obstacle zone X: roughly -1.95 to 1.20 (5.39m from rulebook)
+         Arranged to require path planning, not point-and-traverse
+         ════════════════════════════════════════════════════════════ -->
 
-    <model name="zone_obstacle">
-      <static>true</static>
-      <pose>2.575 -1.1 0.01 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry><box><size>3.15 4.4 0.01</size></box></geometry>
-          <material><ambient>0.7 0.7 0.2 0.2</ambient><diffuse
-                        >0.8 0.8 0.3 0.2</diffuse></material>
-        </visual>
-      </link>
-    </model>
+    <!-- Row 1: block the direct center path -->
+    <include><uri>model://rock_rough</uri><name>rock_1</name>
+      <pose>-1.6 0.3 0.0 0 0 0.5</pose></include>
+    <include><uri>model://rock_round</uri><name>rock_2</name>
+      <pose>-1.5 -0.8 0.0 0 0 1.2</pose></include>
 
-    <model name="zone_excavation">
-      <static>true</static>
-      <pose>5.525 -1.1 0.01 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry><box><size>2.75 4.4 0.01</size></box></geometry>
-          <material><ambient>0.9 0.3 0.4 0.4</ambient><diffuse
-                        >1.0 0.4 0.5 0.4</diffuse></material>
-        </visual>
-      </link>
-    </model> -->
+    <!-- Row 2: force weave to opposite side -->
+    <include><uri>model://rock_large</uri><name>rock_3</name>
+      <pose>-0.5 0.9 0.0 0 0 0.8</pose></include>
+    <include><uri>model://rock_rough</uri><name>rock_4</name>
+      <pose>-0.4 -0.3 0.0 0 0 2.1</pose></include>
 
-    <!-- Rocks -->
-    <include><uri>model://rock_rough</uri><name>rock_1</name><pose
-            >1.95 0.1 0.05 0 0 0.5</pose></include>
-    <include><uri>model://rock_round</uri><name>rock_2</name><pose
-            >3.25 -1.6 0.05 0 0 1.2</pose></include>
-    <include><uri>model://rock_rough</uri><name>rock_3</name><pose
-            >2.1 -2.5 0.05 0 0 2.1</pose></include>
-    <include><uri>model://rock_large</uri><name>rock_4</name><pose
-            >3.8 0.5 0.05 0 0 0.8</pose></include>
-    <include><uri>model://rock_round</uri><name>rock_5</name><pose
-            >5.75 0.4 0.05 0 0 1.5</pose></include>
-    <include><uri>model://rock_small</uri><name>rock_6</name><pose
-            >6.15 -2.1 0.05 0 0 0.3</pose></include>
-    <include><uri>model://rock_rough</uri><name>rock_7</name><pose
-            >5.2 -0.8 0.05 0 0 1.8</pose></include>
+    <!-- Row 3: narrow the gap -->
+    <include><uri>model://rock_round</uri><name>rock_5</name>
+      <pose>0.5 0.0 0.0 0 0 1.5</pose></include>
+    <include><uri>model://rock_rough</uri><name>rock_6</name>
+      <pose>0.6 -1.4 0.0 0 0 0.3</pose></include>
+
+    <!-- Row 4: final obstacle before excavation zone -->
+    <include><uri>model://rock_large</uri><name>rock_7</name>
+      <pose>1.0 0.8 0.0 0 0 1.8</pose></include>
+
 
   </world>
 </sdf>

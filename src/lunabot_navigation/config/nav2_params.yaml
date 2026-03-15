@@ -1,27 +1,89 @@
-# **ADDITIONAL NOTES:
-# add use_sim_time: true, soon...
+# ── Nav2 Parameters ──────────────────────────────────────────────────
+# Tuned for a camera-only Lunabotics rover in a boulder/regolith arena.
+# Key design choices:
+#   - Wide inflation to keep the planner away from rocks early
+#   - RPP collision lookahead tuned so it doesn't abort late
+#   - Local costmap large enough that the forward camera origin is
+#     ALWAYS inside map bounds (fixes "Sensor origin out of map bounds")
+#   - Smac Hybrid-A* with a conservative turning radius
 
-# config bt_nav to have default BT
 bt_navigator:
   ros__parameters:
     use_sim_time: true
-    default_nav_to_pose_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    # Use Nav2's built-in default BT XML from nav2_bt_navigator.
 
-# controller server with RPP
+behavior_server:
+  ros__parameters:
+    use_sim_time: true
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+# lifecycle_manager bond_timeout must be large enough to survive the
+# planner_server configure phase (SmacPlannerHybrid heuristic precompute).
+# Default 4.0 s is too short; 60 s comfortably covers the ~5 s configure.
+lifecycle_manager:
+  ros__parameters:
+    use_sim_time: true
+    autostart: true
+    bond_timeout: 60.0
+
+# ── Controller ───────────────────────────────────────────────────────
 controller_server:
   ros__parameters:
     use_sim_time: true
     controller_frequency: 20.0
     controller_plugins: ["FollowPath"]
+    # Failure tolerance: -1.0 means no timeout (let the BT recovery handle it)
+    failure_tolerance: 0.3
 
-    # choosing RPP
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      max_linear_vel: 0.3 # conservative for regolith
-      desired_linear_vel: 0.3 # incase, max_linear_vel is not read
-      max_angular_vel: 0.5 # prevents aggressive turning
 
-# planner server
+      # Speed — conservative for regolith/sim
+      desired_linear_vel: 0.20
+      max_linear_accel: 0.5
+      max_linear_decel: 1.0
+      lookahead_dist: 0.6
+      min_lookahead_dist: 0.3
+      max_lookahead_dist: 0.9
+      lookahead_time: 1.5
+
+      # Angular
+      max_angular_vel: 0.5
+      rotate_to_heading_angular_vel: 0.4
+      rotate_to_heading_min_angle: 0.6
+
+      # Approach / goal
+      goal_dist_tol: 0.15
+      min_approach_linear_velocity: 0.05
+      approach_velocity_scaling_dist: 0.6
+
+      # ─ Collision avoidance ─
+      # This is the core fix for "collision ahead" aborts near rocks.
+      # A longer lookahead time gives the controller room to slow down
+      # instead of hard-aborting when it sees inflation costs.
+      use_collision_detection: true
+      transform_tolerance: 0.2
+
+      # ─ Cost-aware regulation ─
+      # These make RPP slow down in high-cost areas instead of charging
+      # into the inflation bubble and then aborting.
+      use_regulated_linear_velocity_scaling: true
+      regulated_linear_scaling_min_radius: 1.1
+      regulated_linear_scaling_min_speed: 0.15
+      use_cost_regulated_linear_velocity_scaling: true
+      cost_scaling_dist: 0.6
+      cost_scaling_gain: 1.0
+      inflation_cost_scaling_factor: 4.0
+
+# ── Planner ──────────────────────────────────────────────────────────
 planner_server:
   ros__parameters:
     expected_planner_frequency: 1.0
@@ -37,12 +99,15 @@ planner_server:
       reverse_penalty: 2.1
       change_penalty: 0.0
       non_straight_penalty: 2.0
-      cost_penalty: 3.0
-      max_iterations: 1000000
+      cost_penalty: 2.0
+      # Reduced from 1000000: the 1M value caused a 21-second heuristic
+      # precomputation at startup, which starved the lifecycle_manager and
+      # caused out-of-order activate transitions. 200k is more than enough
+      # for a ~7x5 m arena at 0.05 m resolution.
+      max_iterations: 200000
       max_planning_time: 5.0
 
-# // COSTMAPS //
-# global costmap
+# ── Global Costmap ───────────────────────────────────────────────────
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -51,14 +116,18 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_footprint
-      robot_radius: 0.28
+      # Use the actual footprint so planner knows the robot shape.
+      # Leo rover body is ~0.44 × 0.36 m; pad to 0.50 × 0.42 for safety.
+      robot_radius: 0.34
       resolution: 0.05
       track_unknown_space: false
       rolling_window: true
-      width: 12
-      height: 12
-      origin_x: -5.0
-      origin_y: -8.0
+      # Nav2 Humble declares width/height as integer parameters.
+      # Passing a float (e.g. 14.0) causes a type mismatch crash.
+      width: 15
+      height: 10
+      origin_x: -3.5
+      origin_y: -5.0
       plugins: ["obstacle_layer", "inflation_layer"]
 
       obstacle_layer:
@@ -69,37 +138,42 @@ global_costmap:
           data_type: "PointCloud2"
           marking: true
           clearing: true
-          max_obstacle_height: 0.45
-          min_obstacle_height: 0.10
-          obstacle_max_range: 3.0
-          obstacle_min_range: 0.1
-          raytrace_max_range: 2.5
-          raytrace_min_range: 0.1
+          # Camera at 2Hz, bridge overhead means ~1Hz actual delivery.
+          # Keep obstacles 3s so costmap stays populated across gaps.
+          # expected_update_rate=0 disables the "not updated" warnings.
+          observation_persistence: 3.0
+          expected_update_rate: 0.0
+          max_obstacle_height: 0.50
+          min_obstacle_height: 0.08
+          obstacle_max_range: 3.5
+          obstacle_min_range: 0.15
+          raytrace_max_range: 4.0
+          raytrace_min_range: 0.15
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.5
-        inflation_radius: 0.55
+        inflation_radius: 0.80
+        cost_scaling_factor: 4.0
 
       always_send_full_costmap: true
 
-# local costmap
+# ── Local Costmap ──
+# NOTE: inflation must match global for RPP cost regulation to work.
+# ────────────────────────────────────────────────────
 local_costmap:
   local_costmap:
     ros__parameters:
       use_sim_time: true
+      update_frequency: 5.0
+      publish_frequency: 2.0
       global_frame: odom
       robot_base_frame: base_footprint
-      robot_radius: 0.28
+      robot_radius: 0.34
       plugins: ["obstacle_layer", "inflation_layer"]
 
-      # Center the local window around the rover so the forward camera origin
-      # stays inside bounds for obstacle raytracing while navigating.
       rolling_window: true
-      width: 4
-      height: 4
-      origin_x: -2.0
-      origin_y: -2.0
+      width: 6
+      height: 6
       resolution: 0.05
 
       obstacle_layer:
@@ -110,16 +184,18 @@ local_costmap:
           data_type: "PointCloud2"
           marking: true
           clearing: true
-          max_obstacle_height: 0.45
-          min_obstacle_height: 0.10
-          obstacle_max_range: 3.0
-          obstacle_min_range: 0.1
-          raytrace_max_range: 2.5
-          raytrace_min_range: 0.1
+          observation_persistence: 3.0
+          expected_update_rate: 0.0
+          max_obstacle_height: 0.50
+          min_obstacle_height: 0.08
+          obstacle_max_range: 3.5
+          obstacle_min_range: 0.15
+          raytrace_max_range: 4.0
+          raytrace_min_range: 0.15
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.60
-        cost_scaling_factor: 3.5
+        inflation_radius: 0.80
+        cost_scaling_factor: 4.0
 
       always_send_full_costmap: true

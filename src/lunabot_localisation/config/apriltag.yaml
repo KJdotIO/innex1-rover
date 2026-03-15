@@ -1,8 +1,14 @@
+# ── AprilTag Configuration ────────────────────────────────────────────
+# The tag in sim is 0.15 m. Key tuning:
+#   - decimate: 1.0  (no downsampling — tag is already small/marginal)
+#   - refine: true   (subpixel refinement for better pose)
+#   - threads: 2     (fast enough at 640×480)
+# ──────────────────────────────────────────────────────────────────────
 /**:
   ros__parameters:
     image_transport: raw
     family: 36h11
-    size: 0.25
+    size: 0.15
     max_hamming: 0
     detector:
       threads: 2
