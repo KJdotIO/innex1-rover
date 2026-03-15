@@ -44,7 +44,7 @@ jobs:
       - name: Build
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build
+          colcon build --symlink-install
         shell: bash
 
       - name: Check interface contracts
