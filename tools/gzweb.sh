@@ -22,7 +22,13 @@ if [ -f "$SCRIPT_DIR/install/setup.bash" ]; then
   source "$SCRIPT_DIR/install/setup.bash"
 fi
 
-export GZ_SIM_RESOURCE_PATH="$SCRIPT_DIR/install/lunabot_simulation/share/lunabot_simulation/models:${GZ_SIM_RESOURCE_PATH:-}"
+INSTALL_MODELS="$SCRIPT_DIR/install/lunabot_simulation/share/lunabot_simulation/models"
+SRC_MODELS="$SCRIPT_DIR/src/lunabot_simulation/models"
+MODELS_PATH="$INSTALL_MODELS"
+if [ ! -d "$MODELS_PATH" ]; then
+  MODELS_PATH="$SRC_MODELS"
+fi
+export GZ_SIM_RESOURCE_PATH="$MODELS_PATH:${GZ_SIM_RESOURCE_PATH:-}"
 
 WORLD="$SCRIPT_DIR/install/lunabot_simulation/share/lunabot_simulation/worlds/moon_yard.sdf"
 if [ ! -f "$WORLD" ]; then

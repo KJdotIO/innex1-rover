@@ -13,6 +13,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
+    """Generate a launch description for the full simulation stack."""
     pkg_bringup = get_package_share_directory("lunabot_bringup")
     pkg_simulation = get_package_share_directory("lunabot_simulation")
 

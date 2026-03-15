@@ -103,7 +103,7 @@ def generate_launch_description():
             "/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
-            "/model/leo_rover/pose@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
+            "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
         ],
         output="screen",
     )

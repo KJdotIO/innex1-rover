@@ -19,8 +19,10 @@ from std_msgs.msg import Bool
 
 
 class StatusDashboard(Node):
+    """Compact periodic status summary for the navigation stack."""
 
     def __init__(self):
+        """Initialise subscriptions and aggregation state."""
         super().__init__("status_dashboard")
         self.declare_parameter("period_sec", 5.0)
         period = self.get_parameter("period_sec").value
@@ -113,6 +115,7 @@ class StatusDashboard(Node):
 
 
 def main(args=None):
+    """Run the status dashboard node."""
     rclpy.init(args=args)
     node = StatusDashboard()
     try:

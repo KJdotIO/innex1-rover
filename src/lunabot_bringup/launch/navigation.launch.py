@@ -10,7 +10,10 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Launch localisation + Nav2 + costmap readiness gate."""
+    """Generate a launch description for the navigation stack.
+
+    Includes localisation, Nav2, and the costmap readiness gate node.
+    """
     pkg_bringup = get_package_share_directory("lunabot_bringup")
     pkg_nav = get_package_share_directory("lunabot_navigation")
     pkg_nav2_bringup = get_package_share_directory("nav2_bringup")

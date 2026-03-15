@@ -89,8 +89,8 @@ class NavStabilityTest(Node):
         if self._costmap_ready:
             self.get_logger().info("Costmap ready")
         else:
-            self.get_logger().warn(
-                f"Costmap not ready after {COSTMAP_WAIT_SEC}s, proceeding anyway"
+            self.get_logger().error(
+                f"Costmap not ready after {COSTMAP_WAIT_SEC}s"
             )
         return self._costmap_ready
 
@@ -163,7 +163,11 @@ class NavStabilityTest(Node):
             self.get_logger().fatal("Action server not available, aborting")
             return False
 
-        self.wait_for_costmap()
+        if not self.wait_for_costmap():
+            self.get_logger().fatal(
+                "Aborting: costmap never became ready"
+            )
+            return False
 
         self.get_logger().info(
             f"Settling for {SETTLE_WAIT_SEC}s to let EKF stabilize..."

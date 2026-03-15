@@ -24,8 +24,8 @@
   <xacro:property name="front_rgbd_height" value="$(arg front_rgbd_height)" />
   <xacro:property name="front_rgbd_rate" value="$(arg front_rgbd_rate)" />
   <xacro:property name="front_rgbd_clip_near" value="0.10" />
-  <!-- 4m is plenty for a 7.9m arena and reduces depth rendering load -->
-  <xacro:property name="front_rgbd_clip_far" value="4.0" />
+  <xacro:arg name="front_rgbd_clip_far" default="4.0" />
+  <xacro:property name="front_rgbd_clip_far" value="$(arg front_rgbd_clip_far)" />
   <xacro:property name="oak_clip_near" value="0.10" />
   <xacro:property name="oak_clip_far" value="12.0" />
 

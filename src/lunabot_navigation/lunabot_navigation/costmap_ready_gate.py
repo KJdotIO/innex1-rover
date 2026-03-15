@@ -4,20 +4,27 @@ Subscribes to /camera_front/points and publishes a Bool on
 /nav/costmap_ready once a minimum number of messages have arrived.
 Other nodes (or the test harness) should check this before sending goals.
 
-Also provides a service /nav/wait_for_costmap that blocks until ready.
+Also provides a service /nav/check_costmap to query readiness.
 """
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Bool
 from std_srvs.srv import Trigger
 
 
 class CostmapReadyGate(Node):
+    """Gate that blocks navigation until costmap has obstacle data."""
 
     def __init__(self):
+        """Initialise point cloud subscription and readiness publisher."""
         super().__init__("costmap_ready_gate")
         self.declare_parameter("min_messages", 3)
         self.declare_parameter("topic", "/camera_front/points")
@@ -34,8 +41,14 @@ class CostmapReadyGate(Node):
         )
 
         self.create_subscription(PointCloud2, topic, self._on_points, sensor_qos)
-        self.pub = self.create_publisher(Bool, "/nav/costmap_ready", 10)
-        self.create_service(Trigger, "/nav/wait_for_costmap", self._srv_callback)
+        status_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.pub = self.create_publisher(Bool, "/nav/costmap_ready", status_qos)
+        self.create_service(Trigger, "/nav/check_costmap", self._srv_callback)
         self.create_timer(1.0, self._publish_status)
 
         self.get_logger().info(
@@ -67,6 +80,7 @@ class CostmapReadyGate(Node):
 
 
 def main(args=None):
+    """Run the costmap readiness gate node."""
     rclpy.init(args=args)
     node = CostmapReadyGate()
     try:

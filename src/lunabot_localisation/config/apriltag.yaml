@@ -1,5 +1,5 @@
 # ── AprilTag Configuration ────────────────────────────────────────────
-# The tag in sim is 0.25 m. Key tuning:
+# The tag in sim is 0.15 m. Key tuning:
 #   - decimate: 1.0  (no downsampling — tag is already small/marginal)
 #   - refine: true   (subpixel refinement for better pose)
 #   - threads: 2     (fast enough at 640×480)

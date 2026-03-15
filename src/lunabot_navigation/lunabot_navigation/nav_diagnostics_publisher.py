@@ -13,6 +13,7 @@ class NavDiagnosticsPublisher(Node):
     """Aggregate navigation health signals into a single diagnostics stream."""
 
     def __init__(self) -> None:
+        """Initialise subscriptions and diagnostics publishers."""
         super().__init__("nav_diagnostics_publisher")
 
         sensor_qos = QoSProfile(
@@ -91,6 +92,7 @@ class NavDiagnosticsPublisher(Node):
 
 
 def main(args=None) -> None:
+    """Run the navigation diagnostics publisher."""
     rclpy.init(args=args)
     node = NavDiagnosticsPublisher()
     try:

@@ -77,9 +77,9 @@ controller_server:
       # into the inflation bubble and then aborting.
       use_regulated_linear_velocity_scaling: true
       regulated_linear_scaling_min_radius: 1.1
-      regulated_linear_scaling_min_speed: 0.05
+      regulated_linear_scaling_min_speed: 0.15
       use_cost_regulated_linear_velocity_scaling: true
-      cost_scaling_dist: 1.0
+      cost_scaling_dist: 0.6
       cost_scaling_gain: 1.0
       inflation_cost_scaling_factor: 4.0
 

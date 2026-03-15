@@ -71,7 +71,10 @@ ekf_filter_node_odom:
         false,  # AY
         false   # AZ
       ]
-    imu0_differential: true
+    # Keep absolute (not differential) because we have only one
+    # orientation source. Differential would double-count yaw rate
+    # since we also fuse VYaw from the same IMU.
+    imu0_differential: false
     imu0_remove_gravitational_acceleration: true
 
     # ── Process noise ──
@@ -158,7 +161,7 @@ ekf_filter_node_map:
         false, false, true,
         true, false, false
       ]
-    imu0_differential: true
+    imu0_differential: false
     imu0_remove_gravitational_acceleration: true
 
     # ── AprilTag absolute pose correction ──
