@@ -29,8 +29,8 @@ jobs:
           path: |
             build/
             install/
-          key: colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
-          restore-keys: colcon-
+          key: colcon-symlink-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
+          restore-keys: colcon-symlink-
 
       - name: Install dependencies
         run: |
@@ -44,7 +44,7 @@ jobs:
       - name: Build
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build
+          colcon build --symlink-install
         shell: bash
 
       - name: Check interface contracts
@@ -55,6 +55,7 @@ jobs:
       - name: Run tests
         run: |
           source /opt/ros/humble/setup.bash
+          source install/setup.bash
           colcon test
         shell: bash
 

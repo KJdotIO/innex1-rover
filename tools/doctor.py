@@ -142,6 +142,29 @@ def check_required_topics() -> CheckResult:
     )
 
 
+def check_mission_action_servers() -> CheckResult:
+    proc = run_cmd(["ros2", "action", "list"], timeout=8)
+    if proc.returncode != 0:
+        return CheckResult(
+            "WARN",
+            "Mission action servers",
+            "Skipped: ROS graph unavailable",
+            "Run after launching the full stack.",
+        )
+
+    seen = set(a.strip() for a in proc.stdout.splitlines() if a.strip())
+    required = {"/mission/excavate", "/mission/deposit"}
+    missing = sorted(required - seen)
+    if not missing:
+        return CheckResult("PASS", "Mission action servers", "excavate and deposit servers found")
+    return CheckResult(
+        "WARN",
+        "Mission action servers",
+        f"Missing action servers: {', '.join(missing)}",
+        "Launch material_action_server before starting a mission run.",
+    )
+
+
 def check_nav2_lifecycle() -> CheckResult:
     nodes_proc = run_cmd(["ros2", "lifecycle", "nodes"], timeout=8)
     if nodes_proc.returncode != 0:
@@ -261,6 +284,10 @@ def main() -> int:
             ROOT / ".github/contracts/interface_contracts.json",
             "Interface contracts JSON",
         ),
+        lambda: check_path_exists(
+            ROOT / "src/lunabot_mission/lunabot_mission/readiness_gate.py",
+            "Mission readiness gate node",
+        ),
         check_open3d_available,
     ]
 
@@ -268,6 +295,7 @@ def main() -> int:
         check_ros_graph_available,
         check_required_topics,
         check_nav2_lifecycle,
+        check_mission_action_servers,
     ]
 
     all_results: List[CheckResult] = []

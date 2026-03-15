@@ -6,6 +6,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -38,4 +39,25 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([localisation_launch, nav2_launch])
+    hazard_detection_node = Node(
+        package="lunabot_perception",
+        executable="hazard_detection",
+        name="hazard_detection",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
+    cmd_vel_mux_node = Node(
+        package="lunabot_teleop",
+        executable="cmd_vel_mux",
+        name="cmd_vel_mux",
+        output="screen",
+        parameters=[{"use_sim_time": True, "teleop_timeout_s": 0.5}],
+    )
+
+    return LaunchDescription([
+        localisation_launch,
+        hazard_detection_node,
+        nav2_launch,
+        cmd_vel_mux_node,
+    ])

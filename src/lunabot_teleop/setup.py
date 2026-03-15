@@ -1,3 +1,5 @@
+"""Package configuration for lunabot_teleop."""
+
 from setuptools import find_packages, setup
 
 package_name = 'lunabot_teleop'
@@ -24,6 +26,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'cmd_vel_mux = lunabot_teleop.cmd_vel_mux:main',
         ],
     },
 )
