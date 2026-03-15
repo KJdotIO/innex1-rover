@@ -14,6 +14,11 @@ class RGBDStreamRepublisher(Node):
     """Normalize RGB-D timestamps for downstream sync-sensitive nodes."""
 
     def __init__(self) -> None:
+        """
+        Initialise RGB-D stream republisher.
+
+        Configure input/output topics, QoS, timing gates, and diagnostics counters.
+        """
         super().__init__("rgbd_stream_republisher")
 
         self.declare_parameter("input_image_topic", "/camera_front/image")
@@ -95,7 +100,11 @@ class RGBDStreamRepublisher(Node):
         self.latest_info = msg
 
     def on_image(self, msg: Image) -> None:
-        """Republish color image with corrected timestamp."""
+        """
+        Republish colour image stream.
+
+        Validates frame dimensions, enforces stamp policy, and publishes synced output.
+        """
         self.in_image += 1
         if not self._accept_dimensions(msg.width, msg.height):
             self.dropped_image += 1
@@ -112,7 +121,11 @@ class RGBDStreamRepublisher(Node):
         self._publish_info(stamp, out.width, out.height)
 
     def on_depth(self, msg: Image) -> None:
-        """Republish depth image with corrected timestamp."""
+        """
+        Republish depth image stream.
+
+        Validates frame dimensions, enforces stamp policy, and publishes synced output.
+        """
         self.in_depth += 1
         if not self._accept_dimensions(msg.width, msg.height):
             self.dropped_depth += 1
@@ -130,7 +143,11 @@ class RGBDStreamRepublisher(Node):
             self._publish_info(stamp, out.width, out.height)
 
     def _next_stamp(self, msg: Image):
-        """Return a monotonic output stamp or None when input frame is stale."""
+        """
+        Compute output timestamp for republished frames.
+
+        Preserves valid source stamps, enforces monotonicity, and rejects stale inputs.
+        """
         now = self.get_clock().now()
         input_stamp_ns = (
             int(msg.header.stamp.sec) * 1_000_000_000 + int(msg.header.stamp.nanosec)
@@ -208,7 +225,11 @@ class RGBDStreamRepublisher(Node):
 
 
 def main(args=None) -> None:
-    """Run RGB-D stream republisher."""
+    """
+    Run RGB-D stream republisher.
+
+    Initialise rclpy, spin the node, and shut down cleanly on exit.
+    """
     rclpy.init(args=args)
     node = RGBDStreamRepublisher()
     try:

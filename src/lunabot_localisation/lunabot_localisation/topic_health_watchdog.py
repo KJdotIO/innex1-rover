@@ -49,7 +49,11 @@ class TopicHealthWatchdog(Node):
     }
 
     def __init__(self) -> None:
-        """Initialise subscriptions and health tracking state."""
+        """
+        Initialise topic health watchdog.
+
+        Sets thresholds, subscriptions, QoS, and periodic health evaluation timers.
+        """
         super().__init__("topic_health_watchdog")
         self.declare_parameter("check_period_sec", 5.0)
         self.declare_parameter("startup_grace_sec", 10.0)
@@ -79,7 +83,14 @@ class TopicHealthWatchdog(Node):
         )
 
         self.stats: Dict[str, TopicStats] = {}
-        self.health_pub = self.create_publisher(Bool, "/diagnostics/topics_healthy", 10)
+        health_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self.health_pub = self.create_publisher(
+            Bool, "/diagnostics/topics_healthy", health_qos
+        )
         self.last_image_stamp = 0.0
         self.last_depth_stamp = 0.0
         self.last_info_stamp = 0.0
@@ -231,7 +242,11 @@ class TopicHealthWatchdog(Node):
 
 
 def main(args=None) -> None:
-    """Run the topic health watchdog."""
+    """
+    Run topic health watchdog.
+
+    Initialise rclpy, spin the node, and shut down cleanly on exit.
+    """
     rclpy.init(args=args)
     node = TopicHealthWatchdog()
     try:

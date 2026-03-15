@@ -14,6 +14,7 @@
 
   <exec_depend>nav2_smac_planner</exec_depend>
   <exec_depend>nav2_regulated_pure_pursuit_controller</exec_depend>
+  <exec_depend>nav2_behaviors</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

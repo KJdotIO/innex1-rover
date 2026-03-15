@@ -14,7 +14,11 @@ class CameraInfoSyncRepublisher(Node):
     """Publish a camera_info message for every image with matching stamp."""
 
     def __init__(self) -> None:
-        """Initialise parameters, subscriptions, and output publisher."""
+        """
+        Initialise camera info sync republisher.
+
+        Configure topics, QoS, subscriptions, and the synced CameraInfo publisher.
+        """
         super().__init__("camera_info_sync_republisher")
 
         self.declare_parameter("image_topic", "/camera_front/image")
@@ -61,13 +65,21 @@ class CameraInfoSyncRepublisher(Node):
         self.create_timer(self.status_period_sec, self.on_status_timer)
 
     def on_camera_info(self, msg: CameraInfo) -> None:
-        """Cache the latest intrinsic/extrinsic camera calibration."""
+        """
+        Cache latest camera calibration.
+
+        Stores the newest CameraInfo and receipt time for image-aligned republishing.
+        """
         self.latest_info = msg
         self.latest_info_receive_time = self.get_clock().now()
         self.info_count += 1
 
     def on_image(self, msg: Image) -> None:
-        """Publish a synced CameraInfo stamped to the incoming image."""
+        """
+        Publish image-aligned camera info.
+
+        Copies the latest CameraInfo and stamps it to match each accepted image message.
+        """
         self.image_count += 1
         if self.latest_info is None or self.latest_info_receive_time is None:
             return
@@ -82,7 +94,11 @@ class CameraInfoSyncRepublisher(Node):
         self.pub_count += 1
 
     def on_status_timer(self) -> None:
-        """Emit low-rate diagnostics so sync starvation is visible in logs."""
+        """
+        Emit periodic diagnostics.
+
+        Logs compact health counters so sync starvation is obvious in runtime logs.
+        """
         if self.info_count == 0:
             self.get_logger().warn(
                 "[camera_info_sync] no camera_info received in last "
@@ -110,7 +126,11 @@ class CameraInfoSyncRepublisher(Node):
 
 
 def main(args=None) -> None:
-    """Run the camera info sync republisher node."""
+    """
+    Run camera info sync republisher.
+
+    Initialise rclpy, spin the node, and shut down cleanly on exit.
+    """
     rclpy.init(args=args)
     node = CameraInfoSyncRepublisher()
     try:

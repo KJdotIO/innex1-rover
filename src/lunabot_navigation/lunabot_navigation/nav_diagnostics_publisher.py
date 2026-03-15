@@ -102,7 +102,11 @@ class NavDiagnosticsPublisher(Node):
 
 
 def main(args=None) -> None:
-    """Run the navigation diagnostics publisher."""
+    """
+    Run navigation diagnostics publisher.
+
+    Initialise rclpy, spin the diagnostics node, and shut down cleanly on exit.
+    """
     rclpy.init(args=args)
     node = NavDiagnosticsPublisher()
     try:

@@ -12,6 +12,10 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    """Generate a launch description for moon yard simulation.
+
+    Includes Gazebo startup, rover spawn, state publishing, and bridge nodes.
+    """
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")

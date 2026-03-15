@@ -199,10 +199,14 @@ class VisualOdometryGate(Node):
                 matches=self.latest_info.matches if self.latest_info else 0,
                 features=self.latest_info.features if self.latest_info else 0,
                 position_variance=(
-                    self.latest_info.covariance[0] if self.latest_info else 999.0
+                    self.latest_info.covariance[0]
+                    if self.latest_info and len(self.latest_info.covariance) > 0
+                    else 999.0
                 ),
                 yaw_variance=(
-                    self.latest_info.covariance[35] if self.latest_info else 999.0
+                    self.latest_info.covariance[35]
+                    if self.latest_info and len(self.latest_info.covariance) > 35
+                    else 999.0
                 ),
                 moving=self.is_moving,
             )
@@ -233,10 +237,14 @@ class VisualOdometryGate(Node):
                 matches=self.latest_info.matches if self.latest_info else 0,
                 features=self.latest_info.features if self.latest_info else 0,
                 position_variance=(
-                    self.latest_info.covariance[0] if self.latest_info else 999.0
+                    self.latest_info.covariance[0]
+                    if self.latest_info and len(self.latest_info.covariance) > 0
+                    else 999.0
                 ),
                 yaw_variance=(
-                    self.latest_info.covariance[35] if self.latest_info else 999.0
+                    self.latest_info.covariance[35]
+                    if self.latest_info and len(self.latest_info.covariance) > 35
+                    else 999.0
                 ),
                 moving=self.is_moving,
             )

@@ -69,7 +69,7 @@ controller_server:
       # This is the core fix for "collision ahead" aborts near rocks.
       # A longer lookahead time gives the controller room to slow down
       # instead of hard-aborting when it sees inflation costs.
-      use_collision_detection: false
+      use_collision_detection: true
       transform_tolerance: 0.2
 
       # ─ Cost-aware regulation ─

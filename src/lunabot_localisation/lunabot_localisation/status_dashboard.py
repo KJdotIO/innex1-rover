@@ -27,7 +27,11 @@ class StatusDashboard(Node):
     """Compact periodic status summary for the navigation stack."""
 
     def __init__(self):
-        """Initialise subscriptions and aggregation state."""
+        """
+        Initialise status dashboard node.
+
+        Configures subscriptions, timing windows, and state used for periodic summaries.
+        """
         super().__init__("status_dashboard")
         self.declare_parameter("period_sec", 5.0)
         period = self.get_parameter("period_sec").value
@@ -131,7 +135,11 @@ class StatusDashboard(Node):
 
 
 def main(args=None):
-    """Run the status dashboard node."""
+    """
+    Run status dashboard node.
+
+    Initialise rclpy, spin the node, and shut down cleanly on exit.
+    """
     rclpy.init(args=args)
     node = StatusDashboard()
     try:

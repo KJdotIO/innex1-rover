@@ -39,7 +39,7 @@ def generate_launch_description():
                         "output_depth_topic": "/camera_front/depth_image_sync",
                         "output_camera_info_topic": "/camera_front/camera_info_sync",
                         "max_input_age_sec": 0.5,
-                        "publish_info_on_depth": True,
+                        "publish_info_on_depth": False,
                     }
                 ],
             ),
