@@ -2,6 +2,24 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="lunabot">
 <xacro:include filename="$(find leo_description)/urdf/leo_sim.urdf.xacro" />
 
+  <!-- OAK-D Pro-inspired front camera rig.
+       Keep the physical geometry OAK-like, but drive sim odometry from a
+       lighter stereo pair instead of a single RGB-D sensor. -->
+  <xacro:property name="oak_stereo_baseline" value="0.075" />
+  <xacro:property name="oak_rgb_hfov" value="1.151917306" />
+  <xacro:property name="oak_mono_hfov" value="1.396263402" />
+  <xacro:property name="oak_mono_width" value="640" />
+  <xacro:property name="oak_mono_height" value="400" />
+  <xacro:property name="oak_mono_rate" value="15" />
+  <xacro:property name="front_rgbd_hfov" value="1.57" />
+  <xacro:property name="front_rgbd_width" value="640" />
+  <xacro:property name="front_rgbd_height" value="480" />
+  <xacro:property name="front_rgbd_rate" value="10" />
+  <xacro:property name="front_rgbd_clip_near" value="0.10" />
+  <xacro:property name="front_rgbd_clip_far" value="10.0" />
+  <xacro:property name="oak_clip_near" value="0.10" />
+  <xacro:property name="oak_clip_far" value="12.0" />
+
   <!-- <link name="lidar_link">
     <visual>
       <geometry>
@@ -69,7 +87,7 @@
     <link name="camera_front_link">
     <visual>
       <geometry>
-        <cylinder length="0.05" radius="0.03" />
+        <box size="0.09 0.04 0.03" />
       </geometry>
       <material name="dark_grey">
         <color rgba="0.2 0.2 0.2 1.0" />
@@ -77,12 +95,12 @@
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.05" radius="0.03" />
+        <box size="0.09 0.04 0.03" />
       </geometry>
     </collision>
     <inertial>
-      <mass value="0.1" />
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001" />
+      <mass value="0.18" />
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002" />
     </inertial>
   </link>
 
@@ -92,33 +110,108 @@
       <origin xyz="0.12 0.0 0.05" rpy="0 0.3 0" />
     </joint>
 
+    <link name="camera_front_rgb_link" />
+    <joint name="camera_front_rgb_joint" type="fixed">
+      <parent link="camera_front_link" />
+      <child link="camera_front_rgb_link" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+    </joint>
+
     <link name="camera_front_optical_frame" />
 
     <joint name="camera_front_optical_joint" type="fixed">
-      <parent link="camera_front_link" />
+      <parent link="camera_front_rgb_link" />
       <child link="camera_front_optical_frame" />
       <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
     </joint>
 
+    <link name="camera_front_left_link" />
+    <joint name="camera_front_left_joint" type="fixed">
+      <parent link="camera_front_link" />
+      <child link="camera_front_left_link" />
+      <origin xyz="0 ${oak_stereo_baseline/2.0} 0" rpy="0 0 0" />
+    </joint>
 
+    <link name="camera_front_left_optical_frame" />
+    <joint name="camera_front_left_optical_joint" type="fixed">
+      <parent link="camera_front_left_link" />
+      <child link="camera_front_left_optical_frame" />
+      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
+    </joint>
 
+    <link name="camera_front_right_link" />
+    <joint name="camera_front_right_joint" type="fixed">
+      <parent link="camera_front_link" />
+      <child link="camera_front_right_link" />
+      <origin xyz="0 -${oak_stereo_baseline/2.0} 0" rpy="0 0 0" />
+    </joint>
+
+    <link name="camera_front_right_optical_frame" />
+    <joint name="camera_front_right_optical_joint" type="fixed">
+      <parent link="camera_front_right_link" />
+      <child link="camera_front_right_optical_frame" />
+      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
+    </joint>
+
+    <!-- Keep the centre RGB-D camera aligned with the original sim frame so the
+         point cloud and costmaps stay in the known-good orientation. -->
     <gazebo reference="camera_front_link">
       <sensor name="camera_front" type="rgbd_camera">
-      <camera>
-        <horizontal_fov>1.57</horizontal_fov>
-        <image>
-          <width>640</width>
-          <height>480</height>
-        </image>
-        <clip>
-          <near>0.1</near>
-          <far>10</far>
-        </clip>
-      </camera>
-      <always_on>1</always_on>
-      <update_rate>10</update_rate>
-      <topic>camera_front</topic>
+        <camera>
+          <horizontal_fov>${front_rgbd_hfov}</horizontal_fov>
+          <image>
+            <width>${front_rgbd_width}</width>
+            <height>${front_rgbd_height}</height>
+          </image>
+          <clip>
+            <near>${front_rgbd_clip_near}</near>
+            <far>${front_rgbd_clip_far}</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>${front_rgbd_rate}</update_rate>
+        <topic>camera_front</topic>
         <gz_frame_id>camera_front_link</gz_frame_id>
+      </sensor>
+    </gazebo>
+
+    <gazebo reference="camera_front_left_link">
+      <sensor name="camera_front_left" type="camera">
+        <camera>
+          <horizontal_fov>${oak_mono_hfov}</horizontal_fov>
+          <image>
+            <width>${oak_mono_width}</width>
+            <height>${oak_mono_height}</height>
+          </image>
+          <clip>
+            <near>${oak_clip_near}</near>
+            <far>${oak_clip_far}</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>${oak_mono_rate}</update_rate>
+        <topic>camera_front_left</topic>
+        <gz_frame_id>camera_front_left_optical_frame</gz_frame_id>
+      </sensor>
+    </gazebo>
+
+    <gazebo reference="camera_front_right_link">
+      <sensor name="camera_front_right" type="camera">
+        <camera>
+          <horizontal_fov>${oak_mono_hfov}</horizontal_fov>
+          <image>
+            <width>${oak_mono_width}</width>
+            <height>${oak_mono_height}</height>
+          </image>
+          <clip>
+            <near>${oak_clip_near}</near>
+            <far>${oak_clip_far}</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>${oak_mono_rate}</update_rate>
+        <topic>camera_front_right</topic>
+        <gz_frame_id>camera_front_right_optical_frame</gz_frame_id>
       </sensor>
     </gazebo>
 </robot>
