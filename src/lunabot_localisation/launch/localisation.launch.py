@@ -5,12 +5,11 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    """Launch localisation: wheel odom + IMU EKF backbone + AprilTag correction.
+    """
+    Generate a launch description for the localisation stack.
 
-    Visual odometry is intentionally disabled. Wheel odom + IMU provide
-    smooth continuous pose; AprilTag gives absolute map-frame corrections
-    to kill accumulated drift. RTAB-Map builds the occupancy map for Nav2
-    using the EKF-fused odom (no VO node needed).
+    Launches the RGB-D republisher, dual EKFs, RTAB-Map, AprilTag detection,
+    tag pose bridge, topic health watchdog, and status dashboard.
     """
     pkg_localisation = get_package_share_directory("lunabot_localisation")
 

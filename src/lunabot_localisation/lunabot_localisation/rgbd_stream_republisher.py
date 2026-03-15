@@ -130,7 +130,7 @@ class RGBDStreamRepublisher(Node):
             self._publish_info(stamp, out.width, out.height)
 
     def _next_stamp(self, msg: Image):
-        """Return a fresh monotonic stamp or None when input frame is stale."""
+        """Return a monotonic output stamp or None when input frame is stale."""
         now = self.get_clock().now()
         input_stamp_ns = (
             int(msg.header.stamp.sec) * 1_000_000_000 + int(msg.header.stamp.nanosec)
@@ -142,11 +142,12 @@ class RGBDStreamRepublisher(Node):
             if age_sec > self.max_input_age_sec:
                 return None
 
-        if now_ns <= self.last_stamp_ns:
-            now_ns = self.last_stamp_ns + 1
+        candidate_ns = input_stamp_ns if input_stamp_ns > 0 else now_ns
+        if candidate_ns <= self.last_stamp_ns:
+            candidate_ns = self.last_stamp_ns + 1
 
-        self.last_stamp_ns = now_ns
-        return rclpy.time.Time(nanoseconds=now_ns).to_msg()
+        self.last_stamp_ns = candidate_ns
+        return rclpy.time.Time(nanoseconds=candidate_ns).to_msg()
 
     def _accept_dimensions(self, width: int, height: int) -> bool:
         """Lock output stream dimensions and reject mismatched frame bursts."""

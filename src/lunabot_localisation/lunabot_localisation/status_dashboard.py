@@ -1,4 +1,5 @@
-"""Compact human-readable status dashboard for the nav stack.
+"""
+Compact human-readable status dashboard for the nav stack.
 
 Prints a single-line periodic summary instead of spamming logs:
   [DASH] odom:50Hz imu:100Hz pts:3.2Hz tag:YES ekf:OK costmap:READY pose:(-2.9,1.1,0.3rad)
@@ -7,13 +8,17 @@ Subscribes to key topics and aggregates rates/health into one line.
 """
 
 import math
-import time
 
 import rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 from sensor_msgs.msg import Imu, PointCloud2
 from std_msgs.msg import Bool
 
@@ -36,8 +41,8 @@ class StatusDashboard(Node):
         self._counts = {"odom": 0, "imu": 0, "pts": 0, "tag": 0}
         self._costmap_ready = False
         self._last_pose = None
-        self._last_tag_time = 0.0
-        self._window_start = time.monotonic()
+        self._last_tag_time = None
+        self._window_start = self.get_clock().now()
 
         self.create_subscription(Odometry, "/odom", self._cb("odom"), sensor_qos)
         self.create_subscription(Imu, "/imu/data_raw", self._cb("imu"), sensor_qos)
@@ -47,8 +52,15 @@ class StatusDashboard(Node):
         self.create_subscription(
             PoseWithCovarianceStamped, "/tag_pose", self._on_tag, sensor_qos
         )
+        status_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+
         self.create_subscription(
-            Bool, "/nav/costmap_ready", self._on_costmap, sensor_qos
+            Bool, "/nav/costmap_ready", self._on_costmap, status_qos
         )
         self.create_subscription(
             Odometry, "/odometry/filtered", self._on_filtered, sensor_qos
@@ -63,7 +75,7 @@ class StatusDashboard(Node):
 
     def _on_tag(self, msg):
         self._counts["tag"] += 1
-        self._last_tag_time = time.monotonic()
+        self._last_tag_time = self.get_clock().now()
 
     def _on_costmap(self, msg):
         self._costmap_ready = msg.data
@@ -78,8 +90,8 @@ class StatusDashboard(Node):
         self._last_pose = (p.position.x, p.position.y, yaw)
 
     def _print_status(self):
-        now = time.monotonic()
-        dt = now - self._window_start
+        now = self.get_clock().now()
+        dt = (now - self._window_start).nanoseconds / 1e9
         if dt < 0.1:
             return
 
@@ -89,7 +101,11 @@ class StatusDashboard(Node):
             self._counts[key] = 0
         self._window_start = now
 
-        tag_status = "YES" if (now - self._last_tag_time) < 10.0 else "NO"
+        if self._last_tag_time is None:
+            tag_age_sec = float("inf")
+        else:
+            tag_age_sec = (now - self._last_tag_time).nanoseconds / 1e9
+        tag_status = "YES" if tag_age_sec < 10.0 else "NO"
         costmap = "READY" if self._costmap_ready else "WAIT"
 
         if self._last_pose:

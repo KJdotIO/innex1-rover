@@ -5,12 +5,7 @@
   <!-- OAK-D Pro-inspired front camera rig.
        For this comparison branch, keep the physical geometry OAK-like but use
        a single stable RGB-D stream as the localisation control experiment. -->
-  <xacro:property name="oak_stereo_baseline" value="0.075" />
   <xacro:property name="oak_rgb_hfov" value="1.151917306" />
-  <xacro:property name="oak_mono_hfov" value="1.396263402" />
-  <xacro:property name="oak_mono_width" value="640" />
-  <xacro:property name="oak_mono_height" value="400" />
-  <xacro:property name="oak_mono_rate" value="15" />
   <!-- Post-VO-removal: depth is only for costmap obstacles, not feature
        tracking. 240x150 at 2Hz minimises GPU depth rendering load (the
        main sim bottleneck). Boulders (30cm) are 15px at 3m, enough for
@@ -131,34 +126,6 @@
     <joint name="camera_front_optical_joint" type="fixed">
       <parent link="camera_front_rgb_link" />
       <child link="camera_front_optical_frame" />
-      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
-    </joint>
-
-    <link name="camera_front_left_link" />
-    <joint name="camera_front_left_joint" type="fixed">
-      <parent link="camera_front_link" />
-      <child link="camera_front_left_link" />
-      <origin xyz="0 ${oak_stereo_baseline/2.0} 0" rpy="0 0 0" />
-    </joint>
-
-    <link name="camera_front_left_optical_frame" />
-    <joint name="camera_front_left_optical_joint" type="fixed">
-      <parent link="camera_front_left_link" />
-      <child link="camera_front_left_optical_frame" />
-      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
-    </joint>
-
-    <link name="camera_front_right_link" />
-    <joint name="camera_front_right_joint" type="fixed">
-      <parent link="camera_front_link" />
-      <child link="camera_front_right_link" />
-      <origin xyz="0 -${oak_stereo_baseline/2.0} 0" rpy="0 0 0" />
-    </joint>
-
-    <link name="camera_front_right_optical_frame" />
-    <joint name="camera_front_right_optical_joint" type="fixed">
-      <parent link="camera_front_right_link" />
-      <child link="camera_front_right_optical_frame" />
       <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
     </joint>
 

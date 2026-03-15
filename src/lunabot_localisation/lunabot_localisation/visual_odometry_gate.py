@@ -114,7 +114,7 @@ class VisualOdometryGate(Node):
             Bool,
             self.get_parameter("sensor_health_topic").value,
             self.on_sensor_health,
-            sensor_qos,
+            control_qos,
         )
         self.create_subscription(
             Odometry,
@@ -270,8 +270,17 @@ class VisualOdometryGate(Node):
         """Classify the odometry output using inliers, matches, and covariance."""
         position_variance = msg.covariance[0] if len(msg.covariance) > 0 else 999.0
         yaw_variance = msg.covariance[35] if len(msg.covariance) > 35 else 999.0
+        sensor_health_stale = (
+            self.require_sensor_health
+            and self.latest_sensor_health_time is not None
+            and self.get_clock().now() - self.latest_sensor_health_time
+            > self.sensor_health_timeout
+        )
 
-        if self.require_sensor_health and not self.sensor_contract_healthy:
+        if sensor_health_stale:
+            reason = "sensor_health_timeout"
+            healthy = False
+        elif self.require_sensor_health and not self.sensor_contract_healthy:
             reason = "sensor_contract_unhealthy"
             healthy = False
         elif msg.lost:

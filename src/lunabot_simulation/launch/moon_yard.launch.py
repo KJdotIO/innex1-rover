@@ -110,6 +110,21 @@ def generate_launch_description():
 
     # Split camera bridges: point cloud on its own process to avoid
     # contention with image streams (the main cause of point cloud starvation).
+    camera_qos_overrides = {
+        "qos_overrides./camera_front/camera_info.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/camera_info.publisher.history": "keep_last",
+        "qos_overrides./camera_front/camera_info.publisher.depth": 5,
+        "qos_overrides./camera_front/image.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/image.publisher.history": "keep_last",
+        "qos_overrides./camera_front/image.publisher.depth": 5,
+        "qos_overrides./camera_front/depth_image.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/depth_image.publisher.history": "keep_last",
+        "qos_overrides./camera_front/depth_image.publisher.depth": 5,
+        "qos_overrides./camera_front/points.publisher.reliability": "best_effort",
+        "qos_overrides./camera_front/points.publisher.history": "keep_last",
+        "qos_overrides./camera_front/points.publisher.depth": 5,
+    }
+
     camera_image_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -119,6 +134,7 @@ def generate_launch_description():
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
         ],
+        parameters=[camera_qos_overrides],
         output="screen",
     )
 
@@ -129,6 +145,7 @@ def generate_launch_description():
         arguments=[
             "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
         ],
+        parameters=[camera_qos_overrides],
         output="screen",
     )
 

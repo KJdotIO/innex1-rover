@@ -14,7 +14,11 @@ class TagPosePublisher(Node):
     """Publish a map-frame pose estimate derived from the detected AprilTag."""
 
     def __init__(self):
-        """Initialise TF buffer, subscribers, and publishers."""
+        """
+        Initialise tag pose publisher.
+
+        Set up TF buffering, transform listening, pose publishing, and timer callbacks.
+        """
         super().__init__("tag_pose_publisher")
 
         self.declare_parameter("tag_frame", "tag36h11:0")

@@ -124,9 +124,9 @@ global_costmap:
       rolling_window: true
       # Nav2 Humble declares width/height as integer parameters.
       # Passing a float (e.g. 14.0) causes a type mismatch crash.
-      width: 14
+      width: 15
       height: 10
-      origin_x: -2.0
+      origin_x: -3.5
       origin_y: -5.0
       plugins: ["obstacle_layer", "inflation_layer"]
 

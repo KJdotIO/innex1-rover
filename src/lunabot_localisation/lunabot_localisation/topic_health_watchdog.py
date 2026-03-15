@@ -177,11 +177,9 @@ class TopicHealthWatchdog(Node):
                     all_healthy = False
                 continue
 
-            # Compute average rate over the check period
-            avg_gap = (
-                stats.total_gaps / stats.gap_count if stats.gap_count > 0 else 0.0
-            )
-            effective_hz = 1.0 / avg_gap if avg_gap > 0 else 0.0
+            # Compute rate over the full check window; this avoids undercounting
+            # when a burst has many messages but short inter-message gaps.
+            effective_hz = stats.msg_count / self.check_period
             staleness = now - stats.last_receive_time if stats.last_receive_time > 0 else 999.0
 
             healthy = effective_hz >= stats.min_hz and staleness < self.max_staleness_sec

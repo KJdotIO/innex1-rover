@@ -1,4 +1,5 @@
-"""Launch the complete simulation stack: Gazebo + localisation + Nav2.
+"""
+Launch the complete simulation stack: Gazebo + localisation + Nav2.
 
 Single command to start everything needed for sim testing:
   ros2 launch lunabot_bringup simulation.launch.py

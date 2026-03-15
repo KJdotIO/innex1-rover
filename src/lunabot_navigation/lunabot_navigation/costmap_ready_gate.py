@@ -1,4 +1,5 @@
-"""Block Nav2 goals until the costmap has obstacle data from point clouds.
+"""
+Block Nav2 goals until the costmap has obstacle data from point clouds.
 
 Subscribes to /camera_front/points and publishes a Bool on
 /nav/costmap_ready once a minimum number of messages have arrived.

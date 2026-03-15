@@ -5,7 +5,11 @@ import math
 import rclpy
 from nav_msgs.msg import OccupancyGrid, Odometry
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 from std_msgs.msg import Float32
 
 
@@ -27,11 +31,17 @@ class NavDiagnosticsPublisher(Node):
         self._robot_x = 0.0
         self._robot_y = 0.0
 
+        diagnostics_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+
         self.nearest_pub = self.create_publisher(
-            Float32, "/diagnostics/nearest_obstacle_m", 10
+            Float32, "/diagnostics/nearest_obstacle_m", diagnostics_qos
         )
         self.density_pub = self.create_publisher(
-            Float32, "/diagnostics/obstacle_cells_near_robot", 10
+            Float32, "/diagnostics/obstacle_cells_near_robot", diagnostics_qos
         )
 
         self.create_subscription(

@@ -25,7 +25,12 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 from std_msgs.msg import Bool
 
 # Arena: 7.9x4.4m centered at (0,0). X: -3.95..3.95, Y: -2.2..2.2
@@ -56,6 +61,7 @@ class GoalResult:
 
 
 def yaw_to_quaternion(yaw: float) -> Quaternion:
+    """Convert a planar yaw angle in radians to a quaternion."""
     q = Quaternion()
     q.z = math.sin(yaw / 2.0)
     q.w = math.cos(yaw / 2.0)
@@ -63,25 +69,31 @@ def yaw_to_quaternion(yaw: float) -> Quaternion:
 
 
 class NavStabilityTest(Node):
+    """Execute a repeatable goal sequence against NavigateToPose."""
+
     def __init__(self):
+        """Initialise action client, subscriptions, and result storage."""
         super().__init__("nav_stability_test")
         self._action_client = ActionClient(self, NavigateToPose, "navigate_to_pose")
 
-        sensor_qos = QoSProfile(
+        status_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
-            depth=5,
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self._costmap_ready = False
         self.create_subscription(
-            Bool, "/nav/costmap_ready", self._on_costmap_ready, sensor_qos
+            Bool, "/nav/costmap_ready", self._on_costmap_ready, status_qos
         )
         self.results: list[GoalResult] = []
 
     def _on_costmap_ready(self, msg: Bool):
+        """Cache the latest costmap readiness state."""
         self._costmap_ready = msg.data
 
     def wait_for_costmap(self) -> bool:
+        """Wait until the costmap gate reports ready or timeout expires."""
         self.get_logger().info("Waiting for costmap to populate...")
         deadline = time.monotonic() + COSTMAP_WAIT_SEC
         while not self._costmap_ready and time.monotonic() < deadline:
@@ -95,10 +107,12 @@ class NavStabilityTest(Node):
         return self._costmap_ready
 
     def wait_for_server(self, timeout_sec=30.0) -> bool:
+        """Wait for the NavigateToPose action server to come up."""
         self.get_logger().info("Waiting for navigate_to_pose action server...")
         return self._action_client.wait_for_server(timeout_sec)
 
     def send_goal_and_wait(self, goal_dict: dict) -> GoalResult:
+        """Send one goal and block until success, failure, or timeout."""
         result = GoalResult(name=goal_dict["name"])
 
         goal_msg = NavigateToPose.Goal()
@@ -154,11 +168,13 @@ class NavStabilityTest(Node):
             self.get_logger().error(
                 f"Goal '{goal_dict['name']}' TIMED OUT after {GOAL_TIMEOUT_SEC}s"
             )
-            goal_handle.cancel_goal_async()
+            cancel_future = goal_handle.cancel_goal_async()
+            rclpy.spin_until_future_complete(self, cancel_future, timeout_sec=2.0)
 
         return result
 
     def run_test_sequence(self):
+        """Run the full navigation goal sequence and return overall pass/fail."""
         if not self.wait_for_server():
             self.get_logger().fatal("Action server not available, aborting")
             return False
@@ -186,6 +202,7 @@ class NavStabilityTest(Node):
         return self.print_summary()
 
     def print_summary(self) -> bool:
+        """Print a tabular result summary and return overall pass/fail."""
         print("\n" + "=" * 60)
         print("NAV STABILITY TEST RESULTS")
         print("=" * 60)
@@ -211,6 +228,7 @@ class NavStabilityTest(Node):
 
 
 def main():
+    """Run the nav stability harness and return a process status code."""
     rclpy.init()
     node = NavStabilityTest()
     try:

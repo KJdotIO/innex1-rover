@@ -10,7 +10,8 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Generate a launch description for the navigation stack.
+    """
+    Generate a launch description for the navigation stack.
 
     Includes localisation, Nav2, and the costmap readiness gate node.
     """

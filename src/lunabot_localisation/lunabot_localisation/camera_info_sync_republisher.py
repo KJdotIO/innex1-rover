@@ -20,7 +20,7 @@ class CameraInfoSyncRepublisher(Node):
         self.declare_parameter("image_topic", "/camera_front/image")
         self.declare_parameter("camera_info_topic", "/camera_front/camera_info")
         self.declare_parameter(
-            "camera_info_synced_topic", "/camera_front/camera_info_synced"
+            "camera_info_synced_topic", "/camera_front/camera_info_sync"
         )
         self.declare_parameter("max_info_age_sec", 1.0)
         self.declare_parameter("status_period_sec", 5.0)
