@@ -1,4 +1,5 @@
-"""Command velocity multiplexer for teleop/autonomy arbitration.
+"""
+Command velocity multiplexer for teleop/autonomy arbitration.
 
 Subscribes to:
   /teleop/cmd_vel  — operator input (joystick or keyboard)
