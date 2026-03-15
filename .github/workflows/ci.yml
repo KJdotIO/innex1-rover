@@ -29,8 +29,8 @@ jobs:
           path: |
             build/
             install/
-          key: colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
-          restore-keys: colcon-
+          key: colcon-symlink-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
+          restore-keys: colcon-symlink-
 
       - name: Install dependencies
         run: |
