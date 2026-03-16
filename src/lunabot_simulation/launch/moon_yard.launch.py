@@ -72,8 +72,8 @@ def generate_launch_description():
     )
 
     # Spawn position - surface mesh is at z=0, rover spawns above and drops
-    spawn_x = "0.0"
-    spawn_y = "0.0"
+    spawn_x = "-2.95"
+    spawn_y = "1.1"
     spawn_z = "0.5"  # Start above surface, gravity will settle it
 
     gz_sim = OpaqueFunction(

@@ -8,7 +8,7 @@
         <geometry>
           <plane>
             <normal>0 -1 0</normal>
-            <size>0.15 0.15</size>
+            <size>0.25 0.25</size>
           </plane>
         </geometry>
         <material>
