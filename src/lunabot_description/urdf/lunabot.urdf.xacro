@@ -1,101 +1,192 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="lunabot">
-<xacro:include filename="$(find leo_description)/urdf/leo_sim.urdf.xacro" />
-
-  <!-- OAK-D Pro-inspired front camera rig.
-       Keep the physical geometry OAK-like, but drive sim odometry from a
-       lighter stereo pair instead of a single RGB-D sensor. -->
-  <xacro:property name="oak_stereo_baseline" value="0.075" />
-  <xacro:property name="oak_rgb_hfov" value="1.151917306" />
-  <xacro:property name="oak_mono_hfov" value="1.396263402" />
-  <xacro:property name="oak_mono_width" value="640" />
-  <xacro:property name="oak_mono_height" value="400" />
-  <xacro:property name="oak_mono_rate" value="15" />
-  <xacro:property name="front_rgbd_hfov" value="1.57" />
+  <xacro:property name="chassis_length" value="0.82" />
+  <xacro:property name="chassis_width" value="0.58" />
+  <xacro:property name="chassis_height" value="0.16" />
+  <xacro:property name="wheel_radius" value="0.14" />
+  <xacro:property name="wheel_width" value="0.08" />
+  <xacro:property name="wheel_x" value="0.26" />
+  <xacro:property name="wheel_y" value="0.26" />
+  <xacro:property name="wheel_z" value="-0.12" />
+  <xacro:property name="wheel_separation" value="0.52" />
+  <xacro:property name="front_rgbd_hfov" value="1.15" />
   <xacro:property name="front_rgbd_width" value="640" />
   <xacro:property name="front_rgbd_height" value="480" />
   <xacro:property name="front_rgbd_rate" value="10" />
   <xacro:property name="front_rgbd_clip_near" value="0.10" />
   <xacro:property name="front_rgbd_clip_far" value="10.0" />
-  <xacro:property name="oak_clip_near" value="0.10" />
-  <xacro:property name="oak_clip_far" value="12.0" />
 
-  <!-- <link name="lidar_link">
+  <material name="sand_beige">
+    <color rgba="0.71 0.62 0.44 1.0" />
+  </material>
+  <material name="dark_grey">
+    <color rgba="0.18 0.18 0.20 1.0" />
+  </material>
+
+  <link name="base_footprint" />
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="45.0" />
+      <inertia
+        ixx="2.2"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="2.9"
+        iyz="0.0"
+        izz="4.3" />
+    </inertial>
     <visual>
+      <origin xyz="0 0 0.03" rpy="0 0 0" />
       <geometry>
-        <cylinder length="0.05" radius="0.03"/>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}" />
       </geometry>
-      <material name="dark_grey">
-        <color rgba="0.2 0.2 0.2 1.0"/>
-      </material>
+      <material name="sand_beige" />
     </visual>
     <collision>
+      <origin xyz="0 0 0.03" rpy="0 0 0" />
       <geometry>
-        <cylinder length="0.05" radius="0.03"/>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}" />
       </geometry>
     </collision>
-    <inertial>
-      <mass value="0.1"/>
-      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
-    </inertial>
   </link>
 
-  <joint name="lidar_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="lidar_link"/>
-    <origin xyz="0.1 0.0 0.03" rpy="0 0 0"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint" />
+    <child link="base_link" />
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0" />
   </joint>
 
-    <gazebo reference="lidar_link">
-    <sensor name="lidar" type="gpu_lidar">
-        <always_on>1</always_on>
-        <update_rate>5</update_rate>
-        <topic>scan</topic>
-        <gz_frame_id>lidar_link</gz_frame_id>
-        <lidar>
-        <scan>
-            <horizontal>
-            <samples>180</samples>
-            <resolution>1</resolution>
-            <min_angle>-3.14159</min_angle>
-            <max_angle>3.14159</max_angle>
-            </horizontal>
-        </scan>
-        <range>
-            <min>0.1</min>
-            <max>10.0</max>
-            <resolution>0.01</resolution>
-        </range>
-        </lidar>
-        <visualize>false</visualize>
-    </sensor>
-    </gazebo> -->
-    <gazebo>
-      <plugin
-            filename="ignition-gazebo-pose-publisher-system"
-            name="ignition::gazebo::systems::PosePublisher"
-        >
-        <publish_link_poses>true</publish_link_poses>
-        <publish_sensor_poses>true</publish_sensor_poses>
-        <publish_nested_model_poses>true</publish_nested_model_poses>
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-        <static_publisher>true</static_publisher>
-        <static_update_frequency>1</static_update_frequency>
-      </plugin>
-    </gazebo>
+  <link name="imu_frame" />
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="imu_frame" />
+    <origin xyz="0 0 0.04" rpy="0 0 0" />
+  </joint>
 
-    <link name="camera_front_link">
+  <link name="wheel_front_left">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="3.0" />
+      <inertia ixx="0.03" ixy="0.0" ixz="0.0" iyy="0.03" iyz="0.0" izz="0.03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+      <material name="dark_grey" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="wheel_front_right">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="3.0" />
+      <inertia ixx="0.03" ixy="0.0" ixz="0.0" iyy="0.03" iyz="0.0" izz="0.03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+      <material name="dark_grey" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="wheel_rear_left">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="3.0" />
+      <inertia ixx="0.03" ixy="0.0" ixz="0.0" iyy="0.03" iyz="0.0" izz="0.03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+      <material name="dark_grey" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="wheel_rear_right">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="3.0" />
+      <inertia ixx="0.03" ixy="0.0" ixz="0.0" iyy="0.03" iyz="0.0" izz="0.03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+      <material name="dark_grey" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="wheel_front_left_joint" type="continuous">
+    <parent link="base_link" />
+    <child link="wheel_front_left" />
+    <origin xyz="${wheel_x} ${wheel_y} ${wheel_z}" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <joint name="wheel_front_right_joint" type="continuous">
+    <parent link="base_link" />
+    <child link="wheel_front_right" />
+    <origin xyz="${wheel_x} -${wheel_y} ${wheel_z}" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <joint name="wheel_rear_left_joint" type="continuous">
+    <parent link="base_link" />
+    <child link="wheel_rear_left" />
+    <origin xyz="-${wheel_x} ${wheel_y} ${wheel_z}" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <joint name="wheel_rear_right_joint" type="continuous">
+    <parent link="base_link" />
+    <child link="wheel_rear_right" />
+    <origin xyz="-${wheel_x} -${wheel_y} ${wheel_z}" rpy="0 0 0" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <link name="camera_front_link">
     <visual>
       <geometry>
-        <box size="0.09 0.04 0.03" />
+        <box size="0.10 0.04 0.03" />
       </geometry>
-      <material name="dark_grey">
-        <color rgba="0.2 0.2 0.2 1.0" />
-      </material>
+      <material name="dark_grey" />
     </visual>
     <collision>
       <geometry>
-        <box size="0.09 0.04 0.03" />
+        <box size="0.10 0.04 0.03" />
       </geometry>
     </collision>
     <inertial>
@@ -104,114 +195,93 @@
     </inertial>
   </link>
 
-    <joint name="camera_front_joint" type="fixed">
-      <parent link="base_link" />
-      <child link="camera_front_link" />
-      <origin xyz="0.12 0.0 0.05" rpy="0 0.3 0" />
-    </joint>
+  <joint name="camera_front_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="camera_front_link" />
+    <origin xyz="0.26 0.0 0.14" rpy="0 0.18 0" />
+  </joint>
 
-    <link name="camera_front_rgb_link" />
-    <joint name="camera_front_rgb_joint" type="fixed">
-      <parent link="camera_front_link" />
-      <child link="camera_front_rgb_link" />
-      <origin xyz="0 0 0" rpy="0 0 0" />
-    </joint>
+  <link name="camera_front_optical_frame" />
+  <joint name="camera_front_optical_joint" type="fixed">
+    <parent link="camera_front_link" />
+    <child link="camera_front_optical_frame" />
+    <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
+  </joint>
 
-    <link name="camera_front_optical_frame" />
+  <gazebo>
+    <plugin
+      filename="ignition-gazebo-joint-state-publisher-system"
+      name="ignition::gazebo::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+    </plugin>
+  </gazebo>
 
-    <joint name="camera_front_optical_joint" type="fixed">
-      <parent link="camera_front_rgb_link" />
-      <child link="camera_front_optical_frame" />
-      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
-    </joint>
+  <gazebo reference="imu_frame">
+    <sensor type="imu" name="lunabot_imu_sensor">
+      <always_on>1</always_on>
+      <update_rate>100</update_rate>
+      <topic>imu/data_raw</topic>
+      <gz_frame_id>imu_frame</gz_frame_id>
+    </sensor>
+  </gazebo>
 
-    <link name="camera_front_left_link" />
-    <joint name="camera_front_left_joint" type="fixed">
-      <parent link="camera_front_link" />
-      <child link="camera_front_left_link" />
-      <origin xyz="0 ${oak_stereo_baseline/2.0} 0" rpy="0 0 0" />
-    </joint>
+  <gazebo reference="camera_front_link">
+    <sensor name="camera_front" type="rgbd_camera">
+      <always_on>1</always_on>
+      <update_rate>${front_rgbd_rate}</update_rate>
+      <topic>camera_front</topic>
+      <gz_frame_id>camera_front_optical_frame</gz_frame_id>
+      <camera>
+        <horizontal_fov>${front_rgbd_hfov}</horizontal_fov>
+        <image>
+          <width>${front_rgbd_width}</width>
+          <height>${front_rgbd_height}</height>
+        </image>
+        <clip>
+          <near>${front_rgbd_clip_near}</near>
+          <far>${front_rgbd_clip_far}</far>
+        </clip>
+      </camera>
+    </sensor>
+  </gazebo>
 
-    <link name="camera_front_left_optical_frame" />
-    <joint name="camera_front_left_optical_joint" type="fixed">
-      <parent link="camera_front_left_link" />
-      <child link="camera_front_left_optical_frame" />
-      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
-    </joint>
+  <gazebo reference="wheel_front_left">
+    <mu1>1.6</mu1>
+    <mu2>1.6</mu2>
+  </gazebo>
+  <gazebo reference="wheel_front_right">
+    <mu1>1.6</mu1>
+    <mu2>1.6</mu2>
+  </gazebo>
+  <gazebo reference="wheel_rear_left">
+    <mu1>1.6</mu1>
+    <mu2>1.6</mu2>
+  </gazebo>
+  <gazebo reference="wheel_rear_right">
+    <mu1>1.6</mu1>
+    <mu2>1.6</mu2>
+  </gazebo>
 
-    <link name="camera_front_right_link" />
-    <joint name="camera_front_right_joint" type="fixed">
-      <parent link="camera_front_link" />
-      <child link="camera_front_right_link" />
-      <origin xyz="0 -${oak_stereo_baseline/2.0} 0" rpy="0 0 0" />
-    </joint>
-
-    <link name="camera_front_right_optical_frame" />
-    <joint name="camera_front_right_optical_joint" type="fixed">
-      <parent link="camera_front_right_link" />
-      <child link="camera_front_right_optical_frame" />
-      <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
-    </joint>
-
-    <!-- Keep the centre RGB-D camera aligned with the original sim frame so the
-         point cloud and costmaps stay in the known-good orientation. -->
-    <gazebo reference="camera_front_link">
-      <sensor name="camera_front" type="rgbd_camera">
-        <camera>
-          <horizontal_fov>${front_rgbd_hfov}</horizontal_fov>
-          <image>
-            <width>${front_rgbd_width}</width>
-            <height>${front_rgbd_height}</height>
-          </image>
-          <clip>
-            <near>${front_rgbd_clip_near}</near>
-            <far>${front_rgbd_clip_far}</far>
-          </clip>
-        </camera>
-        <always_on>1</always_on>
-        <update_rate>${front_rgbd_rate}</update_rate>
-        <topic>camera_front</topic>
-        <gz_frame_id>camera_front_link</gz_frame_id>
-      </sensor>
-    </gazebo>
-
-    <gazebo reference="camera_front_left_link">
-      <sensor name="camera_front_left" type="camera">
-        <camera>
-          <horizontal_fov>${oak_mono_hfov}</horizontal_fov>
-          <image>
-            <width>${oak_mono_width}</width>
-            <height>${oak_mono_height}</height>
-          </image>
-          <clip>
-            <near>${oak_clip_near}</near>
-            <far>${oak_clip_far}</far>
-          </clip>
-        </camera>
-        <always_on>1</always_on>
-        <update_rate>${oak_mono_rate}</update_rate>
-        <topic>camera_front_left</topic>
-        <gz_frame_id>camera_front_left_optical_frame</gz_frame_id>
-      </sensor>
-    </gazebo>
-
-    <gazebo reference="camera_front_right_link">
-      <sensor name="camera_front_right" type="camera">
-        <camera>
-          <horizontal_fov>${oak_mono_hfov}</horizontal_fov>
-          <image>
-            <width>${oak_mono_width}</width>
-            <height>${oak_mono_height}</height>
-          </image>
-          <clip>
-            <near>${oak_clip_near}</near>
-            <far>${oak_clip_far}</far>
-          </clip>
-        </camera>
-        <always_on>1</always_on>
-        <update_rate>${oak_mono_rate}</update_rate>
-        <topic>camera_front_right</topic>
-        <gz_frame_id>camera_front_right_optical_frame</gz_frame_id>
-      </sensor>
-    </gazebo>
+  <gazebo>
+    <plugin
+      filename="libignition-gazebo-diff-drive-system.so"
+      name="ignition::gazebo::systems::DiffDrive">
+      <left_joint>wheel_front_left_joint</left_joint>
+      <left_joint>wheel_rear_left_joint</left_joint>
+      <right_joint>wheel_front_right_joint</right_joint>
+      <right_joint>wheel_rear_right_joint</right_joint>
+      <wheel_separation>${wheel_separation}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <tf_topic>tf</tf_topic>
+      <max_linear_acceleration>1.2</max_linear_acceleration>
+      <min_linear_acceleration>-1.2</min_linear_acceleration>
+      <max_angular_acceleration>1.8</max_angular_acceleration>
+      <min_angular_acceleration>-1.8</min_angular_acceleration>
+    </plugin>
+  </gazebo>
 </robot>

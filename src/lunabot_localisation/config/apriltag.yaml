@@ -2,7 +2,7 @@
   ros__parameters:
     image_transport: raw
     family: 36h11
-    size: 0.25
+    size: 0.15
     max_hamming: 0
     detector:
       threads: 2
