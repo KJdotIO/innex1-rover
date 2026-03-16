@@ -201,11 +201,18 @@
     <origin xyz="0.26 0.0 0.14" rpy="0 0.18 0" />
   </joint>
 
+  <link name="camera_front_rgb_link" />
+  <joint name="camera_front_rgb_joint" type="fixed">
+    <parent link="camera_front_link" />
+    <child link="camera_front_rgb_link" />
+    <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
+  </joint>
+
   <link name="camera_front_optical_frame" />
   <joint name="camera_front_optical_joint" type="fixed">
-    <parent link="camera_front_link" />
+    <parent link="camera_front_rgb_link" />
     <child link="camera_front_optical_frame" />
-    <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
   </joint>
 
   <gazebo>
@@ -225,7 +232,7 @@
     </sensor>
   </gazebo>
 
-  <gazebo reference="camera_front_link">
+  <gazebo reference="camera_front_rgb_link">
     <sensor name="camera_front" type="rgbd_camera">
       <always_on>1</always_on>
       <update_rate>${front_rgbd_rate}</update_rate>
