@@ -198,21 +198,21 @@
   <joint name="camera_front_joint" type="fixed">
     <parent link="base_link" />
     <child link="camera_front_link" />
-    <origin xyz="0.26 0.0 0.14" rpy="0 0.18 0" />
+    <origin xyz="0.48 0.0 0.20" rpy="0 0.10 0" />
   </joint>
 
   <link name="camera_front_rgb_link" />
   <joint name="camera_front_rgb_joint" type="fixed">
     <parent link="camera_front_link" />
     <child link="camera_front_rgb_link" />
-    <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
   </joint>
 
   <link name="camera_front_optical_frame" />
   <joint name="camera_front_optical_joint" type="fixed">
     <parent link="camera_front_rgb_link" />
     <child link="camera_front_optical_frame" />
-    <origin xyz="0 0 0" rpy="0 0 0" />
+    <origin xyz="0 0 0" rpy="-${pi/2} 0.0 -${pi/2}" />
   </joint>
 
   <gazebo>
@@ -232,12 +232,12 @@
     </sensor>
   </gazebo>
 
-  <gazebo reference="camera_front_rgb_link">
+  <gazebo reference="camera_front_link">
     <sensor name="camera_front" type="rgbd_camera">
       <always_on>1</always_on>
       <update_rate>${front_rgbd_rate}</update_rate>
       <topic>camera_front</topic>
-      <gz_frame_id>camera_front_optical_frame</gz_frame_id>
+      <gz_frame_id>camera_front_link</gz_frame_id>
       <camera>
         <horizontal_fov>${front_rgbd_hfov}</horizontal_fov>
         <image>
