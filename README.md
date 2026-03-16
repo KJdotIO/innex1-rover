@@ -10,6 +10,8 @@ If you are on macOS or Windows, use an Ubuntu VM for realistic run and validatio
 
 The key point is consistency: run the same Ubuntu + ROS + Gazebo stack as the team baseline.
 
+For the team, the preferred shared workflow is now the Docker-based sim environment on Linux or a Linux cloud VM. That gives everyone the same ROS and Gazebo stack without rebuilding machines from scratch.
+
 ## Baseline versions (team default)
 
 These are the versions we target by default:
@@ -17,7 +19,134 @@ These are the versions we target by default:
 - ROS: ROS 2 Humble
 - Gazebo: Gazebo Fortress (`ignition-fortress` + `ros-humble-ros-gz`)
 
-## Quick start (Linux, recommended path)
+## Quick start (Docker, recommended shared path)
+
+If you want the most repeatable team workflow, use the container setup. This is the path we want people to converge on for simulation and remote work.
+
+Detailed container notes live in [docs/development/containers.md](docs/development/containers.md).
+
+### 1) Linux VM or cloud GPU host prerequisites
+
+You need:
+
+- Ubuntu 22.04
+- Docker Engine
+- NVIDIA container toolkit if the machine has an NVIDIA GPU
+
+Check the GPU path with:
+
+```bash
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.3.2-base-ubuntu22.04 nvidia-smi
+```
+
+### 2) Build the image
+
+```bash
+git clone https://github.com/KJdotIO/innex1-rover.git
+cd innex1-rover
+./docker/scripts/build_sim_image.sh
+```
+
+If Docker still needs `sudo` on your machine, that is acceptable:
+
+```bash
+sudo ./docker/scripts/build_sim_image.sh
+```
+
+The build script uses plain `docker build` by default because it is the least surprising option on shared Linux machines. If you explicitly want `buildx`, for example on a cross-build host, use:
+
+```bash
+USE_BUILDX=true ./docker/scripts/build_sim_image.sh
+```
+
+### 3) Build the workspace once inside the container
+
+```bash
+./docker/scripts/run_sim_dev.sh
+colcon build --symlink-install
+source install/setup.bash
+exit
+```
+
+### 4) Start the stack
+
+Run each command from the repo root in its own terminal:
+
+```bash
+./docker/scripts/run_sim_launch.sh
+```
+
+```bash
+./docker/scripts/run_navigation_launch.sh
+```
+
+```bash
+./docker/scripts/run_foxglove_bridge.sh
+```
+
+On a cloud VM, it is usually more practical to leave them running in the background:
+
+```bash
+DETACH=true ./docker/scripts/run_sim_launch.sh
+DETACH=true ./docker/scripts/run_navigation_launch.sh
+DETACH=true ./docker/scripts/run_foxglove_bridge.sh
+```
+
+The sim launcher defaults to `HEADLESS_RENDERING=true` and `SERVER_ONLY=true` in the container workflow. That matches the intended cloud path: Gazebo runs on the VM, Foxglove runs in your browser, and you do not rely on forwarded desktop graphics.
+
+You can turn those off explicitly:
+
+```bash
+HEADLESS_RENDERING=false SERVER_ONLY=false ./docker/scripts/run_sim_launch.sh
+```
+
+That only changes Gazebo's launch mode. The current Docker helpers do not yet wire a desktop display into the container, so headless plus Foxglove is still the supported team path.
+
+### 5) Connect Foxglove
+
+From your browser:
+
+- on the same machine: `ws://localhost:8765`
+- from another machine: `ws://<vm-ip>:8765`
+
+If your cloud firewall or AWS security group does not expose port `8765`, tunnel it over SSH instead:
+
+```bash
+ssh -L 8765:localhost:8765 -i /path/to/key.pem ubuntu@<vm-ip>
+```
+
+Then connect your local browser to `ws://localhost:8765`.
+
+Foxglove should be the default remote visualisation path for the team. It is lighter and less annoying than trying to make full desktop visualisation work everywhere.
+
+On the current NVIDIA cloud path, Gazebo headless rendering is good enough for point clouds and the navigation stack. If you need camera-image debugging, the safer route is still a VM desktop or DCV session outside this first-pass container path.
+
+If you are already in Amazon DCV or another remote desktop, that is useful for occasional RViz2 or Gazebo GUI sessions. It should not be the only workflow.
+
+To stop the named containers cleanly:
+
+```bash
+docker stop innex1-foxglove innex1-navigation innex1-sim
+```
+
+If your machine still requires `sudo` for Docker:
+
+```bash
+sudo docker stop innex1-foxglove innex1-navigation innex1-sim
+```
+
+To inspect logs from the running services:
+
+```bash
+docker logs innex1-sim --tail 100
+docker logs innex1-navigation --tail 100
+docker logs innex1-foxglove --tail 100
+```
+
+If your host still needs `sudo` for Docker, use `sudo docker logs ...` instead.
+
+## Quick start (Linux, manual install path)
 
 If you want the fastest working path, use the baseline above and run this sequence.
 
@@ -84,6 +213,18 @@ source ~/innex1-rover/install/setup.bash
 ros2 launch lunabot_simulation moon_yard.launch.py
 ```
 
+On a Linux GPU host you can enable Gazebo's official EGL headless path explicitly:
+
+```bash
+ros2 launch lunabot_simulation moon_yard.launch.py headless_rendering:=true server_only:=true
+```
+
+If you want to remove Gazebo's server-only flag:
+
+```bash
+ros2 launch lunabot_simulation moon_yard.launch.py headless_rendering:=false server_only:=false
+```
+
 ### 2) Start navigation stack (new terminal)
 
 ```bash
@@ -131,6 +272,8 @@ Exit codes:
 Typical endpoints:
 - GZ Web: `ws://localhost:9002`
 - Foxglove: `ws://localhost:8765`
+
+For shared remote work, Foxglove is the preferred default. RViz2 is still useful, but better treated as an interactive desktop tool on a Linux box or DCV session rather than the main remote workflow.
 
 ## Common issues
 
@@ -180,4 +323,3 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 
 - Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Licence: [Apache-2.0](LICENSE)
-

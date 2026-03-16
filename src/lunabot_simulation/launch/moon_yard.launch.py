@@ -1,14 +1,43 @@
 import os
 import platform
+import shlex
 import tempfile
 
 import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+
+def launch_gz_sim(context, pkg_ros_gz_sim, world_path):
+    headless_rendering = (
+        LaunchConfiguration("headless_rendering").perform(context).lower()
+        in ("1", "true", "yes", "on")
+    )
+    server_only = (
+        LaunchConfiguration("server_only").perform(context).lower()
+        in ("1", "true", "yes", "on")
+    )
+
+    gz_args = ["-r"]
+    if server_only:
+        gz_args.append("-s")
+    if headless_rendering:
+        gz_args.append("--headless-rendering")
+    gz_args.append(world_path)
+
+    return [
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
+            ),
+            launch_arguments={"gz_args": " ".join(shlex.quote(arg) for arg in gz_args)}.items(),
+        )
+    ]
 
 
 def generate_launch_description():
@@ -47,12 +76,9 @@ def generate_launch_description():
     spawn_y = "0.0"
     spawn_z = "0.5"  # Start above surface, gravity will settle it
 
-    # we'll run the sim without gazebo gui to save resources for now
-    gz_sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
-        ),
-        launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
+    gz_sim = OpaqueFunction(
+        function=launch_gz_sim,
+        kwargs={"pkg_ros_gz_sim": pkg_ros_gz_sim, "world_path": world_path},
     )
 
     robot_state_publisher = Node(
@@ -120,6 +146,16 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "headless_rendering",
+                default_value="false",
+                description="Enable Gazebo EGL headless rendering. Use this on Linux GPU hosts.",
+            ),
+            DeclareLaunchArgument(
+                "server_only",
+                default_value="true",
+                description="Run Gazebo without the GUI client. This is the default for cloud and CI.",
+            ),
             gz_sim,
             robot_state_publisher,
             spawn_robot,
