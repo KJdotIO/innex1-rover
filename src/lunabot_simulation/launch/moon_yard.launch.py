@@ -109,7 +109,6 @@ def generate_launch_description():
             "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/model/leo_rover/pose@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
         ],
         output="screen",
     )
