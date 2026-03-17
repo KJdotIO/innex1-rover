@@ -103,8 +103,6 @@ def generate_launch_description():
             # "/tf@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
-            "/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan",
             "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
             "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
             "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
