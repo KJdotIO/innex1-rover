@@ -23,6 +23,7 @@ def generate_launch_description():
             Node(
                 package="rtabmap_odom",
                 executable="rgbd_odometry",
+                name="rgbd_odometry",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
                 remappings=[*camera_remappings, ("odom", "/visual_odometry")],
@@ -48,6 +49,7 @@ def generate_launch_description():
             Node(
                 package="rtabmap_slam",
                 executable="rtabmap",
+                name="rtabmap",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
                 remappings=[*camera_remappings, ("odom", "/odometry/filtered")],
@@ -57,6 +59,7 @@ def generate_launch_description():
             Node(
                 package="apriltag_ros",
                 executable="apriltag_node",
+                name="apriltag",
                 output="screen",
                 parameters=[apriltag_yaml, {"use_sim_time": True}],
                 remappings=[
