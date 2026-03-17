@@ -136,26 +136,6 @@ ekf_filter_node_map:
         false,
       ]
 
-    odom1: /visual_odometry
-    odom1_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-      ]
-
     # AprilTag pose correction (discontinuous, only in global EKF)
     pose0: /tag_pose
     pose0_config:
