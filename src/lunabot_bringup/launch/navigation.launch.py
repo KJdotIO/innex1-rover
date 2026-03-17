@@ -38,4 +38,4 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([nav2_launch, localisation_launch])
+    return LaunchDescription([localisation_launch, nav2_launch])
