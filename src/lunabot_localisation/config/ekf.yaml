@@ -100,7 +100,7 @@ ekf_filter_node_map:
 
     # Continuous motion source from local EKF (odom -> base_footprint)
     # Keep global EKF lightweight: local filtered odom + intermittent tag pose.
-    odom0: /odometry/filtered
+    odom0: /odometry/local
     odom0_config:
       [
         true,

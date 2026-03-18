@@ -35,6 +35,7 @@ def generate_launch_description():
                 name="ekf_filter_node_odom",
                 output="screen",
                 parameters=[ekf_yaml, {"use_sim_time": True}],
+                remappings=[("odometry/filtered", "/odometry/local")],
             ),
             # Global EKF: map -> odom (corrects drift when tag seen)
             Node(
@@ -52,7 +53,7 @@ def generate_launch_description():
                 name="rtabmap",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
-                remappings=[*camera_remappings, ("odom", "/odometry/filtered")],
+                remappings=[*camera_remappings, ("odom", "/odometry/local")],
                 arguments=["-d"],
             ),
             # AprilTag detector
