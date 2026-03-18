@@ -115,6 +115,18 @@ python3 tools/doctor.py --mode all      # setup + runtime (runtime auto-skips if
 python3 tools/doctor.py --mode runtime  # force runtime checks
 ```
 
+For ROS bringup runtime checks from inside the stack, you can also run:
+
+```bash
+ros2 run lunabot_bringup preflight_check
+```
+
+Optional JSON report output (for evidence packs):
+
+```bash
+ros2 run lunabot_bringup preflight_check --json-out /tmp/preflight_report.json
+```
+
 Exit codes:
 - `0`: all checks passed
 - `1`: warnings present
