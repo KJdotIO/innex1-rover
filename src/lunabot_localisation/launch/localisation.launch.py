@@ -11,66 +11,22 @@ def generate_launch_description():
     ekf_yaml = os.path.join(pkg_localisation, "config", "ekf.yaml")
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
 
-    stereo_remappings = [
-        ("left/image_rect", "/camera_front_left"),
-        ("right/image_rect", "/camera_front_right"),
-        ("left/camera_info", "/camera_front_left/camera_info_synthetic"),
-        ("right/camera_info", "/camera_front_right/camera_info_synthetic"),
+    camera_remappings = [
+        ("rgb/image", "/camera_front/image"),
+        ("depth/image", "/camera_front/depth_image"),
+        ("rgb/camera_info", "/camera_front/camera_info"),
     ]
 
     return LaunchDescription(
         [
-            Node(
-                package="lunabot_localisation",
-                executable="stereo_camera_info_publisher",
-                output="screen",
-                parameters=[
-                    {
-                        "use_sim_time": True,
-                        "width": 640,
-                        "height": 400,
-                        "hfov": 1.396263402,
-                        "baseline": 0.075,
-                        "left_image_topic": "/camera_front_left",
-                        "right_image_topic": "/camera_front_right",
-                        "left_camera_info_topic": "/camera_front_left/camera_info_synthetic",
-                        "right_camera_info_topic": "/camera_front_right/camera_info_synthetic",
-                        "left_frame_id": "camera_front_left_optical_frame",
-                        "right_frame_id": "camera_front_right_optical_frame",
-                    }
-                ],
-            ),
             # Visual odometry
             Node(
                 package="rtabmap_odom",
-                executable="stereo_odometry",
+                executable="rgbd_odometry",
+                name="rgbd_odometry",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
-                remappings=[
-                    *stereo_remappings,
-                    ("odom", "/visual_odometry"),
-                ],
-            ),
-            Node(
-                package="lunabot_localisation",
-                executable="visual_odometry_gate",
-                output="screen",
-                parameters=[
-                    {
-                        "use_sim_time": True,
-                        "odom_topic": "/visual_odometry",
-                        "odom_info_topic": "/odom_info",
-                        "cmd_vel_topic": "/cmd_vel",
-                        "gated_odom_topic": "/visual_odometry/gated",
-                        "health_topic": "/visual_odometry/healthy",
-                        "min_inliers": 20,
-                        "min_matches": 40,
-                        "max_position_variance": 0.25,
-                        "max_yaw_variance": 0.25,
-                        "odom_info_timeout_sec": 3.0,
-                        "transition_log_interval_sec": 2.0,
-                    }
-                ],
+                remappings=[*camera_remappings, ("odom", "/visual_odometry")],
             ),
             # Local EKF: odom -> base_footprint (smooth, continuous)
             Node(
@@ -79,6 +35,7 @@ def generate_launch_description():
                 name="ekf_filter_node_odom",
                 output="screen",
                 parameters=[ekf_yaml, {"use_sim_time": True}],
+                remappings=[("odometry/filtered", "/odometry/local")],
             ),
             # Global EKF: map -> odom (corrects drift when tag seen)
             Node(
@@ -93,23 +50,22 @@ def generate_launch_description():
             Node(
                 package="rtabmap_slam",
                 executable="rtabmap",
+                name="rtabmap",
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
-                remappings=[
-                    *stereo_remappings,
-                    ("odom", "/odometry/filtered"),
-                ],
+                remappings=[*camera_remappings, ("odom", "/odometry/local")],
                 arguments=["-d"],
             ),
             # AprilTag detector
             Node(
                 package="apriltag_ros",
                 executable="apriltag_node",
+                name="apriltag",
                 output="screen",
                 parameters=[apriltag_yaml, {"use_sim_time": True}],
                 remappings=[
-                    ("image_rect", "/camera_front_left"),
-                    ("camera_info", "/camera_front_left/camera_info_synthetic"),
+                    ("image_rect", "/camera_front/image"),
+                    ("camera_info", "/camera_front/camera_info"),
                 ],
             ),
             # Known position of tag 0 in the map frame
@@ -132,12 +88,7 @@ def generate_launch_description():
                 package="lunabot_localisation",
                 executable="tag_pose_publisher",
                 output="screen",
-                parameters=[
-                    {
-                        "use_sim_time": True,
-                        "camera_frame": "camera_front_left_optical_frame",
-                    }
-                ],
+                parameters=[{"use_sim_time": True}],
             ),
         ]
     )
