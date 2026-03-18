@@ -84,7 +84,10 @@ ekf_filter_node_map:
   ros__parameters:
     use_sim_time: true
     frequency: 50.0
+    sensor_timeout: 0.4
     two_d_mode: true
+    smooth_lagged_data: true
+    history_length: 0.5
     publish_acceleration: false
     publish_tf: true
 
@@ -158,4 +161,4 @@ ekf_filter_node_map:
       ]
     pose0_differential: false
     pose0_relative: false
-    pose0_rejection_threshold: 5.0
+    pose0_rejection_threshold: 4.0
