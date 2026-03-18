@@ -98,8 +98,9 @@ ekf_filter_node_map:
 
     # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
 
-    # Same continuous sources as local EKF
-    odom0: /odom
+    # Continuous motion source from local EKF (odom -> base_footprint)
+    # Keep global EKF lightweight: local filtered odom + intermittent tag pose.
+    odom0: /odometry/filtered
     odom0_config:
       [
         true,
@@ -107,34 +108,14 @@ ekf_filter_node_map:
         false,
         false,
         false,
-        false,
         true,
-        false,
-        false,
-        false,
-        false,
         true,
-        false,
-        false,
-        false,
-      ]
-
-    imu0: /imu/data_raw
-    imu0_config:
-      [
-        false,
         false,
         false,
         false,
         false,
         true,
         false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
         false,
         false,
       ]
