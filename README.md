@@ -115,10 +115,27 @@ python3 tools/doctor.py --mode all      # setup + runtime (runtime auto-skips if
 python3 tools/doctor.py --mode runtime  # force runtime checks
 ```
 
-Exit codes:
+For ROS bringup runtime checks from inside the stack, you can also run:
+
+```bash
+ros2 run lunabot_bringup preflight_check
+```
+
+Optional JSON report output (for evidence packs):
+
+```bash
+ros2 run lunabot_bringup preflight_check --json-out /tmp/preflight_report.json
+```
+
+Exit codes (`tools/doctor.py`):
 - `0`: all checks passed
 - `1`: warnings present
 - `2`: failures present
+
+Exit codes (`ros2 run lunabot_bringup preflight_check`):
+- `0`: all checks passed, or only non-critical checks failed
+- `2`: at least one critical check failed
+- `3`: internal checker error (unexpected exception)
 
 ## Visualisation options
 
@@ -180,4 +197,3 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 
 - Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Licence: [Apache-2.0](LICENSE)
-
