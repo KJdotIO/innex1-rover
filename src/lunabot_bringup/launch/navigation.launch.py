@@ -5,6 +5,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
+from launch.actions import TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
@@ -12,7 +13,7 @@ def generate_launch_description():
     """
     Generate a launch description for the navigation stack.
 
-    This includes EKF localisation and Nav2 servers.
+    This includes the EKF localisation and the Nav2 servers.
     """
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
@@ -38,4 +39,7 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([localisation_launch, nav2_launch])
+    # Delay Nav2 startup slightly so sim time / TF / sensor streams can settle.
+    delayed_nav2_launch = TimerAction(period=5.0, actions=[nav2_launch])
+
+    return LaunchDescription([localisation_launch, delayed_nav2_launch])

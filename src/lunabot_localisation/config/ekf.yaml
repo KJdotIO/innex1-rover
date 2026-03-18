@@ -59,8 +59,8 @@ ekf_filter_node_odom:
         false,
       ]
 
-    # Visual odometry is gated before it reaches the filter.
-    odom1: /visual_odometry/gated
+    # Visual odometry: position only
+    odom1: /visual_odometry
     odom1_config:
       [
         true,
@@ -79,15 +79,15 @@ ekf_filter_node_odom:
         false,
         false,
       ]
-    odom1_queue_size: 5
-    odom1_nodelay: true
-    odom1_pose_rejection_threshold: 2.0
 
 ekf_filter_node_map:
   ros__parameters:
     use_sim_time: true
     frequency: 50.0
+    sensor_timeout: 0.4
     two_d_mode: true
+    smooth_lagged_data: true
+    history_length: 0.5
     publish_acceleration: false
     publish_tf: true
 
@@ -98,8 +98,9 @@ ekf_filter_node_map:
 
     # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
 
-    # Same continuous sources as local EKF
-    odom0: /odom
+    # Continuous motion source from local EKF (odom -> base_footprint)
+    # Keep global EKF lightweight: local filtered odom + intermittent tag pose.
+    odom0: /odometry/local
     odom0_config:
       [
         true,
@@ -107,7 +108,7 @@ ekf_filter_node_map:
         false,
         false,
         false,
-        false,
+        true,
         true,
         false,
         false,
@@ -118,49 +119,6 @@ ekf_filter_node_map:
         false,
         false,
       ]
-
-    imu0: /imu/data_raw
-    imu0_config:
-      [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
-      ]
-
-    odom1: /visual_odometry/gated
-    odom1_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-      ]
-    odom1_queue_size: 5
-    odom1_nodelay: true
-    odom1_pose_rejection_threshold: 2.0
 
     # AprilTag pose correction (discontinuous, only in global EKF)
     pose0: /tag_pose
@@ -184,4 +142,4 @@ ekf_filter_node_map:
       ]
     pose0_differential: false
     pose0_relative: false
-    pose0_rejection_threshold: 5.0
+    pose0_rejection_threshold: 4.0

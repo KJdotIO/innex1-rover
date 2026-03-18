@@ -5,6 +5,7 @@ import rclpy
 import tf2_ros
 import tf2_geometry_msgs
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, TransformStamped
+from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener
@@ -21,19 +22,30 @@ class TagPosePublisher(Node):
         self.declare_parameter("camera_frame", "camera_front_optical_frame")
         self.declare_parameter("target_frame", "base_footprint")
         self.declare_parameter("map_frame", "map")
+        self.declare_parameter("max_detection_age_sec", 0.35)
+        self.declare_parameter("max_tag_distance_m", 4.0)
 
         self.tag_frame = self.get_parameter("tag_frame").value
         self.detected_tag_frame = self.get_parameter("detected_tag_frame").value
         self.camera_frame = self.get_parameter("camera_frame").value
         self.target_frame = self.get_parameter("target_frame").value
         self.map_frame = self.get_parameter("map_frame").value
+        self.max_detection_age_sec = float(
+            self.get_parameter("max_detection_age_sec").value
+        )
+        self.max_tag_distance_m = float(self.get_parameter("max_tag_distance_m").value)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.pub = self.create_publisher(PoseWithCovarianceStamped, "/tag_pose", 10)
+        self.last_detection_stamp_ns = None
 
         self.timer = self.create_timer(0.1, self.on_timer)
+
+    @staticmethod
+    def _stamp_to_ns(stamp) -> int:
+        return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
 
     def on_timer(self):
         """Publish a tag-derived base pose when the required TF chain exists."""
@@ -44,19 +56,19 @@ class TagPosePublisher(Node):
                 self.map_frame,
                 self.tag_frame,
                 Time(),
-                timeout=rclpy.duration.Duration(seconds=0.0),
+                timeout=Duration(seconds=0.0),
             )
             camera_to_detected_tag = self.tf_buffer.lookup_transform(
                 self.detected_tag_frame,
                 self.camera_frame,
                 Time(),
-                timeout=rclpy.duration.Duration(seconds=0.0),
+                timeout=Duration(seconds=0.0),
             )
             base_to_camera = self.tf_buffer.lookup_transform(
                 self.camera_frame,
                 self.target_frame,
                 Time(),
-                timeout=rclpy.duration.Duration(seconds=0.0),
+                timeout=Duration(seconds=0.0),
             )
         except (
             tf2_ros.LookupException,
@@ -64,6 +76,26 @@ class TagPosePublisher(Node):
             tf2_ros.ExtrapolationException,
         ):
             return
+
+        detection_stamp_ns = self._stamp_to_ns(camera_to_detected_tag.header.stamp)
+        if detection_stamp_ns == self.last_detection_stamp_ns:
+            return
+        # Consume this stamp even when rejected to avoid reprocessing the same sample.
+        self.last_detection_stamp_ns = detection_stamp_ns
+
+        if detection_stamp_ns > 0:
+            now_ns = self.get_clock().now().nanoseconds
+            age_sec = (now_ns - detection_stamp_ns) / 1e9
+            if age_sec > self.max_detection_age_sec:
+                self.get_logger().debug(
+                    f"Dropping stale tag detection (age={age_sec:.3f}s)"
+                )
+                return
+            if age_sec < -0.05:
+                self.get_logger().debug(
+                    f"Dropping future-dated tag detection (age={age_sec:.3f}s)"
+                )
+                return
 
         detected_tag_to_map = TransformStamped()
         detected_tag_to_map.header = map_to_tag.header
@@ -86,6 +118,11 @@ class TagPosePublisher(Node):
         dy = camera_to_detected_tag.transform.translation.y
         dz = camera_to_detected_tag.transform.translation.z
         distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if distance > self.max_tag_distance_m:
+            self.get_logger().debug(
+                f"Dropping far tag detection (distance={distance:.2f}m)"
+            )
+            return
 
         # Distance-based covariance: accuracy degrades with range
         cov_xy = max((distance * 0.1) ** 2, 0.01)
