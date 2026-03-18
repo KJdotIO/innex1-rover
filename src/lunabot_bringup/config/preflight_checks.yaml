@@ -1,0 +1,72 @@
+preflight:
+  use_interface_contracts: true
+
+  sim_time:
+    critical: true
+    timeout_s: 5.0
+    min_delta_s: 0.2
+
+  topic_message_timeout_s: 5.0
+  tf_timeout_s: 5.0
+  action_timeout_s: 5.0
+  node_timeout_s: 5.0
+
+  required_topics:
+    - name: /imu/data_raw
+      type: sensor_msgs/msg/Imu
+      min_messages: 1
+      critical: true
+    - name: /odom
+      type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: true
+    - name: /camera_front/image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: true
+    - name: /camera_front/depth_image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: true
+    - name: /camera_front/camera_info
+      type: sensor_msgs/msg/CameraInfo
+      min_messages: 1
+      critical: true
+    - name: /camera_front/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: true
+    - name: /odometry/filtered
+      type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: true
+    - name: /hazards/front
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: true
+
+  required_tf_links:
+    - parent: map
+      child: odom
+      critical: true
+    - parent: odom
+      child: base_footprint
+      critical: true
+    - parent: base_footprint
+      child: base_link
+      critical: true
+
+  required_actions:
+    - name: /navigate_to_pose
+      type: nav2_msgs/action/NavigateToPose
+      critical: true
+
+  required_nodes:
+    - name: bt_navigator
+      critical: true
+    - name: controller_server
+      critical: true
+    - name: planner_server
+      critical: true
+    - name: hazard_detection
+      critical: true

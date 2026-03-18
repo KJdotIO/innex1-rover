@@ -1,12 +1,6 @@
 {
   "topics": [
     {
-      "name": "/hazards/front",
-      "type": "sensor_msgs/msg/PointCloud2",
-      "kind": "publisher",
-      "source": "src/lunabot_perception/lunabot_perception/hazard_detection.py"
-    },
-    {
       "name": "/mission/excavate",
       "type": "lunabot_interfaces/action/Excavate",
       "kind": "action_server",

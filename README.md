@@ -181,3 +181,20 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Licence: [Apache-2.0](LICENSE)
 
+## Troubleshooting
+
+**Launch file not found:**
+Ensure launch and worlds directories are installed in `CMakeLists.txt`, then rebuild.
+
+**Multiple Gazebo instances:**
+Kill all: `pkill -9 -f "gz sim"`
+
+**Models not loading:**
+First download requires internet. Models cache locally in `~/.gz/fuel/` for offline use.
+
+## Links
+
+- [ROS 2 Humble Documentation](https://docs.ros.org/en/humble/)
+- [Gazebo Sim Documentation](https://gazebosim.org/docs)
+- [Leo Rover Documentation](https://docs.fictionlab.pl/leo-rover)
+- [UK Lunabotics Website](https://uklunabotics.co.uk/)
