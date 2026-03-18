@@ -1,3 +1,5 @@
+"""Bridge AprilTag TF detections into PoseWithCovarianceStamped updates."""
+
 import math
 import rclpy
 import tf2_ros
@@ -10,6 +12,8 @@ from tf2_ros import Buffer, TransformListener
 
 
 class TagPosePublisher(Node):
+    """Publish a map-frame pose estimate derived from the detected AprilTag."""
+
     def __init__(self):
         super().__init__("tag_pose_publisher")
 
@@ -44,6 +48,7 @@ class TagPosePublisher(Node):
         return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
 
     def on_timer(self):
+        """Publish a tag-derived base pose when the required TF chain exists."""
         # Build an independent map->base estimate using:
         # map->tag (static), camera->tag (AprilTag), and camera->base (URDF static).
         try:
@@ -145,10 +150,14 @@ class TagPosePublisher(Node):
 
 
 def main(args=None):
+    """Run the AprilTag pose bridge node."""
     rclpy.init(args=args)
     node = TagPosePublisher()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
