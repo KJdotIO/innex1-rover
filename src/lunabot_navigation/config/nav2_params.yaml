@@ -56,8 +56,8 @@ global_costmap:
       track_unknown_space: false
       rolling_window: true
       # Keep global costmap rolling for startup robustness while localization settles.
-      width: !!float 8.0
-      height: !!float 5.0
+      width: 8
+      height: 5
       plugins: ["obstacle_layer", "inflation_layer"]
       # plugins: ["static_layer", "inflation_layer"]
 
@@ -105,8 +105,8 @@ local_costmap:
 
       # rolling window
       rolling_window: true
-      width: !!float 3.0 # robot vision has radius of 1.5m
-      height: !!float 3.0 # 3mx3m as specified in docx
+      width: 3 # robot vision has radius of 1.5m
+      height: 3 # 3mx3m as specified in docx
       resolution: 0.05
 
       obstacle_layer:
