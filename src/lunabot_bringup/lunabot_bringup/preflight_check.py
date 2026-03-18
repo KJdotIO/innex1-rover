@@ -54,14 +54,12 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def _repo_contract_path() -> Path | None:
+def _repo_contract_path() -> Path:
     """Locate interface contract file when run from repo root."""
     return Path.cwd() / ".github" / "contracts" / "interface_contracts.json"
 
 
-def _merge_contract_requirements(
-    config: dict[str, Any], logger
-) -> dict[str, Any]:
+def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, Any]:
     """Merge contract-defined topics and TF checks into preflight config."""
     preflight = config.setdefault("preflight", {})
     use_contracts = bool(preflight.get("use_interface_contracts", True))
@@ -131,9 +129,7 @@ class PreflightChecker(Node):
         """Create checker node with merged runtime config."""
         super().__init__(
             "preflight_check",
-            parameter_overrides=[
-                Parameter("use_sim_time", Parameter.Type.BOOL, True)
-            ],
+            parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, True)],
         )
         self._config = _merge_contract_requirements(config, self.get_logger())
         self._results: list[CheckResult] = []
@@ -196,16 +192,16 @@ class PreflightChecker(Node):
 
     def _topic_types(self) -> dict[str, list[str]]:
         """Return discovered topic types keyed by topic name."""
-        return {
-            name: types for name, types in self.get_topic_names_and_types()
-        }
+        return {name: types for name, types in self.get_topic_names_and_types()}
 
     def _check_required_topics(self) -> None:
         """Check required topics for type and message flow."""
         preflight = self._config["preflight"]
         required = preflight.get("required_topics", [])
         msg_timeout_s = float(preflight.get("topic_message_timeout_s", 5.0))
-        available = self._topic_types()
+        discovery_timeout_s = float(
+            preflight.get("topic_discovery_timeout_s", msg_timeout_s)
+        )
 
         for topic_cfg in required:
             topic_name = topic_cfg["name"]
@@ -214,13 +210,20 @@ class PreflightChecker(Node):
             critical = bool(topic_cfg.get("critical", True))
             started = time.monotonic()
 
-            discovered_types = available.get(topic_name)
+            discovery_deadline = time.monotonic() + discovery_timeout_s
+            discovered_types: list[str] | None = None
+            while time.monotonic() < discovery_deadline:
+                discovered_types = self._topic_types().get(topic_name)
+                if discovered_types:
+                    break
+                rclpy.spin_once(self, timeout_sec=0.1)
+
             if not discovered_types:
                 self._record(
                     f"topic:{topic_name}",
                     critical,
                     False,
-                    "topic not discovered",
+                    "topic not discovered within timeout",
                     started,
                 )
                 continue
@@ -255,10 +258,7 @@ class PreflightChecker(Node):
             )
 
             deadline = time.monotonic() + msg_timeout_s
-            while (
-                time.monotonic() < deadline
-                and received["count"] < min_messages
-            ):
+            while time.monotonic() < deadline and received["count"] < min_messages:
                 rclpy.spin_once(self, timeout_sec=0.1)
 
             self.destroy_subscription(subscription)
@@ -402,7 +402,11 @@ class PreflightChecker(Node):
                 )
 
     def run(self) -> list[CheckResult]:
-        """Execute all configured preflight checks in order."""
+        """
+        Run preflight checks.
+
+        Execute all configured preflight checks in order.
+        """
         self._check_sim_time()
         self._check_required_topics()
         self._check_tf_links()
@@ -450,9 +454,7 @@ def _exit_code(results: list[CheckResult]) -> int:
 
 def _arg_parser() -> argparse.ArgumentParser:
     """Create CLI argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Run bringup preflight checks"
-    )
+    parser = argparse.ArgumentParser(description="Run bringup preflight checks")
     parser.add_argument(
         "--config",
         type=Path,
@@ -475,7 +477,11 @@ def _default_config_path() -> Path:
 
 
 def main(args: list[str] | None = None) -> None:
-    """CLI entry point."""
+    """
+    Run CLI entry point.
+
+    Parse arguments, execute checks, print summary, and exit.
+    """
     parser = _arg_parser()
     cli_args = parser.parse_args(args=args)
 
@@ -484,9 +490,7 @@ def main(args: list[str] | None = None) -> None:
     try:
         config_path = cli_args.config or _default_config_path()
         if not config_path.exists():
-            raise FileNotFoundError(
-                f"Preflight config not found: {config_path}"
-            )
+            raise FileNotFoundError(f"Preflight config not found: {config_path}")
 
         config = _load_yaml(config_path)
         checker = PreflightChecker(config)
