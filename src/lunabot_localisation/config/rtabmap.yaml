@@ -30,9 +30,9 @@ rgbd_odometry:
     publish_tf: false
     frame_id: "base_footprint"
     odom_frame_id: "odom"
-    subscribe_depth: false
-    subscribe_rgbd: true
-    approx_sync: false
+    subscribe_depth: true
+    subscribe_rgbd: false
+    approx_sync: true
     Odom/Strategy: "0"
     Vis/MinInliers: "15"
     Vis/FeatureType: "8"
@@ -41,11 +41,11 @@ rtabmap:
   ros__parameters:
     # Global EKF now owns map -> odom; RTAB-Map only builds the map
     publish_tf: false
-    subscribe_rgb: false
-    subscribe_stereo: true
-    subscribe_depth: false
+    subscribe_rgb: true
+    subscribe_stereo: false
+    subscribe_depth: true
     subscribe_rgbd: false
-    approx_sync: false
+    approx_sync: true
     subscribe_odom_info: true
     topic_queue_size: 10
     sync_queue_size: 10
