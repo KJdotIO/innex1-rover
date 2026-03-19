@@ -21,7 +21,7 @@
   <joint name="ouster_joint" type="fixed">
     <parent link="base_link"/>
     <child link="ouster_link"/>
-    <origin xyz="0.0 0.0 0.30" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 0.12" rpy="0 0 0"/>
   </joint>
 
     <gazebo reference="ouster_link">
@@ -39,14 +39,14 @@
             <max_angle>3.14159</max_angle>
             </horizontal>
             <vertical>
-            <samples>16</samples>
+            <samples>32</samples>
             <resolution>1</resolution>
             <min_angle>-0.261799</min_angle>
             <max_angle>0.261799</max_angle>
             </vertical>
         </scan>
         <range>
-            <min>0.3</min>
+            <min>0.1</min>
             <max>20.0</max>
             <resolution>0.02</resolution>
         </range>
