@@ -2,7 +2,7 @@ import os
 from launch.actions import DeclareLaunchArgument
 from launch import LaunchDescription
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -17,6 +17,19 @@ def generate_launch_description():
     )
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
+    enable_visual_slam = LaunchConfiguration("enable_visual_slam")
+
+    visual_slam_condition = IfCondition(
+        PythonExpression(
+            [
+                "'",
+                lidar_costmap_phase,
+                "' == 'false' and '",
+                enable_visual_slam,
+                "' == 'true'",
+            ]
+        )
+    )
 
     camera_remappings = [
         ("rgb/image", "/camera_front/image"),
@@ -28,8 +41,13 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "lidar_costmap_phase",
-                default_value="true",
-                description="Launch only the local odom EKF for lidar/Nav2 bringup.",
+                default_value="false",
+                description="Use odom-only debug localisation with an identity map->odom TF.",
+            ),
+            DeclareLaunchArgument(
+                "enable_visual_slam",
+                default_value="false",
+                description="Optionally enable RTAB-Map visual odometry alongside AprilTag global localisation.",
             ),
             # Visual odometry
             Node(
@@ -39,7 +57,7 @@ def generate_launch_description():
                 output="screen",
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
                 remappings=[*camera_remappings, ("odom", "/visual_odometry")],
-                condition=UnlessCondition(lidar_costmap_phase),
+                condition=visual_slam_condition,
             ),
             # Local EKF: odom -> base_footprint (smooth, continuous)
             Node(
@@ -77,7 +95,7 @@ def generate_launch_description():
                 remappings=[("odometry/filtered", "/odometry/global")],
                 condition=UnlessCondition(lidar_costmap_phase),
             ),
-            # RTAB-Map SLAM (map building only, no TF publishing)
+            # RTAB-Map SLAM (optional, map building only, no TF publishing)
             Node(
                 package="rtabmap_slam",
                 executable="rtabmap",
@@ -86,7 +104,7 @@ def generate_launch_description():
                 parameters=[rtabmap_yaml, {"use_sim_time": True}],
                 remappings=[*camera_remappings, ("odom", "/odometry/local")],
                 arguments=["-d"],
-                condition=UnlessCondition(lidar_costmap_phase),
+                condition=visual_slam_condition,
             ),
             # AprilTag detector
             Node(
