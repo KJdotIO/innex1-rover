@@ -50,6 +50,23 @@ def generate_launch_description():
                 parameters=[ekf_lidar_phase_yaml, {"use_sim_time": True}],
                 remappings=[("odometry/filtered", "/odometry/local")],
             ),
+            # During the lidar debug phase there is no global localisation source,
+            # so publish an identity map->odom transform to keep Nav2 / RViz happy.
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                arguments=[
+                    "--x", "0",
+                    "--y", "0",
+                    "--z", "0",
+                    "--roll", "0",
+                    "--pitch", "0",
+                    "--yaw", "0",
+                    "--frame-id", "map",
+                    "--child-frame-id", "odom",
+                ],
+                condition=IfCondition(lidar_costmap_phase),
+            ),
             # Global EKF: map -> odom (corrects drift when tag seen)
             Node(
                 package="robot_localization",
