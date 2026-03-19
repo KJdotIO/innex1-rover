@@ -39,7 +39,7 @@ preflight:
     - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
-      critical: true
+      critical: false
     - name: /odometry/local
       type: nav_msgs/msg/Odometry
       min_messages: 1
