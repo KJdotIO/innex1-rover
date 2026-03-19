@@ -39,14 +39,14 @@
             <max_angle>3.14159</max_angle>
             </horizontal>
             <vertical>
-            <samples>16</samples>
+            <samples>32</samples>
             <resolution>1</resolution>
             <min_angle>-0.261799</min_angle>
             <max_angle>0.261799</max_angle>
             </vertical>
         </scan>
         <range>
-            <min>0.3</min>
+            <min>0.1</min>
             <max>20.0</max>
             <resolution>0.02</resolution>
         </range>
