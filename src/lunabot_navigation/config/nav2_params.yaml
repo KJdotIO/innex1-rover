@@ -63,8 +63,6 @@ global_costmap:
       resolution: 0.05 # spec resolution
       track_unknown_space: false
       rolling_window: true
-      width: 12.0
-      height: 12.0
       plugins: ["obstacle_layer", "inflation_layer"]
 
       obstacle_layer:
@@ -109,8 +107,6 @@ local_costmap:
 
       # rolling window
       rolling_window: true
-      width: 5.0 # lidar-first local obstacle envelope
-      height: 4.0
       resolution: 0.05
 
       voxel_layer:
