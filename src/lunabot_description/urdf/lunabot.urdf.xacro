@@ -21,7 +21,7 @@
   <joint name="ouster_joint" type="fixed">
     <parent link="base_link"/>
     <child link="ouster_link"/>
-    <origin xyz="0.0 0.0 0.06" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 0.10" rpy="0 0 0"/>
   </joint>
 
     <gazebo reference="ouster_link">
