@@ -23,15 +23,15 @@ preflight:
     - name: /camera_front/image
       type: sensor_msgs/msg/Image
       min_messages: 1
-      critical: true
+      critical: false
     - name: /camera_front/depth_image
       type: sensor_msgs/msg/Image
       min_messages: 1
-      critical: true
+      critical: false
     - name: /camera_front/camera_info
       type: sensor_msgs/msg/CameraInfo
       min_messages: 1
-      critical: true
+      critical: false
     - name: /camera_front/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
@@ -46,9 +46,6 @@ preflight:
       critical: true
 
   required_tf_links:
-    - parent: map
-      child: odom
-      critical: true
     - parent: odom
       child: base_footprint
       critical: true

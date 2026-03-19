@@ -25,7 +25,8 @@ def generate_launch_description():
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_bringup, "launch", "localisation.launch.py")
-        )
+        ),
+        launch_arguments={"lidar_costmap_phase": "true"}.items(),
     )
 
     nav2_launch = IncludeLaunchDescription(
