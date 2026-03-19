@@ -36,12 +36,12 @@ preflight:
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: true
-    - name: /odometry/filtered
-      type: nav_msgs/msg/Odometry
-      min_messages: 1
-      critical: true
-    - name: /hazards/front
+    - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: false
+    - name: /odometry/local
+      type: nav_msgs/msg/Odometry
       min_messages: 1
       critical: true
 
@@ -55,6 +55,9 @@ preflight:
     - parent: base_footprint
       child: base_link
       critical: true
+    - parent: base_link
+      child: ouster_link
+      critical: true
 
   required_actions:
     - name: /navigate_to_pose
@@ -67,6 +70,4 @@ preflight:
     - name: controller_server
       critical: true
     - name: planner_server
-      critical: true
-    - name: hazard_detection
       critical: true

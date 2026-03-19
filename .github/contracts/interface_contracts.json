@@ -39,9 +39,18 @@
       "source": "src/external/leo_common-ros2/leo_description/urdf/macros.xacro",
       "parent_pattern": "${link_prefix}base_footprint",
       "child_pattern": "${link_prefix}base_link"
+    },
+    {
+      "parent": "base_link",
+      "child": "ouster_link",
+      "kind": "xacro_joint",
+      "source": "src/lunabot_description/urdf/lunabot.urdf.xacro",
+      "parent_pattern": "base_link",
+      "child_pattern": "ouster_link"
     }
   ],
   "deferred_topics": [
+    "/ouster/points",
     "/mission/state",
     "/mission/autonomy_mode",
     "/mission/time_remaining_s",
