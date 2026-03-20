@@ -118,48 +118,36 @@
     <!-- Zone markers for debugging only. These are visual overlays, not collisions. -->
     <model name="zone_starting">
       <static>true</static>
-      <pose>0 0 0.03 0 0 0</pose>
+      <pose>0 0 0.02 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry><box><size>2.0 2.0 0.003</size></box></geometry>
-          <material><ambient>0.20 0.75 0.20 0.18</ambient><diffuse
-                        >0.30 0.85 0.30 0.18</diffuse></material>
+          <material><ambient>0.20 0.75 0.20 0.08</ambient><diffuse
+                        >0.30 0.85 0.30 0.08</diffuse></material>
         </visual>
       </link>
     </model>
 
     <model name="zone_construction">
       <static>true</static>
-      <pose>0.3 -2.55 0.03 0 0 0</pose>
+      <pose>0.3 -2.55 0.02 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry><box><size>2.6 1.5 0.003</size></box></geometry>
-          <material><ambient>0.18 0.45 0.80 0.16</ambient><diffuse
-                        >0.28 0.56 0.92 0.16</diffuse></material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="zone_obstacle">
-      <static>true</static>
-      <pose>2.575 -1.1 0.03 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry><box><size>3.15 4.4 0.003</size></box></geometry>
-          <material><ambient>0.78 0.66 0.16 0.12</ambient><diffuse
-                        >0.88 0.76 0.24 0.12</diffuse></material>
+          <material><ambient>0.18 0.45 0.80 0.08</ambient><diffuse
+                        >0.28 0.56 0.92 0.08</diffuse></material>
         </visual>
       </link>
     </model>
 
     <model name="zone_excavation">
       <static>true</static>
-      <pose>5.525 -1.1 0.03 0 0 0</pose>
+      <pose>5.525 -1.1 0.02 0 0 0</pose>
       <link name="link">
         <visual name="visual">
           <geometry><box><size>2.75 4.4 0.003</size></box></geometry>
-          <material><ambient>0.82 0.28 0.36 0.12</ambient><diffuse
-                        >0.92 0.36 0.46 0.12</diffuse></material>
+          <material><ambient>0.82 0.28 0.36 0.08</ambient><diffuse
+                        >0.92 0.36 0.46 0.08</diffuse></material>
         </visual>
       </link>
     </model>
