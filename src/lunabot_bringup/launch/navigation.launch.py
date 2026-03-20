@@ -8,6 +8,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -19,6 +20,8 @@ def generate_launch_description():
     Start the blank map server, localisation include, and Nav2 navigation
     servers. The forwarded launch arguments keep the odom-only debug mode
     available while AprilTag global localisation remains the default path.
+    Optionally launch RViz with sim time enabled to avoid goal timestamp
+    mismatches during simulation testing.
     """
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
@@ -27,8 +30,10 @@ def generate_launch_description():
 
     nav_params_path = os.path.join(pkg_nav, "config", "nav2_params.yaml")
     blank_map_path = os.path.join(pkg_nav, "maps", "moon_yard_blank.yaml")
+    rviz_config_path = os.path.join(pkg_bringup, "rviz", "navigation.rviz")
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
+    launch_rviz = LaunchConfiguration("launch_rviz")
 
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -74,6 +79,16 @@ def generate_launch_description():
         ],
     )
 
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=["-d", rviz_config_path],
+        parameters=[{"use_sim_time": True}],
+        condition=IfCondition(launch_rviz),
+    )
+
     # Delay Nav2 startup slightly so sim time / TF / sensor streams can settle.
     delayed_nav2_launch = TimerAction(period=5.0, actions=[nav2_launch])
 
@@ -92,9 +107,18 @@ def generate_launch_description():
                     "alongside AprilTag global localisation."
                 ),
             ),
+            DeclareLaunchArgument(
+                "launch_rviz",
+                default_value="false",
+                description=(
+                    "Launch RViz with sim time enabled using the repo's "
+                    "navigation config."
+                ),
+            ),
             map_server,
             map_lifecycle_manager,
             localisation_launch,
             delayed_nav2_launch,
+            rviz,
         ]
     )

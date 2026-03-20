@@ -22,6 +22,7 @@
   <exec_depend>nav2_bringup</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
   <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>rviz2</exec_depend>
   <exec_depend>lunabot_navigation</exec_depend>
   <exec_depend>lunabot_perception</exec_depend>
 
