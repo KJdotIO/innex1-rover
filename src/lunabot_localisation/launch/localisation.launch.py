@@ -25,6 +25,7 @@ def generate_launch_description():
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
+    use_sim_time = LaunchConfiguration("use_sim_time")
 
     visual_slam_condition = IfCondition(
         PythonExpression(
@@ -59,13 +60,18 @@ def generate_launch_description():
                     "alongside AprilTag global localisation."
                 ),
             ),
+            DeclareLaunchArgument(
+                "use_sim_time",
+                default_value="true",
+                description="Use /clock instead of wall time for all launched nodes.",
+            ),
             # Visual odometry
             Node(
                 package="rtabmap_odom",
                 executable="rgbd_odometry",
                 name="rgbd_odometry",
                 output="screen",
-                parameters=[rtabmap_yaml, {"use_sim_time": True}],
+                parameters=[rtabmap_yaml, {"use_sim_time": use_sim_time}],
                 remappings=[*camera_remappings, ("odom", "/visual_odometry")],
                 condition=visual_slam_condition,
             ),
@@ -75,7 +81,7 @@ def generate_launch_description():
                 executable="ekf_node",
                 name="ekf_filter_node_odom",
                 output="screen",
-                parameters=[ekf_lidar_phase_yaml, {"use_sim_time": True}],
+                parameters=[ekf_lidar_phase_yaml, {"use_sim_time": use_sim_time}],
                 remappings=[("odometry/filtered", "/odometry/local")],
             ),
             # During the lidar debug phase there is no global localisation source,
@@ -101,7 +107,7 @@ def generate_launch_description():
                 executable="ekf_node",
                 name="ekf_filter_node_map",
                 output="screen",
-                parameters=[ekf_yaml, {"use_sim_time": True}],
+                parameters=[ekf_yaml, {"use_sim_time": use_sim_time}],
                 remappings=[("odometry/filtered", "/odometry/global")],
                 condition=UnlessCondition(lidar_costmap_phase),
             ),
@@ -111,7 +117,7 @@ def generate_launch_description():
                 executable="rtabmap",
                 name="rtabmap",
                 output="screen",
-                parameters=[rtabmap_yaml, {"use_sim_time": True}],
+                parameters=[rtabmap_yaml, {"use_sim_time": use_sim_time}],
                 remappings=[*camera_remappings, ("odom", "/odometry/local")],
                 arguments=["-d"],
                 condition=visual_slam_condition,
@@ -122,7 +128,7 @@ def generate_launch_description():
                 executable="apriltag_node",
                 name="apriltag",
                 output="screen",
-                parameters=[apriltag_yaml, {"use_sim_time": True}],
+                parameters=[apriltag_yaml, {"use_sim_time": use_sim_time}],
                 remappings=[
                     ("image_rect", "/camera_front/image"),
                     ("camera_info", "/camera_front/camera_info"),
@@ -151,7 +157,7 @@ def generate_launch_description():
                 executable="tag_pose_publisher",
                 name="tag_pose_publisher",
                 output="screen",
-                parameters=[{"use_sim_time": True}],
+                parameters=[{"use_sim_time": use_sim_time}],
                 condition=UnlessCondition(lidar_costmap_phase),
             ),
         ]

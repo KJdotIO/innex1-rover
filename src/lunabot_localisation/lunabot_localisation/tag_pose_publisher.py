@@ -1,6 +1,8 @@
 """Bridge AprilTag TF detections into PoseWithCovarianceStamped updates."""
 
 import math
+
+from apriltag_msgs.msg import AprilTagDetectionArray
 import rclpy
 import tf2_ros
 import tf2_geometry_msgs
@@ -22,8 +24,13 @@ class TagPosePublisher(Node):
         self.declare_parameter("camera_frame", "camera_front_optical_frame")
         self.declare_parameter("target_frame", "base_footprint")
         self.declare_parameter("map_frame", "map")
+        self.declare_parameter("tag_id", 0)
+        self.declare_parameter("detections_topic", "/detections")
         self.declare_parameter("max_detection_age_sec", 0.35)
-        self.declare_parameter("max_tag_distance_m", 4.0)
+        self.declare_parameter("max_tag_distance_m", 3.0)
+        self.declare_parameter("max_detection_sync_slop_sec", 0.05)
+        self.declare_parameter("max_hamming", 0)
+        self.declare_parameter("min_decision_margin", 35.0)
         self.declare_parameter("correction_log_period_sec", 1.0)
 
         self.tag_frame = self.get_parameter("tag_frame").value
@@ -31,10 +38,19 @@ class TagPosePublisher(Node):
         self.camera_frame = self.get_parameter("camera_frame").value
         self.target_frame = self.get_parameter("target_frame").value
         self.map_frame = self.get_parameter("map_frame").value
+        self.tag_id = int(self.get_parameter("tag_id").value)
+        self.detections_topic = self.get_parameter("detections_topic").value
         self.max_detection_age_sec = float(
             self.get_parameter("max_detection_age_sec").value
         )
         self.max_tag_distance_m = float(self.get_parameter("max_tag_distance_m").value)
+        self.max_detection_sync_slop_sec = float(
+            self.get_parameter("max_detection_sync_slop_sec").value
+        )
+        self.max_hamming = int(self.get_parameter("max_hamming").value)
+        self.min_decision_margin = float(
+            self.get_parameter("min_decision_margin").value
+        )
         self.correction_log_period_sec = float(
             self.get_parameter("correction_log_period_sec").value
         )
@@ -43,7 +59,16 @@ class TagPosePublisher(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.pub = self.create_publisher(PoseWithCovarianceStamped, "/tag_pose", 10)
-        self.last_detection_stamp_ns = None
+        self.detection_sub = self.create_subscription(
+            AprilTagDetectionArray,
+            self.detections_topic,
+            self.on_detections,
+            10,
+        )
+        self.last_processed_stamp_ns = None
+        self.latest_detection_stamp_ns = None
+        self.latest_detection_hamming = None
+        self.latest_detection_margin = None
         self.last_report_time_ns = 0
 
         self.timer = self.create_timer(0.1, self.on_timer)
@@ -62,6 +87,17 @@ class TagPosePublisher(Node):
             quaternion.y * quaternion.y + quaternion.z * quaternion.z
         )
         return math.atan2(siny_cosp, cosy_cosp)
+
+    def on_detections(self, msg: AprilTagDetectionArray) -> None:
+        """Cache the latest AprilTag metadata for the configured tag id."""
+        for detection in msg.detections:
+            if detection.id != self.tag_id:
+                continue
+
+            self.latest_detection_stamp_ns = self._stamp_to_ns(msg.header.stamp)
+            self.latest_detection_hamming = int(detection.hamming)
+            self.latest_detection_margin = float(detection.decision_margin)
+            return
 
     def on_timer(self):
         """Publish a tag-derived base pose when the required TF chain exists."""
@@ -94,10 +130,36 @@ class TagPosePublisher(Node):
             return
 
         detection_stamp_ns = self._stamp_to_ns(camera_to_detected_tag.header.stamp)
-        if detection_stamp_ns == self.last_detection_stamp_ns:
+        if detection_stamp_ns == self.last_processed_stamp_ns:
             return
         # Consume this stamp even when rejected to avoid reprocessing the same sample.
-        self.last_detection_stamp_ns = detection_stamp_ns
+        self.last_processed_stamp_ns = detection_stamp_ns
+
+        if self.latest_detection_stamp_ns is None:
+            self.get_logger().debug("Dropping tag detection without matching metadata")
+            return
+
+        sync_error_sec = abs(detection_stamp_ns - self.latest_detection_stamp_ns) / 1e9
+        if sync_error_sec > self.max_detection_sync_slop_sec:
+            self.get_logger().debug(
+                "Dropping unsynchronised tag detection "
+                f"(tf_vs_msg={sync_error_sec:.3f}s)"
+            )
+            return
+
+        if self.latest_detection_hamming > self.max_hamming:
+            self.get_logger().debug(
+                "Dropping low-quality tag detection "
+                f"(hamming={self.latest_detection_hamming})"
+            )
+            return
+
+        if self.latest_detection_margin < self.min_decision_margin:
+            self.get_logger().debug(
+                "Dropping low-confidence tag detection "
+                f"(margin={self.latest_detection_margin:.1f})"
+            )
+            return
 
         if detection_stamp_ns > 0:
             now_ns = self.get_clock().now().nanoseconds
@@ -168,6 +230,7 @@ class TagPosePublisher(Node):
             self.get_logger().info(
                 "Accepted AprilTag correction "
                 f"distance={distance:.2f}m "
+                f"margin={self.latest_detection_margin:.1f} "
                 f"map_pose=({msg.pose.pose.position.x:.2f}, "
                 f"{msg.pose.pose.position.y:.2f}, yaw={yaw:.2f})"
             )

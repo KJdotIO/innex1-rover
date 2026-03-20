@@ -34,6 +34,7 @@ def generate_launch_description():
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     launch_rviz = LaunchConfiguration("launch_rviz")
+    use_sim_time = LaunchConfiguration("use_sim_time")
 
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -42,6 +43,7 @@ def generate_launch_description():
         launch_arguments={
             "lidar_costmap_phase": lidar_costmap_phase,
             "enable_visual_slam": enable_visual_slam,
+            "use_sim_time": use_sim_time,
         }.items(),
     )
 
@@ -50,7 +52,7 @@ def generate_launch_description():
             os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
         ),
         launch_arguments={
-            "use_sim_time": "true",
+            "use_sim_time": use_sim_time,
             "params_file": nav_params_path,
             "autostart": "true",
         }.items(),
@@ -62,7 +64,7 @@ def generate_launch_description():
         name="map_server",
         output="screen",
         parameters=[
-            {"use_sim_time": True},
+            {"use_sim_time": use_sim_time},
             {"yaml_filename": blank_map_path},
         ],
     )
@@ -73,7 +75,7 @@ def generate_launch_description():
         name="lifecycle_manager_map",
         output="screen",
         parameters=[
-            {"use_sim_time": True},
+            {"use_sim_time": use_sim_time},
             {"autostart": True},
             {"node_names": ["map_server"]},
         ],
@@ -85,7 +87,7 @@ def generate_launch_description():
         name="rviz2",
         output="screen",
         arguments=["-d", rviz_config_path],
-        parameters=[{"use_sim_time": True}],
+        parameters=[{"use_sim_time": use_sim_time}],
         condition=IfCondition(launch_rviz),
     )
 
@@ -114,6 +116,11 @@ def generate_launch_description():
                     "Launch RViz with sim time enabled using the repo's "
                     "navigation config."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "use_sim_time",
+                default_value="true",
+                description="Use /clock instead of wall time for all launched nodes.",
             ),
             map_server,
             map_lifecycle_manager,
