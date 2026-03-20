@@ -16,7 +16,9 @@ def generate_launch_description():
     """
     Generate a launch description for the navigation stack.
 
-    This includes the EKF localisation and the Nav2 servers.
+    Start the blank map server, localisation include, and Nav2 navigation
+    servers. The forwarded launch arguments keep the odom-only debug mode
+    available while AprilTag global localisation remains the default path.
     """
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
@@ -85,7 +87,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "enable_visual_slam",
                 default_value="false",
-                description="Optionally enable RTAB-Map visual odometry alongside AprilTag global localisation.",
+                description=(
+                    "Optionally enable RTAB-Map visual odometry "
+                    "alongside AprilTag global localisation."
+                ),
             ),
             map_server,
             map_lifecycle_manager,

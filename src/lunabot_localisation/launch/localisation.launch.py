@@ -8,6 +8,13 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
+    """
+    Generate a launch description for the localisation stack.
+
+    Start the local EKF in all modes, optionally publish the debug identity
+    map->odom transform, and enable AprilTag/global EKF nodes by default.
+    Visual SLAM remains available behind an explicit launch argument.
+    """
     pkg_localisation = get_package_share_directory("lunabot_localisation")
 
     rtabmap_yaml = os.path.join(pkg_localisation, "config", "rtabmap.yaml")
@@ -47,7 +54,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "enable_visual_slam",
                 default_value="false",
-                description="Optionally enable RTAB-Map visual odometry alongside AprilTag global localisation.",
+                description=(
+                    "Optionally enable RTAB-Map visual odometry "
+                    "alongside AprilTag global localisation."
+                ),
             ),
             # Visual odometry
             Node(
@@ -139,6 +149,7 @@ def generate_launch_description():
             Node(
                 package="lunabot_localisation",
                 executable="tag_pose_publisher",
+                name="tag_pose_publisher",
                 output="screen",
                 parameters=[{"use_sim_time": True}],
                 condition=UnlessCondition(lidar_costmap_phase),

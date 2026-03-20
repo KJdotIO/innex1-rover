@@ -44,6 +44,8 @@ preflight:
       type: nav_msgs/msg/OccupancyGrid
       min_messages: 1
       critical: true
+      reliability: reliable
+      durability: transient_local
     - name: /odometry/local
       type: nav_msgs/msg/Odometry
       min_messages: 1

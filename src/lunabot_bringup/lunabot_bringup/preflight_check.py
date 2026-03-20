@@ -16,6 +16,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 from rclpy.qos import QoSProfile
 from rclpy.qos import QoSReliabilityPolicy
@@ -194,6 +195,24 @@ class PreflightChecker(Node):
         """Return discovered topic types keyed by topic name."""
         return {name: types for name, types in self.get_topic_names_and_types()}
 
+    @staticmethod
+    def _parse_reliability(value: str) -> QoSReliabilityPolicy:
+        """Return QoS reliability from config text."""
+        mapping = {
+            "best_effort": QoSReliabilityPolicy.BEST_EFFORT,
+            "reliable": QoSReliabilityPolicy.RELIABLE,
+        }
+        return mapping.get(value.lower(), QoSReliabilityPolicy.BEST_EFFORT)
+
+    @staticmethod
+    def _parse_durability(value: str) -> QoSDurabilityPolicy:
+        """Return QoS durability from config text."""
+        mapping = {
+            "volatile": QoSDurabilityPolicy.VOLATILE,
+            "transient_local": QoSDurabilityPolicy.TRANSIENT_LOCAL,
+        }
+        return mapping.get(value.lower(), QoSDurabilityPolicy.VOLATILE)
+
     def _check_required_topics(self) -> None:
         """Check required topics for type and message flow."""
         preflight = self._config["preflight"]
@@ -208,6 +227,12 @@ class PreflightChecker(Node):
             expected_type = topic_cfg["type"]
             min_messages = int(topic_cfg.get("min_messages", 1))
             critical = bool(topic_cfg.get("critical", True))
+            reliability = self._parse_reliability(
+                str(topic_cfg.get("reliability", "best_effort"))
+            )
+            durability = self._parse_durability(
+                str(topic_cfg.get("durability", "volatile"))
+            )
             started = time.monotonic()
 
             discovery_deadline = time.monotonic() + discovery_timeout_s
@@ -245,7 +270,8 @@ class PreflightChecker(Node):
             qos = QoSProfile(
                 history=QoSHistoryPolicy.KEEP_LAST,
                 depth=10,
-                reliability=QoSReliabilityPolicy.BEST_EFFORT,
+                reliability=reliability,
+                durability=durability,
             )
 
             subscription = self.create_subscription(

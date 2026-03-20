@@ -38,7 +38,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "enable_visual_slam",
                 default_value="false",
-                description="Optionally enable RTAB-Map visual odometry alongside AprilTag global localisation.",
+                description=(
+                    "Optionally enable RTAB-Map visual odometry "
+                    "alongside AprilTag global localisation."
+                ),
             ),
             localisation_launch,
         ]

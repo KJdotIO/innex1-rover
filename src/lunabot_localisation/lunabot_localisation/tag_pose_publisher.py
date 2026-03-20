@@ -24,6 +24,7 @@ class TagPosePublisher(Node):
         self.declare_parameter("map_frame", "map")
         self.declare_parameter("max_detection_age_sec", 0.35)
         self.declare_parameter("max_tag_distance_m", 4.0)
+        self.declare_parameter("correction_log_period_sec", 1.0)
 
         self.tag_frame = self.get_parameter("tag_frame").value
         self.detected_tag_frame = self.get_parameter("detected_tag_frame").value
@@ -34,18 +35,33 @@ class TagPosePublisher(Node):
             self.get_parameter("max_detection_age_sec").value
         )
         self.max_tag_distance_m = float(self.get_parameter("max_tag_distance_m").value)
+        self.correction_log_period_sec = float(
+            self.get_parameter("correction_log_period_sec").value
+        )
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.pub = self.create_publisher(PoseWithCovarianceStamped, "/tag_pose", 10)
         self.last_detection_stamp_ns = None
+        self.last_report_time_ns = 0
 
         self.timer = self.create_timer(0.1, self.on_timer)
 
     @staticmethod
     def _stamp_to_ns(stamp) -> int:
         return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+
+    @staticmethod
+    def _yaw_from_quaternion(quaternion) -> float:
+        """Return planar yaw from a quaternion."""
+        siny_cosp = 2.0 * (
+            quaternion.w * quaternion.z + quaternion.x * quaternion.y
+        )
+        cosy_cosp = 1.0 - 2.0 * (
+            quaternion.y * quaternion.y + quaternion.z * quaternion.z
+        )
+        return math.atan2(siny_cosp, cosy_cosp)
 
     def on_timer(self):
         """Publish a tag-derived base pose when the required TF chain exists."""
@@ -144,6 +160,18 @@ class TagPosePublisher(Node):
         msg.pose.covariance = cov
 
         self.pub.publish(msg)
+        now_ns = self.get_clock().now().nanoseconds
+        if now_ns - self.last_report_time_ns >= int(
+            self.correction_log_period_sec * 1e9
+        ):
+            yaw = self._yaw_from_quaternion(msg.pose.pose.orientation)
+            self.get_logger().info(
+                "Accepted AprilTag correction "
+                f"distance={distance:.2f}m "
+                f"map_pose=({msg.pose.pose.position.x:.2f}, "
+                f"{msg.pose.pose.position.y:.2f}, yaw={yaw:.2f})"
+            )
+            self.last_report_time_ns = now_ns
         self.get_logger().debug(
             f"Tag at {distance:.2f}m, cov_xy={cov_xy:.4f}, cov_yaw={cov_yaw:.4f}"
         )
