@@ -35,6 +35,7 @@ def generate_launch_description():
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
 
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -44,6 +45,7 @@ def generate_launch_description():
             "lidar_costmap_phase": lidar_costmap_phase,
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
+            "enable_apriltag_debug": enable_apriltag_debug,
         }.items(),
     )
 
@@ -121,6 +123,14 @@ def generate_launch_description():
                 "use_sim_time",
                 default_value="true",
                 description="Use /clock instead of wall time for all launched nodes.",
+            ),
+            DeclareLaunchArgument(
+                "enable_apriltag_debug",
+                default_value="false",
+                description=(
+                    "Launch the apriltag_draw overlay for annotated front camera "
+                    "debugging."
+                ),
             ),
             map_server,
             map_lifecycle_manager,

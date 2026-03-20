@@ -25,7 +25,7 @@ class TagPosePublisher(Node):
         self.declare_parameter("target_frame", "base_footprint")
         self.declare_parameter("map_frame", "map")
         self.declare_parameter("tag_id", 0)
-        self.declare_parameter("detections_topic", "/detections")
+        self.declare_parameter("detections_topic", "/camera_front/tags")
         self.declare_parameter("max_detection_age_sec", 0.35)
         self.declare_parameter("max_tag_distance_m", 3.0)
         self.declare_parameter("max_detection_sync_slop_sec", 0.05)

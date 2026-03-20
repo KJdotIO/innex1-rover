@@ -2,8 +2,12 @@ import os
 from launch.actions import DeclareLaunchArgument
 from launch import LaunchDescription
 from launch.conditions import IfCondition, UnlessCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+from launch.actions import IncludeLaunchDescription
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -26,6 +30,7 @@ def generate_launch_description():
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
 
     visual_slam_condition = IfCondition(
         PythonExpression(
@@ -34,6 +39,17 @@ def generate_launch_description():
                 lidar_costmap_phase,
                 "' == 'false' and '",
                 enable_visual_slam,
+                "' == 'true'",
+            ]
+        )
+    )
+    apriltag_debug_condition = IfCondition(
+        PythonExpression(
+            [
+                "'",
+                lidar_costmap_phase,
+                "' == 'false' and '",
+                enable_apriltag_debug,
                 "' == 'true'",
             ]
         )
@@ -64,6 +80,14 @@ def generate_launch_description():
                 "use_sim_time",
                 default_value="true",
                 description="Use /clock instead of wall time for all launched nodes.",
+            ),
+            DeclareLaunchArgument(
+                "enable_apriltag_debug",
+                default_value="false",
+                description=(
+                    "Launch the apriltag_draw overlay for annotated front camera "
+                    "debugging."
+                ),
             ),
             # Visual odometry
             Node(
@@ -132,8 +156,23 @@ def generate_launch_description():
                 remappings=[
                     ("image_rect", "/camera_front/image"),
                     ("camera_info", "/camera_front/camera_info"),
+                    ("detections", "/camera_front/tags"),
                 ],
                 condition=UnlessCondition(lidar_costmap_phase),
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare("apriltag_draw"), "launch", "draw.launch.py"]
+                    )
+                ),
+                launch_arguments={
+                    "camera": "/camera_front",
+                    "image": "image",
+                    "tags": "tags",
+                    "image_transport": "raw",
+                }.items(),
+                condition=apriltag_debug_condition,
             ),
             # Known position of tag 0 in the map frame
             Node(
@@ -157,7 +196,12 @@ def generate_launch_description():
                 executable="tag_pose_publisher",
                 name="tag_pose_publisher",
                 output="screen",
-                parameters=[{"use_sim_time": use_sim_time}],
+                parameters=[
+                    {
+                        "use_sim_time": use_sim_time,
+                        "detections_topic": "/camera_front/tags",
+                    }
+                ],
                 condition=UnlessCondition(lidar_costmap_phase),
             ),
         ]
