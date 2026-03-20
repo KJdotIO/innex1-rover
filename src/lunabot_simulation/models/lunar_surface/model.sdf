@@ -3,14 +3,12 @@
   <model name="lunar_surface">
     <static>true</static>
     <link name="surface_link">
-      <!-- Traversal/deposition ground plane -->
       <visual name="ground_visual">
         <pose>0 0 0 0 0 0</pose>
         <geometry>
-          <plane>
-            <normal>0 0 1</normal>
-            <size>7.9 4.4</size>
-          </plane>
+          <mesh>
+            <uri>model://lunar_surface/meshes/lunar_surface_rulebook.obj</uri>
+          </mesh>
         </geometry>
         <material>
           <ambient>0.76 0.67 0.47 1</ambient>
@@ -26,10 +24,9 @@
       <collision name="ground_collision">
         <pose>0 0 0 0 0 0</pose>
         <geometry>
-          <plane>
-            <normal>0 0 1</normal>
-            <size>7.9 4.4</size>
-          </plane>
+          <mesh>
+            <uri>model://lunar_surface/meshes/lunar_surface_rulebook.obj</uri>
+          </mesh>
         </geometry>
         <surface>
           <friction>
