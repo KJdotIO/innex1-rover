@@ -79,7 +79,7 @@ global_costmap:
           data_type: "PointCloud2"
           marking: true
           clearing: true
-          expected_update_rate: 10.0
+          expected_update_rate: 1.0
           observation_persistence: 0.0
           footprint_clearing_enabled: true
           tf_filter_tolerance: 0.2
@@ -124,7 +124,7 @@ local_costmap:
           transport_type: "raw"
           marking: true
           clearing: true
-          expected_update_rate: 10.0
+          expected_update_rate: 1.0
           observation_persistence: 0.0
           footprint_clearing_enabled: true
           tf_filter_tolerance: 0.2

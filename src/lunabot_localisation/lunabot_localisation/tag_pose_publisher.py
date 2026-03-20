@@ -9,6 +9,7 @@ import tf2_geometry_msgs
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, TransformStamped
 from rclpy.duration import Duration
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformListener
 
@@ -32,6 +33,8 @@ class TagPosePublisher(Node):
         self.declare_parameter("max_hamming", 0)
         self.declare_parameter("min_decision_margin", 35.0)
         self.declare_parameter("correction_log_period_sec", 1.0)
+        self.declare_parameter("correction_log_min_translation_delta_m", 0.20)
+        self.declare_parameter("correction_log_min_yaw_delta_rad", 0.20)
 
         self.tag_frame = self.get_parameter("tag_frame").value
         self.detected_tag_frame = self.get_parameter("detected_tag_frame").value
@@ -51,25 +54,38 @@ class TagPosePublisher(Node):
         self.min_decision_margin = float(
             self.get_parameter("min_decision_margin").value
         )
-        self.correction_log_period_sec = float(
-            self.get_parameter("correction_log_period_sec").value
+        self.correction_log_period_sec = max(
+            0.0, float(self.get_parameter("correction_log_period_sec").value)
+        )
+        self.correction_log_min_translation_delta_m = max(
+            0.0,
+            float(self.get_parameter("correction_log_min_translation_delta_m").value),
+        )
+        self.correction_log_min_yaw_delta_rad = max(
+            0.0, float(self.get_parameter("correction_log_min_yaw_delta_rad").value)
         )
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.pub = self.create_publisher(PoseWithCovarianceStamped, "/tag_pose", 10)
+        detection_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
         self.detection_sub = self.create_subscription(
             AprilTagDetectionArray,
             self.detections_topic,
             self.on_detections,
-            10,
+            detection_qos,
         )
         self.last_processed_stamp_ns = None
         self.latest_detection_stamp_ns = None
         self.latest_detection_hamming = None
         self.latest_detection_margin = None
         self.last_report_time_ns = 0
+        self.last_logged_pose = None
 
         self.timer = self.create_timer(0.1, self.on_timer)
 
@@ -87,6 +103,11 @@ class TagPosePublisher(Node):
             quaternion.y * quaternion.y + quaternion.z * quaternion.z
         )
         return math.atan2(siny_cosp, cosy_cosp)
+
+    @staticmethod
+    def _angle_delta(a: float, b: float) -> float:
+        """Return the wrapped angular difference between two yaw values."""
+        return math.atan2(math.sin(a - b), math.cos(a - b))
 
     def on_detections(self, msg: AprilTagDetectionArray) -> None:
         """Cache the latest AprilTag metadata for the configured tag id."""
@@ -223,10 +244,23 @@ class TagPosePublisher(Node):
 
         self.pub.publish(msg)
         now_ns = self.get_clock().now().nanoseconds
-        if now_ns - self.last_report_time_ns >= int(
-            self.correction_log_period_sec * 1e9
+        yaw = self._yaw_from_quaternion(msg.pose.pose.orientation)
+        should_log = self.last_logged_pose is None
+        if not should_log:
+            dx_log = msg.pose.pose.position.x - self.last_logged_pose[0]
+            dy_log = msg.pose.pose.position.y - self.last_logged_pose[1]
+            translation_delta = math.sqrt(dx_log * dx_log + dy_log * dy_log)
+            yaw_delta = abs(self._angle_delta(yaw, self.last_logged_pose[2]))
+            should_log = (
+                translation_delta >= self.correction_log_min_translation_delta_m
+                or yaw_delta >= self.correction_log_min_yaw_delta_rad
+            )
+
+        if (
+            should_log
+            and now_ns - self.last_report_time_ns
+            >= int(self.correction_log_period_sec * 1e9)
         ):
-            yaw = self._yaw_from_quaternion(msg.pose.pose.orientation)
             self.get_logger().info(
                 "Accepted AprilTag correction "
                 f"distance={distance:.2f}m "
@@ -235,6 +269,11 @@ class TagPosePublisher(Node):
                 f"{msg.pose.pose.position.y:.2f}, yaw={yaw:.2f})"
             )
             self.last_report_time_ns = now_ns
+            self.last_logged_pose = (
+                msg.pose.pose.position.x,
+                msg.pose.pose.position.y,
+                yaw,
+            )
         self.get_logger().debug(
             f"Tag at {distance:.2f}m, cov_xy={cov_xy:.4f}, cov_yaw={cov_yaw:.4f}"
         )
