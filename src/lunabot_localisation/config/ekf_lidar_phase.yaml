@@ -3,6 +3,7 @@ ekf_filter_node_odom:
     use_sim_time: true
     frequency: 50.0
     sensor_timeout: 0.4
+    reset_on_time_jump: true
     two_d_mode: true
     publish_acceleration: true
     publish_tf: true

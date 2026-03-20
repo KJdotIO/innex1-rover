@@ -20,6 +20,8 @@
   <exec_depend>rtabmap_odom</exec_depend>
   <exec_depend>rtabmap_util</exec_depend>
   <exec_depend>apriltag_ros</exec_depend>
+  <exec_depend>apriltag_msgs</exec_depend>
+  <exec_depend>apriltag_draw</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>

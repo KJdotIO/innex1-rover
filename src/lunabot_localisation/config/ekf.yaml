@@ -6,6 +6,7 @@ ekf_filter_node_odom:
   ros__parameters:
     use_sim_time: true
     frequency: 50.0
+    reset_on_time_jump: true
     two_d_mode: true
     publish_acceleration: true
     publish_tf: true
@@ -85,6 +86,7 @@ ekf_filter_node_map:
     use_sim_time: true
     frequency: 50.0
     sensor_timeout: 0.4
+    reset_on_time_jump: true
     two_d_mode: true
     smooth_lagged_data: true
     history_length: 0.5

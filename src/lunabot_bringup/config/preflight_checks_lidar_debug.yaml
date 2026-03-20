@@ -71,17 +71,11 @@ preflight:
       critical: true
 
   required_nodes:
-    - name: apriltag
-      critical: true
     - name: bt_navigator
       critical: true
     - name: controller_server
       critical: true
-    - name: ekf_filter_node_map
-      critical: true
     - name: map_server
       critical: true
     - name: planner_server
-      critical: true
-    - name: tag_pose_publisher
       critical: true
