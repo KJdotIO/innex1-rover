@@ -4,8 +4,11 @@
   <name>lunabot_teleop</name>
   <version>0.1.0</version>
   <description>Teleoperation and manual control interfaces</description>
-  <maintainer email="lunabotics@le.ac.uk">Leicester Lunabotics Team</maintainer>
+  <maintainer email="ko129@student.le.ac.uk">Leicester Lunabotics Team</maintainer>
   <license>Apache-2.0</license>
+
+  <exec_depend>joy</exec_depend>
+  <exec_depend>teleop_twist_joy</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

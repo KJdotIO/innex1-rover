@@ -32,10 +32,10 @@ setup(
     ],
     install_requires=["setuptools"],
     zip_safe=True,
-    maintainer="drkwonk",
-    maintainer_email="drkwonk@todo.todo",
-    description="TODO: Package description",
-    license="TODO: License declaration",
+    maintainer="Leicester Lunabotics Team",
+    maintainer_email="ko129@student.le.ac.uk",
+    description="System bringup launch files and checks for Lunabot",
+    license="Apache-2.0",
     extras_require={
         "test": [
             "pytest",
