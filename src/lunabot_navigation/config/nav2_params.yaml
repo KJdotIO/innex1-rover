@@ -117,7 +117,7 @@ local_costmap:
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
-        observation_sources: ouster_points
+        observation_sources: ouster_points crater_hazards
         ouster_points:
           topic: /ouster/points
           data_type: "PointCloud2"
@@ -138,6 +138,23 @@ local_costmap:
           obstacle_max_range: 7.0
           obstacle_min_range: 0.0
           raytrace_max_range: 9.0
+          raytrace_min_range: 0.0
+          mark_threshold: 0
+        crater_hazards:
+          topic: /crater_hazards/points
+          data_type: "PointCloud2"
+          transport_type: "raw"
+          marking: true
+          clearing: false
+          expected_update_rate: 0.0
+          observation_persistence: 0.6
+          footprint_clearing_enabled: false
+          tf_filter_tolerance: 0.2
+          min_obstacle_height: 0.10
+          max_obstacle_height: 0.60
+          obstacle_max_range: 3.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 0.0
           raytrace_min_range: 0.0
           mark_threshold: 0
 

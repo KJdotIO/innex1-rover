@@ -21,7 +21,8 @@ def generate_launch_description():
     servers. The forwarded launch arguments keep the odom-only debug mode
     available while AprilTag global localisation remains the default path.
     Optionally launch RViz with sim time enabled to avoid goal timestamp
-    mismatches during simulation testing.
+    mismatches during simulation testing. The launch file can also start
+    the front depth crater detector to provide local hazard observations.
     """
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
@@ -36,6 +37,7 @@ def generate_launch_description():
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    enable_crater_detection = LaunchConfiguration("enable_crater_detection")
 
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -93,6 +95,15 @@ def generate_launch_description():
         condition=IfCondition(launch_rviz),
     )
 
+    crater_hazard_detector = Node(
+        package="lunabot_perception",
+        executable="hazard_detection",
+        name="crater_hazard_detector",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
+        condition=IfCondition(enable_crater_detection),
+    )
+
     # Delay Nav2 startup slightly so sim time / TF / sensor streams can settle.
     delayed_nav2_launch = TimerAction(period=5.0, actions=[nav2_launch])
 
@@ -101,7 +112,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "lidar_costmap_phase",
                 default_value="false",
-                description="Use odom-only debug localisation with an identity map->odom TF.",
+                description=(
+                    "Use odom-only debug localisation with an identity "
+                    "map->odom TF."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_visual_slam",
@@ -122,19 +136,30 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "use_sim_time",
                 default_value="true",
-                description="Use /clock instead of wall time for all launched nodes.",
+                description=(
+                    "Use /clock instead of wall time for all launched nodes."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_apriltag_debug",
                 default_value="false",
                 description=(
-                    "Launch the apriltag_draw overlay for annotated front camera "
-                    "debugging."
+                    "Launch the apriltag_draw overlay for annotated front "
+                    "camera debugging."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "enable_crater_detection",
+                default_value=use_sim_time,
+                description=(
+                    "Launch the front depth crater detector and feed its "
+                    "hazards into the local costmap."
                 ),
             ),
             map_server,
             map_lifecycle_manager,
             localisation_launch,
+            crater_hazard_detector,
             delayed_nav2_launch,
             rviz,
         ]
