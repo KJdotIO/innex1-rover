@@ -150,7 +150,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "enable_crater_detection",
-                default_value=use_sim_time,
+                default_value="true",
                 description=(
                     "Launch the front depth crater detector and feed its "
                     "hazards into the local costmap."
