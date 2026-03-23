@@ -80,7 +80,6 @@ class HazardDetectionNode(Node):
         """Initialise subscriptions, publishers, and tuning parameters."""
         super().__init__("crater_hazard_detector")
 
-        self.declare_parameter("use_sim_time", True)
         self.declare_parameter("drop_threshold", 0.10)
         self.declare_parameter("min_points_per_cell", 2)
         self.declare_parameter("hazard_padding_cells", 1)
@@ -99,9 +98,7 @@ class HazardDetectionNode(Node):
         self.ground_inlier_margin = 0.04
         self.ground_above_margin = 0.10
         self.drop_threshold = float(self.get_parameter("drop_threshold").value)
-        self.min_points_per_cell = int(
-            self.get_parameter("min_points_per_cell").value
-        )
+        self.min_points_per_cell = int(self.get_parameter("min_points_per_cell").value)
         self.hazard_padding_cells = int(
             self.get_parameter("hazard_padding_cells").value
         )
@@ -142,9 +139,7 @@ class HazardDetectionNode(Node):
         """Convert a front point cloud into hazard points and a debug grid."""
         field_names = {field.name for field in msg.fields}
         if not {"x", "y", "z"}.issubset(field_names):
-            self.get_logger().error(
-                "Front camera point cloud is missing x/y/z fields."
-            )
+            self.get_logger().error("Front camera point cloud is missing x/y/z fields.")
             self.publish_outputs(
                 msg.header,
                 np.zeros((0, 3), dtype=np.float32),
@@ -219,9 +214,7 @@ class HazardDetectionNode(Node):
             )
             self.last_log_time = now
 
-    def transform_points(
-        self, points: np.ndarray, header: Header
-    ) -> np.ndarray | None:
+    def transform_points(self, points: np.ndarray, header: Header) -> np.ndarray | None:
         """Transform the point cloud into the rover base frame."""
         try:
             transform = self.tf_buffer.lookup_transform(
@@ -232,8 +225,7 @@ class HazardDetectionNode(Node):
             )
         except TransformException as exc:
             self.get_logger().warn(
-                "Failed to transform crater points into "
-                f"{self.base_frame}: {exc}"
+                f"Failed to transform crater points into {self.base_frame}: {exc}"
             )
             return None
 
@@ -270,9 +262,9 @@ class HazardDetectionNode(Node):
         for _ in range(2):
             plane_heights = a_matrix @ coeffs
             residuals = z_values - plane_heights
-            inliers = (
-                residuals >= -self.ground_inlier_margin
-            ) & (residuals <= self.ground_above_margin)
+            inliers = (residuals >= -self.ground_inlier_margin) & (
+                residuals <= self.ground_above_margin
+            )
             if inliers.sum() < 30:
                 break
             coeffs, *_ = np.linalg.lstsq(
@@ -298,12 +290,8 @@ class HazardDetectionNode(Node):
         plane_height = plane[0] * xs + plane[1] * ys + plane[2]
         residuals = points[:, 2] - plane_height
 
-        x_indices = np.floor(
-            (xs - self.grid.min_x) / self.grid.resolution
-        ).astype(int)
-        y_indices = np.floor(
-            (ys - self.grid.min_y) / self.grid.resolution
-        ).astype(int)
+        x_indices = np.floor((xs - self.grid.min_x) / self.grid.resolution).astype(int)
+        y_indices = np.floor((ys - self.grid.min_y) / self.grid.resolution).astype(int)
         valid = (
             (x_indices >= 0)
             & (x_indices < width)
@@ -381,8 +369,7 @@ class HazardDetectionNode(Node):
         grid_msg.info.origin.position.z = 0.0
         grid_msg.info.origin.orientation.w = 1.0
         grid_msg.data = [
-            100 if occupied else 0
-            for occupied in hazard_cells.reshape(-1)
+            100 if occupied else 0 for occupied in hazard_cells.reshape(-1)
         ]
         self.hazard_grid_pub.publish(grid_msg)
 
