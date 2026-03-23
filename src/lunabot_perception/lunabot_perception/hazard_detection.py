@@ -147,17 +147,31 @@ class HazardDetectionNode(Node):
             )
             return
 
-        points = np.array(
-            list(
-                point_cloud2.read_points(
-                    msg,
-                    field_names=("x", "y", "z"),
-                    skip_nans=True,
-                )
-            ),
-            dtype=np.float32,
-        )
         empty_cells = np.zeros((self.grid.height, self.grid.width), dtype=bool)
+        try:
+            raw_points = point_cloud2.read_points(
+                msg,
+                field_names=("x", "y", "z"),
+                skip_nans=True,
+            )
+            if isinstance(raw_points, np.ndarray):
+                if raw_points.dtype.names is None:
+                    points = np.asarray(raw_points, dtype=np.float32)
+                else:
+                    points = np.column_stack(
+                        [raw_points["x"], raw_points["y"], raw_points["z"]]
+                    ).astype(np.float32, copy=False)
+            else:
+                points = np.asarray(list(raw_points), dtype=np.float32)
+        except (TypeError, ValueError) as exc:
+            self.get_logger().error(f"Failed to decode front camera point cloud: {exc}")
+            self.publish_outputs(
+                msg.header,
+                np.zeros((0, 3), dtype=np.float32),
+                empty_cells,
+            )
+            return
+
         if points.size == 0:
             self.publish_outputs(
                 msg.header,
