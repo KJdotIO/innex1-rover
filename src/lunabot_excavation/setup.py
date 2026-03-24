@@ -14,7 +14,13 @@ setup(
             ["resource/" + package_name],
         ),
         ("share/" + package_name, ["package.xml"]),
-        ("share/" + package_name + "/launch", ["launch/excavation_controller.launch.py"]),
+        (
+            "share/" + package_name + "/launch",
+            [
+                "launch/excavation_controller.launch.py",
+                "launch/excavation_action_server.launch.py",
+            ],
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -26,6 +32,7 @@ setup(
     entry_points={
         "console_scripts": [
             "excavation_controller = lunabot_excavation.excavation_controller:main",
+            "excavation_action_server = lunabot_excavation.excavation_action_server:main",
         ],
     },
 )
