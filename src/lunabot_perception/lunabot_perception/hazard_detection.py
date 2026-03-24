@@ -1,7 +1,8 @@
-"""Crater hazard extraction from the front depth camera point cloud."""
+"""Local crater hazard extraction from the front depth camera point cloud."""
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -31,6 +32,15 @@ def quaternion_to_matrix(quaternion: Quaternion) -> np.ndarray:
     y = quaternion.y
     z = quaternion.z
     w = quaternion.w
+
+    norm = np.sqrt(x * x + y * y + z * z + w * w)
+    if norm <= 1e-6 or not np.isfinite(norm):
+        raise ValueError("Received a non-finite transform quaternion.")
+
+    x /= norm
+    y /= norm
+    z /= norm
+    w /= norm
 
     xx = x * x
     yy = y * y
@@ -74,49 +84,59 @@ class GridSpec:
 
 
 class HazardDetectionNode(Node):
-    """Estimate a local crater hazard map from the front RGB-D point cloud."""
+    """Estimate local negative obstacles from depth."""
 
     def __init__(self) -> None:
-        """Initialise subscriptions, publishers, and tuning parameters."""
+        """Initialise subscriptions, publishers, and detector state."""
         super().__init__("crater_hazard_detector")
 
-        self.declare_parameter("drop_threshold", 0.10)
-        self.declare_parameter("min_points_per_cell", 2)
-        self.declare_parameter("hazard_padding_cells", 1)
         self.declare_parameter("log_period_sec", 5.0)
 
         self.base_frame = BASE_FRAME
         self.grid = GridSpec(
-            min_x=0.35,
-            max_x=2.50,
-            min_y=-1.20,
-            max_y=1.20,
+            min_x=0.40,
+            max_x=2.40,
+            min_y=-1.00,
+            max_y=1.00,
             resolution=0.10,
         )
-        self.fit_max_x = 2.00
-        self.fit_lateral_limit = 1.00
-        self.ground_inlier_margin = 0.04
-        self.ground_above_margin = 0.10
-        self.drop_threshold = float(self.get_parameter("drop_threshold").value)
-        self.min_points_per_cell = int(self.get_parameter("min_points_per_cell").value)
-        self.hazard_padding_cells = int(
-            self.get_parameter("hazard_padding_cells").value
-        )
-        self.hazard_marker_height = 0.25
+
+        self.min_points_per_cell = 3
+        self.neighborhood_radius_cells = 2
+        self.min_neighbor_cells = 6
+        self.drop_threshold = 0.14
+        self.roughness_threshold = 0.10
+        self.min_cluster_cells = 4
+        self.hazard_padding_cells = 1
+        self.confidence_add = 0.45
+        self.confidence_decay = 0.82
+        self.confidence_clear = 0.20
+        self.publish_threshold = 0.90
+        self.reference_frame_rate = 5.0
+        self.max_detection_x = 2.10
+        self.edge_margin_cells = 1
+        self.min_valid_z = -1.50
+        self.max_valid_z = 1.00
+        self.self_filter_x = 0.70
+        self.self_filter_y = 0.40
+        self.self_filter_z = -0.30
+        self.hazard_marker_height = 0.20
         self.log_period = Duration(
             seconds=float(self.get_parameter("log_period_sec").value)
         )
         self.last_log_time = self.get_clock().now() - self.log_period
-
-        self.tf_buffer = Buffer(cache_time=Duration(seconds=5.0))
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.last_confidence_time = self.get_clock().now()
+        self.confidence = np.zeros(
+            (self.grid.height, self.grid.width),
+            dtype=np.float32,
+        )
 
         assert self.grid.max_x > self.grid.min_x
         assert self.grid.max_y > self.grid.min_y
         assert self.grid.resolution > 0.0
-        assert self.drop_threshold > 0.0
-        assert self.min_points_per_cell > 0
-        assert self.hazard_padding_cells >= 0
+
+        self.tf_buffer = Buffer(cache_time=Duration(seconds=5.0))
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.hazard_points_pub = self.create_publisher(
             PointCloud2,
@@ -136,24 +156,59 @@ class HazardDetectionNode(Node):
         )
 
     def point_cloud_callback(self, msg: PointCloud2) -> None:
-        """Convert a front point cloud into hazard points and a debug grid."""
-        field_names = {field.name for field in msg.fields}
-        if not {"x", "y", "z"}.issubset(field_names):
-            self.get_logger().error("Front camera point cloud is missing x/y/z fields.")
-            self.publish_outputs(
-                msg.header,
-                np.zeros((0, 3), dtype=np.float32),
-                np.zeros((self.grid.height, self.grid.width), dtype=bool),
-            )
+        """Convert a front point cloud into a hazard grid."""
+        now = self.get_clock().now()
+        points = self.decode_points(msg)
+        if points is None or points.size == 0:
+            self.publish_outputs(msg.header, self.decay_confidence(now))
             return
 
-        empty_cells = np.zeros((self.grid.height, self.grid.width), dtype=bool)
+        transformed = self.transform_points(points, msg.header)
+        if transformed is None or transformed.size == 0:
+            self.publish_outputs(msg.header, self.decay_confidence(now))
+            return
+
+        roi_points = self.crop_points(transformed)
+        if roi_points.shape[0] < 50:
+            self.publish_outputs(msg.header, self.decay_confidence(now))
+            return
+
+        min_height, max_height, counts = self.build_elevation_grid(roi_points)
+        evidence = self.detect_drop_cells(min_height, max_height, counts)
+        evidence = self.filter_clusters(evidence)
+        evidence = self.pad_hazards(evidence)
+        hazards = self.update_confidence(evidence, counts, now)
+        self.publish_outputs(msg.header, hazards)
+
+        if now - self.last_log_time >= self.log_period:
+            self.get_logger().info(
+                "Published %d crater hazard cells from %d front camera points."
+                % (int(hazards.sum()), roi_points.shape[0])
+            )
+            self.last_log_time = now
+
+    def decode_points(self, msg: PointCloud2) -> np.ndarray | None:
+        """Decode x/y/z points from the front camera cloud."""
+        field_names = {field.name for field in msg.fields}
+        if not {"x", "y", "z"}.issubset(field_names):
+            self.get_logger().error(
+                "Front camera point cloud is missing x/y/z fields."
+            )
+            return None
+
         try:
             raw_points = point_cloud2.read_points(
                 msg,
                 field_names=("x", "y", "z"),
                 skip_nans=True,
             )
+        except (TypeError, ValueError) as exc:
+            self.get_logger().error(
+                f"Failed to decode front camera point cloud: {exc}"
+            )
+            return None
+
+        try:
             if isinstance(raw_points, np.ndarray):
                 if raw_points.dtype.names is None:
                     points = np.asarray(raw_points, dtype=np.float32)
@@ -163,72 +218,26 @@ class HazardDetectionNode(Node):
                     ).astype(np.float32, copy=False)
             else:
                 points = np.asarray(list(raw_points), dtype=np.float32)
-        except (TypeError, ValueError) as exc:
-            self.get_logger().error(f"Failed to decode front camera point cloud: {exc}")
-            self.publish_outputs(
-                msg.header,
-                np.zeros((0, 3), dtype=np.float32),
-                empty_cells,
+        except (IndexError, KeyError, TypeError, ValueError) as exc:
+            self.get_logger().error(
+                f"Failed to normalize front camera point cloud layout: {exc}"
             )
-            return
+            return None
 
-        if points.size == 0:
-            self.publish_outputs(
-                msg.header,
-                np.zeros((0, 3), dtype=np.float32),
-                empty_cells,
+        if points.ndim != 2 or points.shape[1] != 3:
+            self.get_logger().error(
+                "Front camera point cloud did not decode into Nx3 data."
             )
-            return
+            return None
 
-        transformed = self.transform_points(points, msg.header)
-        if transformed is None or transformed.size == 0:
-            self.publish_outputs(
-                msg.header,
-                np.zeros((0, 3), dtype=np.float32),
-                empty_cells,
-            )
-            return
+        finite_mask = np.all(np.isfinite(points), axis=1)
+        return points[finite_mask]
 
-        roi_mask = (
-            (transformed[:, 0] >= self.grid.min_x)
-            & (transformed[:, 0] <= self.grid.max_x)
-            & (transformed[:, 1] >= self.grid.min_y)
-            & (transformed[:, 1] <= self.grid.max_y)
-            & np.isfinite(transformed[:, 2])
-        )
-        roi_points = transformed[roi_mask]
-        if roi_points.shape[0] < 50:
-            self.publish_outputs(
-                msg.header,
-                np.zeros((0, 3), dtype=np.float32),
-                empty_cells,
-            )
-            return
-
-        plane = self.fit_ground_plane(roi_points)
-        if plane is None:
-            self.publish_outputs(
-                msg.header,
-                np.zeros((0, 3), dtype=np.float32),
-                empty_cells,
-            )
-            return
-
-        hazard_cells, hazard_points = self.extract_hazards(roi_points, plane)
-        self.publish_outputs(msg.header, hazard_points, hazard_cells)
-
-        now = self.get_clock().now()
-        if now - self.last_log_time >= self.log_period:
-            self.get_logger().info(
-                "Published %d crater hazard cells from %d front camera points."
-                % (
-                    int(hazard_cells.sum()) if hazard_cells is not None else 0,
-                    roi_points.shape[0],
-                )
-            )
-            self.last_log_time = now
-
-    def transform_points(self, points: np.ndarray, header: Header) -> np.ndarray | None:
+    def transform_points(
+        self,
+        points: np.ndarray,
+        header: Header,
+    ) -> np.ndarray | None:
         """Transform the point cloud into the rover base frame."""
         try:
             transform = self.tf_buffer.lookup_transform(
@@ -237,13 +246,13 @@ class HazardDetectionNode(Node):
                 Time.from_msg(header.stamp),
                 timeout=Duration(seconds=0.1),
             )
-        except TransformException as exc:
+            rotation = quaternion_to_matrix(transform.transform.rotation)
+        except (TransformException, ValueError) as exc:
             self.get_logger().warn(
                 f"Failed to transform crater points into {self.base_frame}: {exc}"
             )
             return None
 
-        rotation = quaternion_to_matrix(transform.transform.rotation)
         translation = np.array(
             [
                 transform.transform.translation.x,
@@ -252,60 +261,52 @@ class HazardDetectionNode(Node):
             ],
             dtype=np.float32,
         )
-        return (points @ rotation.T) + translation
-
-    def fit_ground_plane(self, points: np.ndarray) -> np.ndarray | None:
-        """Fit a simple ground plane z=ax+by+c over near-field points."""
-        plane_mask = (
-            (points[:, 0] >= self.grid.min_x)
-            & (points[:, 0] <= self.fit_max_x)
-            & (np.abs(points[:, 1]) <= self.fit_lateral_limit)
-        )
-        candidates = points[plane_mask]
-        if candidates.shape[0] < 50:
+        if not np.all(np.isfinite(translation)):
+            self.get_logger().warn("Received a non-finite transform translation.")
             return None
 
-        a_matrix = np.c_[
-            candidates[:, 0],
-            candidates[:, 1],
-            np.ones(candidates.shape[0]),
-        ]
-        z_values = candidates[:, 2]
-        coeffs, *_ = np.linalg.lstsq(a_matrix, z_values, rcond=None)
+        transformed = (points @ rotation.T) + translation
+        finite_mask = np.all(np.isfinite(transformed), axis=1)
+        return transformed[finite_mask]
 
-        for _ in range(2):
-            plane_heights = a_matrix @ coeffs
-            residuals = z_values - plane_heights
-            inliers = (residuals >= -self.ground_inlier_margin) & (
-                residuals <= self.ground_above_margin
-            )
-            if inliers.sum() < 30:
-                break
-            coeffs, *_ = np.linalg.lstsq(
-                a_matrix[inliers],
-                z_values[inliers],
-                rcond=None,
-            )
+    def crop_points(self, points: np.ndarray) -> np.ndarray:
+        """Keep only plausible terrain points inside the local grid."""
+        mask = (
+            (points[:, 0] >= self.grid.min_x)
+            & (points[:, 0] <= self.grid.max_x)
+            & (points[:, 1] >= self.grid.min_y)
+            & (points[:, 1] <= self.grid.max_y)
+            & (points[:, 0] <= self.max_detection_x)
+            & (points[:, 2] >= self.min_valid_z)
+            & (points[:, 2] <= self.max_valid_z)
+        )
+        mask &= ~(
+            (points[:, 0] <= self.self_filter_x)
+            & (np.abs(points[:, 1]) <= self.self_filter_y)
+            & (points[:, 2] >= self.self_filter_z)
+        )
+        return points[mask]
 
-        return coeffs.astype(np.float32)
-
-    def extract_hazards(
-        self, points: np.ndarray, plane: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Build a local hazard grid from depth below the fitted plane."""
-        width = self.grid.width
+    def build_elevation_grid(
+        self, points: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Build per-cell terrain height statistics."""
         height = self.grid.height
-
-        min_residual = np.full((height, width), np.inf, dtype=np.float32)
+        width = self.grid.width
+        min_height = np.full((height, width), np.inf, dtype=np.float32)
+        max_height = np.full((height, width), -np.inf, dtype=np.float32)
         counts = np.zeros((height, width), dtype=np.int32)
 
         xs = points[:, 0]
         ys = points[:, 1]
-        plane_height = plane[0] * xs + plane[1] * ys + plane[2]
-        residuals = points[:, 2] - plane_height
+        zs = points[:, 2]
 
-        x_indices = np.floor((xs - self.grid.min_x) / self.grid.resolution).astype(int)
-        y_indices = np.floor((ys - self.grid.min_y) / self.grid.resolution).astype(int)
+        x_indices = np.floor(
+            (xs - self.grid.min_x) / self.grid.resolution
+        ).astype(int)
+        y_indices = np.floor(
+            (ys - self.grid.min_y) / self.grid.resolution
+        ).astype(int)
         valid = (
             (x_indices >= 0)
             & (x_indices < width)
@@ -313,29 +314,122 @@ class HazardDetectionNode(Node):
             & (y_indices < height)
         )
 
-        for x_idx, y_idx, residual in zip(
-            x_indices[valid], y_indices[valid], residuals[valid], strict=False
+        for x_idx, y_idx, z_val in zip(
+            x_indices[valid], y_indices[valid], zs[valid], strict=False
         ):
             counts[y_idx, x_idx] += 1
-            if residual < min_residual[y_idx, x_idx]:
-                min_residual[y_idx, x_idx] = residual
+            if z_val < min_height[y_idx, x_idx]:
+                min_height[y_idx, x_idx] = z_val
+            if z_val > max_height[y_idx, x_idx]:
+                max_height[y_idx, x_idx] = z_val
 
-        hazards = (counts >= self.min_points_per_cell) & (
-            min_residual <= -self.drop_threshold
-        )
-        hazards = self.pad_hazards(hazards)
+        return min_height, max_height, counts
 
-        hazard_points: list[list[float]] = []
-        for y_idx, x_idx in np.argwhere(hazards):
-            hazard_points.append(
-                [
-                    self.grid.min_x + (x_idx + 0.5) * self.grid.resolution,
-                    self.grid.min_y + (y_idx + 0.5) * self.grid.resolution,
-                    self.hazard_marker_height,
-                ]
-            )
+    def detect_drop_cells(
+        self,
+        min_height: np.ndarray,
+        max_height: np.ndarray,
+        counts: np.ndarray,
+    ) -> np.ndarray:
+        """Detect cells below a locally smooth terrain neighborhood."""
+        hazards = np.zeros((self.grid.height, self.grid.width), dtype=bool)
+        supported = counts >= self.min_points_per_cell
 
-        return hazards, np.asarray(hazard_points, dtype=np.float32)
+        for y_idx in range(
+            self.edge_margin_cells,
+            self.grid.height - self.edge_margin_cells,
+        ):
+            for x_idx in range(
+                self.edge_margin_cells, self.grid.width - self.edge_margin_cells
+            ):
+                if not supported[y_idx, x_idx]:
+                    continue
+
+                x_center = self.grid.min_x + (
+                    (x_idx + 0.5) * self.grid.resolution
+                )
+                if x_center > self.max_detection_x:
+                    continue
+
+                min_y = max(0, y_idx - self.neighborhood_radius_cells)
+                max_y = min(
+                    self.grid.height,
+                    y_idx + self.neighborhood_radius_cells + 1,
+                )
+                min_x = max(0, x_idx - self.neighborhood_radius_cells)
+                max_x = min(
+                    self.grid.width,
+                    x_idx + self.neighborhood_radius_cells + 1,
+                )
+                neighborhood = supported[min_y:max_y, min_x:max_x]
+                neighbor_min = min_height[min_y:max_y, min_x:max_x]
+
+                neighbor_values = neighbor_min[neighborhood]
+                if neighbor_values.size < self.min_neighbor_cells:
+                    continue
+
+                reference_height = float(np.median(neighbor_values))
+                roughness = float(
+                    np.percentile(neighbor_values, 90)
+                    - np.percentile(neighbor_values, 10)
+                )
+                local_span = (
+                    max_height[y_idx, x_idx] - min_height[y_idx, x_idx]
+                )
+                if (
+                    roughness > self.roughness_threshold
+                    or local_span > 0.18
+                ):
+                    continue
+
+                if (
+                    min_height[y_idx, x_idx]
+                    <= reference_height - self.drop_threshold
+                ):
+                    hazards[y_idx, x_idx] = True
+
+        return hazards
+
+    def filter_clusters(self, hazards: np.ndarray) -> np.ndarray:
+        """Remove tiny hazard clusters."""
+        if not hazards.any():
+            return hazards
+
+        filtered = np.zeros_like(hazards)
+        visited = np.zeros_like(hazards, dtype=bool)
+        offsets = ((1, 0), (-1, 0), (0, 1), (0, -1))
+
+        for start_y, start_x in np.argwhere(hazards):
+            if visited[start_y, start_x]:
+                continue
+
+            queue: deque[tuple[int, int]] = deque([(start_y, start_x)])
+            cluster: list[tuple[int, int]] = []
+            visited[start_y, start_x] = True
+
+            while queue:
+                y_idx, x_idx = queue.popleft()
+                cluster.append((y_idx, x_idx))
+                for dy, dx in offsets:
+                    next_y = y_idx + dy
+                    next_x = x_idx + dx
+                    if (
+                        next_y < 0
+                        or next_y >= hazards.shape[0]
+                        or next_x < 0
+                        or next_x >= hazards.shape[1]
+                        or visited[next_y, next_x]
+                        or not hazards[next_y, next_x]
+                    ):
+                        continue
+                    visited[next_y, next_x] = True
+                    queue.append((next_y, next_x))
+
+            if len(cluster) >= self.min_cluster_cells:
+                for y_idx, x_idx in cluster:
+                    filtered[y_idx, x_idx] = True
+
+        return filtered
 
     def pad_hazards(self, hazards: np.ndarray) -> np.ndarray:
         """Dilate hazard cells slightly around crater detections."""
@@ -343,8 +437,7 @@ class HazardDetectionNode(Node):
             return hazards
 
         padded = hazards.copy()
-        hazard_indices = np.argwhere(hazards)
-        for y_idx, x_idx in hazard_indices:
+        for y_idx, x_idx in np.argwhere(hazards):
             min_y = max(0, y_idx - self.hazard_padding_cells)
             max_y = min(
                 hazards.shape[0],
@@ -358,20 +451,55 @@ class HazardDetectionNode(Node):
             padded[min_y:max_y, min_x:max_x] = True
         return padded
 
-    def publish_outputs(
+    def update_confidence(
         self,
-        input_header: Header,
-        hazard_points: np.ndarray,
-        hazard_cells: np.ndarray,
-    ) -> None:
-        """Publish the local crater hazards as a point cloud and grid."""
+        evidence: np.ndarray,
+        counts: np.ndarray,
+        now: Time,
+    ) -> np.ndarray:
+        """Fuse hazard evidence over time."""
+        scale = self.confidence_scale(now)
+        supported = counts >= self.min_points_per_cell
+        self.confidence *= self.confidence_decay**scale
+        self.confidence[evidence] += self.confidence_add * scale
+        self.confidence[supported & ~evidence] -= self.confidence_clear * scale
+        self.confidence = np.clip(self.confidence, 0.0, 2.0)
+        return self.confidence >= self.publish_threshold
+
+    def decay_confidence(self, now: Time) -> np.ndarray:
+        """Decay confidence when no fresh terrain evidence is available."""
+        scale = self.confidence_scale(now)
+        self.confidence *= self.confidence_decay**scale
+        self.confidence = np.clip(self.confidence, 0.0, 2.0)
+        return self.confidence >= self.publish_threshold
+
+    def confidence_scale(self, now: Time) -> float:
+        """Scale confidence updates by elapsed time instead of raw callback count."""
+        elapsed = max(
+            (now - self.last_confidence_time).nanoseconds / 1e9,
+            0.0,
+        )
+        self.last_confidence_time = now
+        return max(elapsed * self.reference_frame_rate, 0.25)
+
+    def publish_outputs(self, input_header: Header, hazards: np.ndarray) -> None:
+        """Publish crater hazards as a point cloud and occupancy grid."""
         header = Header()
         header.stamp = input_header.stamp
         header.frame_id = self.base_frame
 
+        hazard_points = [
+            [
+                self.grid.min_x + (x_idx + 0.5) * self.grid.resolution,
+                self.grid.min_y + (y_idx + 0.5) * self.grid.resolution,
+                self.hazard_marker_height,
+            ]
+            for y_idx, x_idx in np.argwhere(hazards)
+        ]
         self.hazard_points_pub.publish(
-            point_cloud2.create_cloud_xyz32(header, hazard_points.tolist())
+            point_cloud2.create_cloud_xyz32(header, hazard_points)
         )
+
         grid_msg = OccupancyGrid()
         grid_msg.header = header
         grid_msg.info.map_load_time = TimeMsg()
@@ -383,7 +511,8 @@ class HazardDetectionNode(Node):
         grid_msg.info.origin.position.z = 0.0
         grid_msg.info.origin.orientation.w = 1.0
         grid_msg.data = [
-            100 if occupied else 0 for occupied in hazard_cells.reshape(-1)
+            100 if occupied else 0
+            for occupied in hazards.reshape(-1)
         ]
         self.hazard_grid_pub.publish(grid_msg)
 
