@@ -11,6 +11,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ExcavationCommand.msg"
   "msg/ExcavationStatus.msg"
   "msg/ExcavationTelemetry.msg"
+  "srv/ExcavationJog.srv"
   DEPENDENCIES std_msgs
 )
 
