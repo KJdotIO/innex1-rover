@@ -1,4 +1,4 @@
-"""Stub action servers for excavation and deposition mission phases."""
+"""Stub action server for the deposition mission phase."""
 
 from time import monotonic, sleep
 
@@ -8,32 +8,22 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
-from lunabot_interfaces.action import Deposit, Excavate
+from lunabot_interfaces.action import Deposit
 
 
 class MaterialActionServer(Node):
-    """Provide action stubs for excavation and deposition."""
+    """Provide a deposition action stub while excavation uses the real controller path."""
 
     def __init__(self):
         """Initialise action servers and simulation parameters."""
         super().__init__("material_action_server")
 
-        self.declare_parameter("excavate_nominal_duration_s", 8.0)
         self.declare_parameter("deposit_nominal_duration_s", 5.0)
         self.declare_parameter("loop_period_s", 0.2)
         self.declare_parameter("force_failure_action", "")
 
         self._callback_group = ReentrantCallbackGroup()
 
-        self._excavate_server = ActionServer(
-            self,
-            Excavate,
-            "/mission/excavate",
-            execute_callback=self.execute_excavate,
-            goal_callback=self.goal_callback,
-            cancel_callback=self.cancel_callback,
-            callback_group=self._callback_group,
-        )
         self._deposit_server = ActionServer(
             self,
             Deposit,
@@ -44,11 +34,10 @@ class MaterialActionServer(Node):
             callback_group=self._callback_group,
         )
 
-        self.get_logger().info("Material action stubs ready")
+        self.get_logger().info("Deposition action stub ready")
 
     def destroy_node(self):
         """Destroy action server handles before node teardown."""
-        self._excavate_server.destroy()
         self._deposit_server.destroy()
         super().destroy_node()
 
@@ -72,17 +61,6 @@ class MaterialActionServer(Node):
         return configured == action_name
 
     @staticmethod
-    def _excavate_result(success, reason_code, reason, mass_kg, duration_s):
-        """Build an Excavate result message."""
-        result = Excavate.Result()
-        result.success = bool(success)
-        result.reason_code = int(reason_code)
-        result.failure_reason = str(reason)
-        result.collected_mass_kg_estimate = float(mass_kg)
-        result.duration_s = float(duration_s)
-        return result
-
-    @staticmethod
     def _deposit_result(success, reason_code, reason, residual_fill, duration_s):
         """Build a Deposit result message."""
         result = Deposit.Result()
@@ -92,87 +70,6 @@ class MaterialActionServer(Node):
         result.residual_fill_fraction_estimate = float(residual_fill)
         result.duration_s = float(duration_s)
         return result
-
-    def execute_excavate(self, goal_handle):
-        """Run excavation stub with success, timeout, and failure paths."""
-        nominal_duration = float(
-            self.get_parameter("excavate_nominal_duration_s").value
-        )
-        timeout_s = float(goal_handle.request.timeout_s)
-        start = monotonic()
-
-        while rclpy.ok():
-            elapsed = monotonic() - start
-
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return self._excavate_result(
-                    False,
-                    Excavate.Result.REASON_CANCELED,
-                    "Excavation goal canceled by client",
-                    0.0,
-                    elapsed,
-                )
-
-            if timeout_s > 0.0 and elapsed >= timeout_s:
-                goal_handle.abort()
-                return self._excavate_result(
-                    False,
-                    Excavate.Result.REASON_TIMEOUT,
-                    "Excavation timeout reached",
-                    0.0,
-                    elapsed,
-                )
-
-            if self._should_force_failure("excavate"):
-                goal_handle.abort()
-                return self._excavate_result(
-                    False,
-                    Excavate.Result.REASON_FORCED_FAILURE,
-                    "Forced failure for bench testing",
-                    0.0,
-                    elapsed,
-                )
-
-            progress = min(elapsed / max(nominal_duration, 0.1), 1.0)
-
-            feedback = Excavate.Feedback()
-            if progress < 0.2:
-                feedback.phase = Excavate.Feedback.PHASE_PRECHECK
-            elif progress < 0.35:
-                feedback.phase = Excavate.Feedback.PHASE_SPINUP
-            elif progress < 0.85:
-                feedback.phase = Excavate.Feedback.PHASE_DIGGING
-            else:
-                feedback.phase = Excavate.Feedback.PHASE_RETRACT
-            feedback.elapsed_s = float(elapsed)
-            feedback.fill_fraction_estimate = float(progress)
-            feedback.excavation_motor_current_a = float(8.0 + 6.0 * progress)
-            feedback.jam_detected = False
-            feedback.estop_active = False
-            goal_handle.publish_feedback(feedback)
-
-            if progress >= 1.0:
-                goal_handle.succeed()
-                return self._excavate_result(
-                    True,
-                    Excavate.Result.REASON_SUCCESS,
-                    "",
-                    12.5,
-                    elapsed,
-                )
-
-            sleep(self.loop_period_s)
-
-        if goal_handle.is_active:
-            goal_handle.abort()
-        return self._excavate_result(
-            False,
-            Excavate.Result.REASON_SHUTDOWN,
-            "Node shutdown during excavation",
-            0.0,
-            monotonic() - start,
-        )
 
     def execute_deposit(self, goal_handle):
         """Run deposition stub with success, timeout, and failure paths."""

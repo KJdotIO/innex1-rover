@@ -4,7 +4,7 @@
       "name": "/mission/excavate",
       "type": "lunabot_interfaces/action/Excavate",
       "kind": "action_server",
-      "source": "src/lunabot_control/lunabot_control/material_action_server.py"
+      "source": "src/lunabot_excavation/lunabot_excavation/excavation_action_server.py"
     },
     {
       "name": "/mission/deposit",
