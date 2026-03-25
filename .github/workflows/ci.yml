@@ -14,9 +14,14 @@ jobs:
       pull-requests: read
     outputs:
       ros_ci: ${{ steps.changes.outputs.ros_ci }}
+      selection_mode: ${{ steps.selection.outputs.mode }}
+      selection_packages: ${{ steps.selection.outputs.packages }}
+      selection_reason: ${{ steps.selection.outputs.reason }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Mark workspace as a safe git directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -48,6 +53,29 @@ jobs:
         run: |
           python3 .github/scripts/run_preflight_checks.py
           python3 .github/scripts/check_interface_contracts.py
+          python3 .github/scripts/test_select_ci_packages.py
+        shell: bash
+
+      - name: Determine comparison range
+        id: range
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            echo "base_sha=$(git merge-base HEAD origin/${{ github.base_ref }})" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "head_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Select ROS package scope
+        id: selection
+        if: steps.changes.outputs.ros_ci == 'true'
+        run: |
+          python3 .github/scripts/select_ci_packages.py \
+            --base-sha "${{ steps.range.outputs.base_sha }}" \
+            --head-sha "${{ steps.range.outputs.head_sha }}" \
+            --github-output "$GITHUB_OUTPUT"
         shell: bash
 
   build-and-test:
@@ -64,12 +92,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Explain selected ROS scope
+        run: |
+          echo "Selection mode: ${{ needs.preflight.outputs.selection_mode }}"
+          echo "Selection reason: ${{ needs.preflight.outputs.selection_reason }}"
+          echo "Selected packages: ${{ needs.preflight.outputs.selection_packages }}"
+        shell: bash
+
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-${{ hashFiles('src/**/package.xml') }}
-          restore-keys: apt-
+          key: ${{ runner.os }}-apt-${{ hashFiles('src/**/package.xml') }}
+          restore-keys: ${{ runner.os }}-apt-
 
       - name: Cache colcon workspace
         uses: actions/cache@v4
@@ -77,8 +112,8 @@ jobs:
           path: |
             build/
             install/
-          key: colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
-          restore-keys: colcon-
+          key: ${{ runner.os }}-colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
+          restore-keys: ${{ runner.os }}-colcon-
 
       - name: Install dependencies
         run: |
@@ -90,15 +125,29 @@ jobs:
         shell: bash
 
       - name: Build
+        env:
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGES: ${{ needs.preflight.outputs.selection_packages }}
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build
+          if [ "$SELECTION_MODE" = "packages" ]; then
+            colcon build --packages-up-to $SELECTED_PACKAGES
+          else
+            colcon build
+          fi
         shell: bash
 
       - name: Run tests
+        env:
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGES: ${{ needs.preflight.outputs.selection_packages }}
         run: |
           source /opt/ros/humble/setup.bash
-          colcon test
+          if [ "$SELECTION_MODE" = "packages" ]; then
+            colcon test --packages-select $SELECTED_PACKAGES
+          else
+            colcon test
+          fi
         shell: bash
 
       - name: Check test results
