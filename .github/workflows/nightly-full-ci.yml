@@ -152,8 +152,8 @@ jobs:
         run: |
           echo "Container image: ${{ needs.resolve-build-image.outputs.image }}"
           echo "Container reason: ${{ needs.resolve-build-image.outputs.image_reason }}"
+          apt-get update
           if [ "$USE_PREBUILT_IMAGE" != "true" ]; then
-            apt-get update
             apt-get install -y python3-colcon-common-extensions python3-rosdep
           fi
           if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
