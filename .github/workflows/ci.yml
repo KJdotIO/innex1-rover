@@ -7,14 +7,13 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  preflight:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       pull-requests: read
-    container:
-      image: ros:humble-ros-base
-
+    outputs:
+      ros_ci: ${{ steps.changes.outputs.ros_ci }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,13 +29,42 @@ jobs:
           filters: |
             ros_ci:
               - 'src/**'
-              - '.github/workflows/ci.yml'
+              - '.github/workflows/**'
               - '.github/actions/**'
               - '.github/scripts/**'
               - '.github/contracts/**'
 
+      - name: Install preflight dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+          python3 - <<'PY'
+          import yaml
+          print(f"PyYAML available: {yaml.__version__}")
+          PY
+        shell: bash
+
+      - name: Run preflight checks
+        run: |
+          python3 .github/scripts/run_preflight_checks.py
+          python3 .github/scripts/check_interface_contracts.py
+        shell: bash
+
+  build-and-test:
+    needs: preflight
+    if: needs.preflight.outputs.ros_ci == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
+    container:
+      image: ros:humble-ros-base
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Cache apt packages
-        if: steps.changes.outputs.ros_ci == 'true'
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
@@ -44,7 +72,6 @@ jobs:
           restore-keys: apt-
 
       - name: Cache colcon workspace
-        if: steps.changes.outputs.ros_ci == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -53,13 +80,7 @@ jobs:
           key: colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
           restore-keys: colcon-
 
-      - name: Skip heavy ROS CI for docs-only changes
-        if: steps.changes.outputs.ros_ci != 'true'
-        run: echo "No code-bearing changes detected; skipping ROS build and test."
-        shell: bash
-
       - name: Install dependencies
-        if: steps.changes.outputs.ros_ci == 'true'
         run: |
           apt-get update
           apt-get install -y python3-colcon-common-extensions python3-rosdep
@@ -69,27 +90,18 @@ jobs:
         shell: bash
 
       - name: Build
-        if: steps.changes.outputs.ros_ci == 'true'
         run: |
           source /opt/ros/humble/setup.bash
           colcon build
         shell: bash
 
-      - name: Check interface contracts
-        if: steps.changes.outputs.ros_ci == 'true'
-        run: |
-          python3 .github/scripts/check_interface_contracts.py
-        shell: bash
-
       - name: Run tests
-        if: steps.changes.outputs.ros_ci == 'true'
         run: |
           source /opt/ros/humble/setup.bash
           colcon test
         shell: bash
 
       - name: Check test results
-        if: steps.changes.outputs.ros_ci == 'true'
         run: |
           source /opt/ros/humble/setup.bash
           colcon test-result --verbose
