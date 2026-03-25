@@ -17,10 +17,12 @@ setup(
         (
             "share/" + package_name + "/launch",
             [
+                "launch/excavation_bench.launch.py",
                 "launch/excavation_controller.launch.py",
                 "launch/excavation_action_server.launch.py",
             ],
         ),
+        ("share/" + package_name, ["README.md"]),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -31,6 +33,7 @@ setup(
     extras_require={"test": ["pytest"]},
     entry_points={
         "console_scripts": [
+            "excavation_bench = lunabot_excavation.excavation_bench:main",
             "excavation_controller = lunabot_excavation.excavation_controller:main",
             "excavation_action_server = lunabot_excavation.excavation_action_server:main",
         ],
