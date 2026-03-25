@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Launch the excavation controller node."""
+    """Generate a launch description for the excavation controller node."""
     return LaunchDescription(
         [
             Node(

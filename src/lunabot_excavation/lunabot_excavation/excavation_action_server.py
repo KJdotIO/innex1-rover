@@ -7,6 +7,7 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_srvs.srv import Trigger
 
 from lunabot_interfaces.action import Excavate
@@ -42,6 +43,12 @@ class ExcavationActionServer(Node):
         self.declare_parameter("loop_period_s", 0.2)
         self.declare_parameter("stop_timeout_s", 2.0)
 
+        qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+
         self._status = None
         self._latest_telemetry = None
         self._callback_group = ReentrantCallbackGroup()
@@ -50,13 +57,13 @@ class ExcavationActionServer(Node):
             ExcavationStatus,
             "/excavation/status",
             self._handle_status,
-            10,
+            qos,
         )
         self.create_subscription(
             ExcavationTelemetry,
             "/excavation/telemetry",
             self._handle_telemetry,
-            10,
+            qos,
         )
 
         self._home_client = self.create_client(Trigger, "/excavation/home")

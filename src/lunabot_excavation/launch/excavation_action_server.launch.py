@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    """Launch the excavation action server node."""
+    """Generate a launch description for the excavation action server node."""
     return LaunchDescription(
         [
             Node(
