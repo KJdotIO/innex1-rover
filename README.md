@@ -1,6 +1,7 @@
 # INNEX1 Rover Software Stack (UK Lunabotics 2026)
 
 This repository contains the University of Leicester rover software stack for UK Lunabotics 2026.
+This temporary line exists only to exercise the docs-only CI path on a throwaway branch.
 
 Linux is the primary runtime target for development and testing.
 
