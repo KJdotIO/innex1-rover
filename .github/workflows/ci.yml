@@ -13,13 +13,13 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      ros_ci: ${{ steps.changes.outputs.ros_ci }}
+      ros_ci: ${{ steps.selection.outputs.ros_ci }}
       selection_mode: ${{ steps.selection.outputs.mode }}
       selection_packages: ${{ steps.selection.outputs.packages }}
       selection_reason: ${{ steps.selection.outputs.reason }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -27,33 +27,22 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
         shell: bash
 
-      - name: Detect code-bearing changes
-        id: changes
-        uses: dorny/paths-filter@v3
+      - name: Set up Python for preflight
+        uses: actions/setup-python@v6
         with:
-          filters: |
-            ros_ci:
-              - 'src/**'
-              - '.github/workflows/**'
-              - '.github/actions/**'
-              - '.github/scripts/**'
-              - '.github/contracts/**'
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: .github/requirements-preflight.txt
 
       - name: Install preflight dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-yaml
-          python3 - <<'PY'
-          import yaml
-          print(f"PyYAML available: {yaml.__version__}")
-          PY
+        run: python -m pip install --disable-pip-version-check -r .github/requirements-preflight.txt
         shell: bash
 
       - name: Run preflight checks
         run: |
-          python3 .github/scripts/run_preflight_checks.py
-          python3 .github/scripts/check_interface_contracts.py
-          python3 .github/scripts/test_select_ci_packages.py
+          python .github/scripts/run_preflight_checks.py
+          python .github/scripts/check_interface_contracts.py
+          python .github/scripts/test_select_ci_packages.py
         shell: bash
 
       - name: Determine comparison range
@@ -70,9 +59,8 @@ jobs:
 
       - name: Select ROS package scope
         id: selection
-        if: steps.changes.outputs.ros_ci == 'true'
         run: |
-          python3 .github/scripts/select_ci_packages.py \
+          python .github/scripts/select_ci_packages.py \
             --base-sha "${{ steps.range.outputs.base_sha }}" \
             --head-sha "${{ steps.range.outputs.head_sha }}" \
             --github-output "$GITHUB_OUTPUT"
@@ -90,7 +78,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Explain selected ROS scope
         run: |
@@ -100,14 +88,14 @@ jobs:
         shell: bash
 
       - name: Cache apt packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-${{ hashFiles('src/**/package.xml') }}
           restore-keys: ${{ runner.os }}-apt-
 
       - name: Cache colcon workspace
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/

@@ -14,7 +14,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
-BROAD_PATH_PREFIXES = (
+ROS_CI_PATH_PREFIXES = (
     ".github/workflows/",
     ".github/actions/",
     ".github/scripts/",
@@ -46,6 +46,17 @@ class Selection:
     mode: str
     packages: tuple[str, ...]
     reason: str
+
+
+def requires_ros_ci(changed_files: list[str]) -> bool:
+    if not changed_files:
+        return True
+
+    return any(
+        path.startswith("src/")
+        or any(path.startswith(prefix) for prefix in ROS_CI_PATH_PREFIXES)
+        for path in changed_files
+    )
 
 
 def _git_changed_files(base_sha: str, head_sha: str) -> list[str]:
@@ -133,7 +144,7 @@ def _select(
         return Selection("full", (), "No reliable diff range available")
 
     if any(
-        any(path.startswith(prefix) for prefix in BROAD_PATH_PREFIXES)
+        any(path.startswith(prefix) for prefix in ROS_CI_PATH_PREFIXES)
         for path in changed_files
     ):
         return Selection("full", (), "Shared CI or contract files changed")
@@ -182,17 +193,25 @@ def main() -> int:
 
     package_roots, dependencies = _discover_packages()
     changed_files = _git_changed_files(args.base_sha, args.head_sha)
-    selection = _select(changed_files, package_roots, dependencies)
+    ros_ci = requires_ros_ci(changed_files)
+    selection = _select(changed_files, package_roots, dependencies) if ros_ci else Selection(
+        "skip",
+        (),
+        "ROS build/test not needed for this change set",
+    )
 
     summary = {
         "mode": selection.mode,
         "packages": list(selection.packages),
         "reason": selection.reason,
+        "ros_ci": ros_ci,
         "changed_files": changed_files,
     }
     print(json.dumps(summary, indent=2))
 
     if args.github_output:
+        with Path(args.github_output).open("a", encoding="utf-8") as handle:
+            handle.write(f"ros_ci={'true' if ros_ci else 'false'}\n")
         _write_github_output(Path(args.github_output), selection)
 
     return 0
