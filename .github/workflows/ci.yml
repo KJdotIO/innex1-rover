@@ -19,6 +19,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        shell: bash
+
       - name: Detect code-bearing changes
         id: changes
         uses: dorny/paths-filter@v3
