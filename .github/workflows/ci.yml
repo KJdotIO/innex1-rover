@@ -21,7 +21,7 @@ jobs:
 
       - name: Detect code-bearing changes
         id: changes
-        uses: step-security/paths-filter@v3
+        uses: dorny/paths-filter@v3
         with:
           filters: |
             ros_ci:
