@@ -7,42 +7,51 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from lunabot_interfaces.action import Excavate
-from lunabot_interfaces.msg import ExcavationTelemetry
+from lunabot_interfaces.msg import ExcavationStatus, ExcavationTelemetry
 
 
 STATE_TO_PHASE = {
-    "idle": Excavate.Feedback.PHASE_PRECHECK,
-    "homing": Excavate.Feedback.PHASE_PRECHECK,
-    "ready": Excavate.Feedback.PHASE_PRECHECK,
-    "starting": Excavate.Feedback.PHASE_SPINUP,
-    "excavating": Excavate.Feedback.PHASE_DIGGING,
-    "stopping": Excavate.Feedback.PHASE_RETRACT,
-    "fault": Excavate.Feedback.PHASE_RETRACT,
+    ExcavationStatus.STATE_IDLE: Excavate.Feedback.PHASE_PRECHECK,
+    ExcavationStatus.STATE_HOMING: Excavate.Feedback.PHASE_PRECHECK,
+    ExcavationStatus.STATE_READY: Excavate.Feedback.PHASE_PRECHECK,
+    ExcavationStatus.STATE_STARTING: Excavate.Feedback.PHASE_SPINUP,
+    ExcavationStatus.STATE_EXCAVATING: Excavate.Feedback.PHASE_DIGGING,
+    ExcavationStatus.STATE_STOPPING: Excavate.Feedback.PHASE_RETRACT,
+    ExcavationStatus.STATE_FAULT: Excavate.Feedback.PHASE_RETRACT,
 }
 
-ACTIVE_STATES = {"homing", "starting", "excavating", "stopping"}
+ACTIVE_STATES = {
+    ExcavationStatus.STATE_HOMING,
+    ExcavationStatus.STATE_STARTING,
+    ExcavationStatus.STATE_EXCAVATING,
+    ExcavationStatus.STATE_STOPPING,
+}
 
 
 class ExcavationActionServer(Node):
     """Bridge the mission-facing excavation action onto the controller."""
 
     def __init__(self):
-        """Initialise action server, state subscriptions, and service clients."""
+        """Initialise action server, status subscriptions, and service clients."""
         super().__init__("excavation_action_server")
 
         self.declare_parameter("nominal_duration_s", 8.0)
         self.declare_parameter("loop_period_s", 0.2)
         self.declare_parameter("stop_timeout_s", 2.0)
 
-        self._state = "idle"
+        self._status = None
         self._latest_telemetry = None
         self._callback_group = ReentrantCallbackGroup()
 
-        self.create_subscription(String, "/excavation/status", self._handle_state, 10)
+        self.create_subscription(
+            ExcavationStatus,
+            "/excavation/status",
+            self._handle_status,
+            10,
+        )
         self.create_subscription(
             ExcavationTelemetry,
             "/excavation/telemetry",
@@ -69,9 +78,9 @@ class ExcavationActionServer(Node):
         self._server.destroy()
         super().destroy_node()
 
-    def _handle_state(self, msg: String):
-        """Store the latest controller state string."""
-        self._state = msg.data
+    def _handle_status(self, msg: ExcavationStatus):
+        """Store the latest excavation controller status."""
+        self._status = msg
 
     def _handle_telemetry(self, msg: ExcavationTelemetry):
         """Store the latest excavation telemetry sample."""
@@ -111,35 +120,46 @@ class ExcavationActionServer(Node):
         return future.result()
 
     def _publish_feedback(self, goal_handle, elapsed: float):
-        """Publish action feedback from controller state and telemetry."""
+        """Publish action feedback from controller status and telemetry."""
         telemetry = self._latest_telemetry
+        state = (
+            self._status.state
+            if self._status is not None
+            else ExcavationStatus.STATE_IDLE
+        )
+
         feedback = Excavate.Feedback()
-        feedback.phase = STATE_TO_PHASE.get(self._state, Excavate.Feedback.PHASE_PRECHECK)
+        feedback.phase = STATE_TO_PHASE.get(state, Excavate.Feedback.PHASE_PRECHECK)
         feedback.elapsed_s = float(elapsed)
         feedback.fill_fraction_estimate = 0.0
         feedback.excavation_motor_current_a = (
-            float(telemetry.motor_current_a) if telemetry is not None else 0.0
+            float(telemetry.motor_current_a)
+            if telemetry is not None
+            else (
+                float(self._status.motor_current_a) if self._status is not None else 0.0
+            )
         )
         feedback.jam_detected = (
-            telemetry is not None
-            and telemetry.fault_code == ExcavationTelemetry.FAULT_OVERCURRENT
+            self._status is not None
+            and self._status.fault_code == ExcavationStatus.FAULT_OVERCURRENT
         )
-        feedback.estop_active = telemetry.estop_active if telemetry is not None else False
+        feedback.estop_active = (
+            self._status.estop_active if self._status is not None else False
+        )
         goal_handle.publish_feedback(feedback)
 
     def _fault_reason(self):
-        """Map the latest telemetry fault into an action result code and reason."""
-        telemetry = self._latest_telemetry
-        if telemetry is None:
-            return Excavate.Result.REASON_SHUTDOWN, "Excavation telemetry unavailable"
-        if telemetry.estop_active:
+        """Map the latest status fault into an action result code and reason."""
+        if self._status is None:
+            return Excavate.Result.REASON_SHUTDOWN, "Excavation status unavailable"
+        if self._status.fault_code == ExcavationStatus.FAULT_ESTOP:
             return Excavate.Result.REASON_ESTOP, "Excavation estop active"
-        if telemetry.fault_code == ExcavationTelemetry.FAULT_OVERCURRENT:
+        if self._status.fault_code == ExcavationStatus.FAULT_OVERCURRENT:
             return (
                 Excavate.Result.REASON_JAM_OR_OVERCURRENT,
                 "Excavation jam or overcurrent detected",
             )
-        if telemetry.driver_fault:
+        if self._status.fault_code == ExcavationStatus.FAULT_DRIVER:
             return Excavate.Result.REASON_DRIVER_FAULT, "Excavation driver fault active"
         return Excavate.Result.REASON_INTERLOCK_BLOCKED, "Excavation controller faulted"
 
@@ -150,14 +170,11 @@ class ExcavationActionServer(Node):
 
             if goal_handle.is_cancel_requested:
                 return "cancel", elapsed
-
             if timeout_s > 0.0 and elapsed >= timeout_s:
                 return "timeout", elapsed
-
-            if self._state == "ready":
+            if self._status is not None and self._status.state == ExcavationStatus.STATE_READY:
                 return "ready", elapsed
-
-            if self._state == "fault":
+            if self._status is not None and self._status.state == ExcavationStatus.STATE_FAULT:
                 return "fault", elapsed
 
             self._publish_feedback(goal_handle, elapsed)
@@ -169,7 +186,7 @@ class ExcavationActionServer(Node):
         """Wait until the controller leaves active motion states."""
         settle_start = monotonic()
         while rclpy.ok():
-            if self._state not in ACTIVE_STATES:
+            if self._status is not None and self._status.state not in ACTIVE_STATES:
                 return True
             if monotonic() - settle_start >= timeout_s:
                 return False
@@ -183,22 +200,31 @@ class ExcavationActionServer(Node):
         stop_timeout_s = float(self.get_parameter("stop_timeout_s").value)
         start = monotonic()
         saw_excavating = False
+        stop_requested = False
+        state = (
+            self._status.state
+            if self._status is not None
+            else ExcavationStatus.STATE_IDLE
+        )
 
-        if self._state == "fault":
+        if state == ExcavationStatus.STATE_FAULT:
             goal_handle.abort()
             code, reason = self._fault_reason()
             return self._result(False, code, reason, 0.0)
 
-        if self._state not in ("idle", "ready"):
+        if state not in (
+            ExcavationStatus.STATE_IDLE,
+            ExcavationStatus.STATE_READY,
+        ):
             goal_handle.abort()
             return self._result(
                 False,
                 Excavate.Result.REASON_INTERLOCK_BLOCKED,
-                f"Excavation controller busy in state '{self._state}'",
+                f"Excavation controller busy in state '{state}'",
                 0.0,
             )
 
-        if self._state != "ready":
+        if state != ExcavationStatus.STATE_READY:
             response = self._call_trigger(self._home_client, 2.0)
             if response is None or not response.success:
                 goal_handle.abort()
@@ -208,6 +234,7 @@ class ExcavationActionServer(Node):
                     "Excavation home command was rejected",
                     0.0,
                 )
+
             homing_result, elapsed = self._wait_for_ready_or_fault(
                 timeout_s,
                 goal_handle,
@@ -233,6 +260,7 @@ class ExcavationActionServer(Node):
             if homing_result == "timeout":
                 self._call_trigger(self._stop_client, stop_timeout_s)
                 if not self._wait_for_stop_settle(stop_timeout_s):
+                    goal_handle.abort()
                     return self._result(
                         False,
                         Excavate.Result.REASON_INTERLOCK_BLOCKED,
@@ -308,18 +336,25 @@ class ExcavationActionServer(Node):
                     elapsed,
                 )
 
-            if self._state == "fault":
+            if self._status is not None and self._status.state == ExcavationStatus.STATE_FAULT:
                 goal_handle.abort()
                 code, reason = self._fault_reason()
                 return self._result(False, code, reason, elapsed)
 
-            if self._state == "excavating":
+            if (
+                self._status is not None
+                and self._status.state == ExcavationStatus.STATE_EXCAVATING
+            ):
                 saw_excavating = True
 
-            if saw_excavating and elapsed >= nominal_duration:
+            if saw_excavating and elapsed >= nominal_duration and not stop_requested:
                 self._call_trigger(self._stop_client, stop_timeout_s)
+                stop_requested = True
 
-            if saw_excavating and self._state in ("ready", "idle"):
+            if saw_excavating and self._status is not None and self._status.state in (
+                ExcavationStatus.STATE_READY,
+                ExcavationStatus.STATE_IDLE,
+            ):
                 goal_handle.succeed()
                 return self._result(True, Excavate.Result.REASON_SUCCESS, "", elapsed)
 

@@ -4,10 +4,13 @@ from enum import Enum
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from lunabot_interfaces.msg import ExcavationCommand, ExcavationTelemetry
+from lunabot_interfaces.msg import (
+    ExcavationCommand,
+    ExcavationStatus,
+    ExcavationTelemetry,
+)
 
 
 class ExcavationState(str, Enum):
@@ -32,7 +35,7 @@ class ExcavationController(Node):
         self.declare_parameter("control_period_s", 0.1)
 
         self._state = ExcavationState.IDLE
-        self._last_fault_code = ExcavationTelemetry.FAULT_NONE
+        self._last_fault_code = ExcavationStatus.FAULT_NONE
         self._latest_telemetry = None
 
         self._command_pub = self.create_publisher(
@@ -40,7 +43,11 @@ class ExcavationController(Node):
             "/excavation/command",
             10,
         )
-        self._status_pub = self.create_publisher(String, "/excavation/status", 10)
+        self._status_pub = self.create_publisher(
+            ExcavationStatus,
+            "/excavation/status",
+            10,
+        )
         self._telemetry_sub = self.create_subscription(
             ExcavationTelemetry,
             "/excavation/telemetry",
@@ -78,8 +85,24 @@ class ExcavationController(Node):
 
     def _publish_status(self):
         """Publish the current excavation controller state."""
-        msg = String()
-        msg.data = self._state.value
+        msg = ExcavationStatus()
+        if self._latest_telemetry is not None:
+            msg.header = self._latest_telemetry.header
+            msg.estop_active = self._latest_telemetry.estop_active
+            msg.driver_fault = self._latest_telemetry.driver_fault
+            msg.homed = self._latest_telemetry.home_switch
+            msg.motor_enabled = self._latest_telemetry.motor_enabled
+            msg.motor_current_a = self._latest_telemetry.motor_current_a
+        msg.fault_code = self._last_fault_code
+        msg.state = {
+            ExcavationState.IDLE: ExcavationStatus.STATE_IDLE,
+            ExcavationState.HOMING: ExcavationStatus.STATE_HOMING,
+            ExcavationState.READY: ExcavationStatus.STATE_READY,
+            ExcavationState.STARTING: ExcavationStatus.STATE_STARTING,
+            ExcavationState.EXCAVATING: ExcavationStatus.STATE_EXCAVATING,
+            ExcavationState.STOPPING: ExcavationStatus.STATE_STOPPING,
+            ExcavationState.FAULT: ExcavationStatus.STATE_FAULT,
+        }[self._state]
         self._status_pub.publish(msg)
 
     def _enter_fault(self, fault_code: int):
@@ -137,7 +160,7 @@ class ExcavationController(Node):
         if self._state is not ExcavationState.FAULT:
             return self._trigger_response(False, "Excavation controller is not faulted")
         self._publish_command(ExcavationCommand.COMMAND_CLEAR_FAULT)
-        self._last_fault_code = ExcavationTelemetry.FAULT_NONE
+        self._last_fault_code = ExcavationStatus.FAULT_NONE
         self._set_state(ExcavationState.IDLE)
         return self._trigger_response(True, "Excavation fault cleared")
 
@@ -148,12 +171,17 @@ class ExcavationController(Node):
             return
 
         if self._latest_telemetry.estop_active:
-            self._enter_fault(ExcavationTelemetry.FAULT_ESTOP)
+            self._enter_fault(ExcavationStatus.FAULT_ESTOP)
             self._publish_status()
             return
 
         if self._latest_telemetry.driver_fault:
-            self._enter_fault(ExcavationTelemetry.FAULT_DRIVER)
+            self._enter_fault(ExcavationStatus.FAULT_DRIVER)
+            self._publish_status()
+            return
+
+        if self._latest_telemetry.fault_code != ExcavationTelemetry.FAULT_NONE:
+            self._enter_fault(self._latest_telemetry.fault_code)
             self._publish_status()
             return
 

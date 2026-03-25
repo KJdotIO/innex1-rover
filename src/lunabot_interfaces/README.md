@@ -22,6 +22,7 @@ The intended split is:
 
 - `/excavation/command` uses `lunabot_interfaces/msg/ExcavationCommand`
 - `/excavation/telemetry` uses `lunabot_interfaces/msg/ExcavationTelemetry`
+- `/excavation/status` uses `lunabot_interfaces/msg/ExcavationStatus`
 
 ### Excavation Commands
 
@@ -68,6 +69,42 @@ The first fault-code table is:
 - `FAULT_OVERCURRENT=3`
 - `FAULT_HOME_SWITCH_INVALID=4`
 - `FAULT_COMMAND_REJECTED=5`
+
+### Excavation Status
+
+The controller publishes a typed status snapshot for action adapters and bench tooling.
+
+The first status-state table is:
+
+- `STATE_IDLE=0`
+- `STATE_HOMING=1`
+- `STATE_READY=2`
+- `STATE_STARTING=3`
+- `STATE_EXCAVATING=4`
+- `STATE_STOPPING=5`
+- `STATE_FAULT=6`
+
+The status topic carries the same latched fault-code table as excavation telemetry:
+
+- `FAULT_NONE=0`
+- `FAULT_ESTOP=1`
+- `FAULT_DRIVER=2`
+- `FAULT_OVERCURRENT=3`
+- `FAULT_HOME_SWITCH_INVALID=4`
+- `FAULT_COMMAND_REJECTED=5`
+
+This topic is the controller-owned view of state. It is the supported coordination contract for
+the excavation action adapter, replacing free-form string state names.
+
+The first status fields are:
+
+- `state`
+- `fault_code`
+- `estop_active`
+- `driver_fault`
+- `homed`
+- `motor_enabled`
+- `motor_current_a`
 
 ### Out of Scope for the First Contract
 
