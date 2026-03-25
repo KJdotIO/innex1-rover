@@ -17,6 +17,7 @@ jobs:
       selection_mode: ${{ steps.selection.outputs.mode }}
       selection_packages: ${{ steps.selection.outputs.packages }}
       selection_reason: ${{ steps.selection.outputs.reason }}
+      ci_image: ${{ steps.image.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -25,6 +26,13 @@ jobs:
 
       - name: Mark workspace as a safe git directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        shell: bash
+
+      - name: Derive ROS CI image reference
+        id: image
+        run: |
+          owner_lower=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner_lower}/innex1-rover-ci:humble" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Set up Python for preflight
@@ -66,15 +74,51 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
         shell: bash
 
-  build-and-test:
+  resolve-build-image:
     needs: preflight
+    if: needs.preflight.outputs.ros_ci == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+      prebuilt: ${{ steps.resolve.outputs.prebuilt }}
+      image_reason: ${{ steps.resolve.outputs.image_reason }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Resolve ROS CI image
+        id: resolve
+        env:
+          CI_IMAGE: ${{ needs.preflight.outputs.ci_image }}
+        run: |
+          if docker buildx imagetools inspect "$CI_IMAGE" >/tmp/ci-image-inspect.txt 2>/tmp/ci-image-inspect.err; then
+            digest=$(awk '/^Digest:/ {print $2}' /tmp/ci-image-inspect.txt)
+            if [ -n "$digest" ]; then
+              echo "image=${CI_IMAGE%@*}@${digest}" >> "$GITHUB_OUTPUT"
+              echo "prebuilt=true" >> "$GITHUB_OUTPUT"
+              echo "image_reason=Using published ROS CI image" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          echo "image=ros:humble-ros-base" >> "$GITHUB_OUTPUT"
+          echo "prebuilt=false" >> "$GITHUB_OUTPUT"
+          echo "image_reason=Falling back because the published ROS CI image is unavailable" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  build-and-test:
+    needs:
+      - preflight
+      - resolve-build-image
     if: needs.preflight.outputs.ros_ci == 'true'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       pull-requests: read
     container:
-      image: ros:humble-ros-base
+      image: ${{ needs.resolve-build-image.outputs.image }}
 
     steps:
       - name: Checkout code
@@ -85,14 +129,9 @@ jobs:
           echo "Selection mode: ${{ needs.preflight.outputs.selection_mode }}"
           echo "Selection reason: ${{ needs.preflight.outputs.selection_reason }}"
           echo "Selected packages: ${{ needs.preflight.outputs.selection_packages }}"
+          echo "Container image: ${{ needs.resolve-build-image.outputs.image }}"
+          echo "Container reason: ${{ needs.resolve-build-image.outputs.image_reason }}"
         shell: bash
-
-      - name: Cache apt packages
-        uses: actions/cache@v5
-        with:
-          path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-${{ hashFiles('src/**/package.xml') }}
-          restore-keys: ${{ runner.os }}-apt-
 
       - name: Cache colcon workspace
         uses: actions/cache@v5
@@ -104,10 +143,16 @@ jobs:
           restore-keys: ${{ runner.os }}-colcon-
 
       - name: Install dependencies
+        env:
+          USE_PREBUILT_IMAGE: ${{ needs.resolve-build-image.outputs.prebuilt }}
         run: |
-          apt-get update
-          apt-get install -y python3-colcon-common-extensions python3-rosdep
-          rosdep init || true
+          if [ "$USE_PREBUILT_IMAGE" != "true" ]; then
+            apt-get update
+            apt-get install -y python3-colcon-common-extensions python3-rosdep
+          fi
+          if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+            rosdep init
+          fi
           rosdep update
           rosdep install --from-paths src -y --ignore-src
         shell: bash
