@@ -23,6 +23,7 @@ The intended split is:
 - `/excavation/command` uses `lunabot_interfaces/msg/ExcavationCommand`
 - `/excavation/telemetry` uses `lunabot_interfaces/msg/ExcavationTelemetry`
 - `/excavation/status` uses `lunabot_interfaces/msg/ExcavationStatus`
+- `/excavation/jog_forward` uses `lunabot_interfaces/srv/ExcavationJog`
 
 ### Excavation Commands
 
@@ -38,6 +39,21 @@ after embedded-side interlock checks pass.
 
 Anything more complicated than that belongs in a later issue once the base mechanism path is
 real and tested.
+
+### Bench Jog Contract
+
+The first bench-tooling pass adds one controller-owned forward jog service:
+
+- `/excavation/jog_forward` with `lunabot_interfaces/srv/ExcavationJog`
+
+This is intentionally narrow:
+
+- forward only
+- bounded by duration
+- only accepted when the controller is already `READY`
+- still subject to normal stop and fault handling
+
+The bench path must not become a raw motor bypass.
 
 ### Command Channel Rules
 

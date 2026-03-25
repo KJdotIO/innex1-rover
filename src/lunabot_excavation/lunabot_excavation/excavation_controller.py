@@ -1,6 +1,8 @@
 """Excavation controller skeleton."""
 
 from enum import Enum
+from math import isfinite
+from time import monotonic
 
 import rclpy
 from rclpy.node import Node
@@ -12,6 +14,7 @@ from lunabot_interfaces.msg import (
     ExcavationStatus,
     ExcavationTelemetry,
 )
+from lunabot_interfaces.srv import ExcavationJog
 
 
 class ExcavationState(str, Enum):
@@ -24,6 +27,14 @@ class ExcavationState(str, Enum):
     EXCAVATING = "excavating"
     STOPPING = "stopping"
     FAULT = "fault"
+
+
+class ActiveRun(str, Enum):
+    """Controller-owned run kinds for excavation motion."""
+
+    NONE = "none"
+    MISSION = "mission"
+    JOG = "jog"
 
 
 STATE_TO_STATUS = {
@@ -45,6 +56,7 @@ class ExcavationController(Node):
         super().__init__("excavation_controller")
 
         self.declare_parameter("control_period_s", 0.1)
+        self.declare_parameter("max_jog_duration_s", 2.0)
 
         qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -55,6 +67,9 @@ class ExcavationController(Node):
         self._state = ExcavationState.IDLE
         self._last_fault_code = ExcavationStatus.FAULT_NONE
         self._latest_telemetry = None
+        self._active_run = ActiveRun.NONE
+        self._jog_duration_s = None
+        self._jog_started_at = None
 
         self._command_pub = self.create_publisher(
             ExcavationCommand,
@@ -80,6 +95,11 @@ class ExcavationController(Node):
             "/excavation/clear_fault",
             self._handle_clear_fault,
         )
+        self.create_service(
+            ExcavationJog,
+            "/excavation/jog_forward",
+            self._handle_jog_forward,
+        )
         self._control_timer = self.create_timer(
             float(self.get_parameter("control_period_s").value),
             self._tick,
@@ -101,6 +121,12 @@ class ExcavationController(Node):
         """Transition the controller to a new state."""
         self._state = state
 
+    def _clear_active_run(self):
+        """Clear any latched run mode or jog deadline."""
+        self._active_run = ActiveRun.NONE
+        self._jog_duration_s = None
+        self._jog_started_at = None
+
     def _publish_status(self):
         """Publish the current excavation controller state."""
         msg = ExcavationStatus()
@@ -117,6 +143,7 @@ class ExcavationController(Node):
 
     def _enter_fault(self, fault_code: int):
         """Latch a fault and force a stop command."""
+        self._clear_active_run()
         self._set_state(ExcavationState.FAULT)
         self._last_fault_code = fault_code
         self._publish_command(ExcavationCommand.COMMAND_STOP)
@@ -154,12 +181,15 @@ class ExcavationController(Node):
                 False,
                 f"Excavation start requires READY state, got '{self._state.value}'",
             )
+        self._active_run = ActiveRun.MISSION
+        self._jog_deadline = None
         self._publish_command(ExcavationCommand.COMMAND_START)
         self._set_state(ExcavationState.STARTING)
         return self._trigger_response(True, "Excavation start accepted")
 
     def _handle_stop(self, _request, _response):
         """Request a stop on the excavation subsystem."""
+        self._clear_active_run()
         self._publish_command(ExcavationCommand.COMMAND_STOP)
         if self._state is not ExcavationState.FAULT:
             self._set_state(ExcavationState.STOPPING)
@@ -170,9 +200,53 @@ class ExcavationController(Node):
         if self._state is not ExcavationState.FAULT:
             return self._trigger_response(False, "Excavation controller is not faulted")
         self._publish_command(ExcavationCommand.COMMAND_CLEAR_FAULT)
+        self._clear_active_run()
         self._last_fault_code = ExcavationStatus.FAULT_NONE
         self._set_state(ExcavationState.IDLE)
         return self._trigger_response(True, "Excavation fault cleared")
+
+    def _handle_jog_forward(self, request, _response):
+        """Start one bounded forward jog for bench testing."""
+        max_duration = float(self.get_parameter("max_jog_duration_s").value)
+        duration = float(request.duration_s)
+
+        if self._state is ExcavationState.FAULT:
+            response = ExcavationJog.Response()
+            response.success = False
+            response.message = "Excavation controller faulted"
+            return response
+
+        if self._state is not ExcavationState.READY:
+            response = ExcavationJog.Response()
+            response.success = False
+            response.message = (
+                f"Excavation jog requires READY state, got '{self._state.value}'"
+            )
+            return response
+
+        if (
+            not isfinite(duration)
+            or not isfinite(max_duration)
+            or duration <= 0.0
+            or duration > max_duration
+        ):
+            response = ExcavationJog.Response()
+            response.success = False
+            response.message = (
+                f"Excavation jog duration must be in (0.0, {max_duration}] seconds"
+            )
+            return response
+
+        self._active_run = ActiveRun.JOG
+        self._jog_duration_s = duration
+        self._jog_started_at = None
+        self._publish_command(ExcavationCommand.COMMAND_START)
+        self._set_state(ExcavationState.STARTING)
+
+        response = ExcavationJog.Response()
+        response.success = True
+        response.message = f"Excavation jog accepted for {duration:.2f} seconds"
+        return response
 
     def _tick(self):
         """Advance the excavation controller loop."""
@@ -202,14 +276,28 @@ class ExcavationController(Node):
             and self._latest_telemetry.motor_enabled
         ):
             self._set_state(ExcavationState.EXCAVATING)
+            if self._active_run is ActiveRun.JOG and self._jog_duration_s is not None:
+                self._jog_started_at = monotonic()
         elif (
             self._state is ExcavationState.STOPPING
             and not self._latest_telemetry.motor_enabled
         ):
+            self._clear_active_run()
             if self._latest_telemetry.home_switch:
                 self._set_state(ExcavationState.READY)
             else:
                 self._set_state(ExcavationState.IDLE)
+
+        if (
+            self._state is ExcavationState.EXCAVATING
+            and self._active_run is ActiveRun.JOG
+            and self._jog_duration_s is not None
+            and self._jog_started_at is not None
+            and monotonic() - self._jog_started_at >= self._jog_duration_s
+        ):
+            self._clear_active_run()
+            self._publish_command(ExcavationCommand.COMMAND_STOP)
+            self._set_state(ExcavationState.STOPPING)
 
         self._publish_status()
 

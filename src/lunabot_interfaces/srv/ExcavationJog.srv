@@ -1,0 +1,7 @@
+# Forward-only bounded jog request for bench bringup.
+# This remains controller-owned and does not bypass normal stop or fault handling.
+
+float32 duration_s
+---
+bool success
+string message
