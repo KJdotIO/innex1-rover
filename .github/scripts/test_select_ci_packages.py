@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -24,6 +25,13 @@ def _load_selector_module():
 def main() -> int:
     selector = _load_selector_module()
     package_roots, dependencies = selector._discover_packages()
+
+    ros_ci_scenarios = {
+        "docs_only_skips_ros_ci": (["README.md"], False),
+        "src_change_needs_ros_ci": (["src/lunabot_teleop/config/xbox_teleop.yaml"], True),
+        "workflow_change_needs_ros_ci": ([".github/workflows/ci.yml"], True),
+        "empty_diff_forces_ros_ci": ([], True),
+    }
 
     scenarios = {
         "empty_diff_forces_full": (
@@ -61,6 +69,11 @@ def main() -> int:
     }
 
     failures: list[str] = []
+    for name, (changed_files, expected) in ros_ci_scenarios.items():
+        actual = selector.requires_ros_ci(changed_files)
+        if actual != expected:
+            failures.append(f"{name}: expected {expected}, got {actual}")
+
     for name, (changed_files, expected) in scenarios.items():
         selection = selector._select(changed_files, package_roots, dependencies)
         actual = (selection.mode, selection.packages)
@@ -90,6 +103,44 @@ def main() -> int:
         print("CI package selector regression checks failed:")
         print(f"- invalid_diff_range: expected [], got {invalid_diff}")
         return 1
+
+    with tempfile.NamedTemporaryFile("r+", encoding="utf-8") as handle:
+        old_git_changed_files = selector._git_changed_files
+        old_argv = sys.argv[:]
+        selector._git_changed_files = lambda _base, _head: ["README.md"]
+        sys.argv = [
+            "select_ci_packages.py",
+            "--base-sha",
+            "base",
+            "--head-sha",
+            "head",
+            "--github-output",
+            handle.name,
+        ]
+        try:
+            result = selector.main()
+        finally:
+            selector._git_changed_files = old_git_changed_files
+            sys.argv = old_argv
+
+        if result != 0:
+            print("CI package selector regression checks failed:")
+            print(f"- cli_output: expected exit 0, got {result}")
+            return 1
+
+        output = handle.read()
+        expected_fragments = [
+            "ros_ci=false",
+            "mode=skip",
+            "packages=",
+            "reason=ROS build/test not needed for this change set",
+        ]
+        missing = [fragment for fragment in expected_fragments if fragment not in output]
+        if missing:
+            print("CI package selector regression checks failed:")
+            for fragment in missing:
+                print(f"- cli_output: missing {fragment!r} in {output!r}")
+            return 1
 
     print("CI package selector regression checks passed.")
     return 0
