@@ -1,0 +1,143 @@
+name: Nightly Full CI
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  decide:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+      previous_sha: ${{ steps.decide.outputs.previous_sha }}
+      current_sha: ${{ steps.decide.outputs.current_sha }}
+      previous_started_at: ${{ steps.decide.outputs.previous_started_at }}
+    steps:
+      - name: Decide whether a full run is needed
+        id: decide
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowId = '.github/workflows/nightly-full-ci.yml';
+            const branch = context.ref.replace('refs/heads/', '');
+            const currentSha = context.sha;
+
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflowId,
+              branch,
+              status: 'completed',
+              per_page: 20,
+            });
+
+            const previousRun = data.workflow_runs.find((run) =>
+              run.id !== context.runId && run.conclusion === 'success'
+            );
+
+            const previousSha = previousRun ? previousRun.head_sha : '';
+            const previousStartedAt = previousRun ? previousRun.run_started_at : '';
+
+            let shouldRun = 'true';
+            if (previousSha === currentSha && previousStartedAt) {
+              const ageMs = Date.now() - Date.parse(previousStartedAt);
+              const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+              shouldRun = ageMs >= sevenDaysMs ? 'true' : 'false';
+            }
+
+            core.setOutput('should_run', shouldRun);
+            core.setOutput('previous_sha', previousSha);
+            core.setOutput('current_sha', currentSha);
+            core.setOutput('previous_started_at', previousStartedAt);
+
+            if (shouldRun === 'true') {
+              core.info(
+                `Running full CI for ${branch}: ${previousSha || '<none>'} -> ${currentSha}`
+              );
+            } else {
+              core.info(
+                `Skipping full CI for ${branch}: ${currentSha} was already checked on ${previousStartedAt}`
+              );
+            }
+
+  skip:
+    runs-on: ubuntu-22.04
+    needs: decide
+    if: needs.decide.outputs.should_run != 'true'
+    steps:
+      - name: Report that the full run is already up to date
+        run: |
+          echo "Nightly full CI skipped."
+          echo "Current commit: ${{ needs.decide.outputs.current_sha }}"
+          echo "Last successful nightly/full run already covered this commit."
+          echo "Last successful run started at: ${{ needs.decide.outputs.previous_started_at }}"
+        shell: bash
+
+  full-build-and-test:
+    runs-on: ubuntu-22.04
+    needs: decide
+    if: needs.decide.outputs.should_run == 'true'
+    container:
+      image: ros:humble-ros-base
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        shell: bash
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: nightly-apt-${{ hashFiles('src/**/package.xml') }}
+          restore-keys: nightly-apt-
+
+      - name: Cache colcon workspace
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+            install/
+          key: nightly-colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
+          restore-keys: nightly-colcon-
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y python3-colcon-common-extensions python3-rosdep
+          rosdep init || true
+          rosdep update
+          rosdep install --from-paths src -y --ignore-src
+        shell: bash
+
+      - name: Run preflight checks
+        run: |
+          apt-get update
+          apt-get install -y python3-yaml
+          python3 .github/scripts/run_preflight_checks.py
+          python3 .github/scripts/check_interface_contracts.py
+        shell: bash
+
+      - name: Build
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build
+        shell: bash
+
+      - name: Run tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test
+        shell: bash
+
+      - name: Check test results
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test-result --verbose
+        shell: bash
