@@ -1,6 +1,7 @@
 # Material Handling Interface Notes
 
 This package contains mechanism-agnostic action contracts for excavation and deposition.
+This temporary line exists only to exercise the broad-package CI path on a throwaway branch.
 
 ## Actions
 
