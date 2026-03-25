@@ -48,7 +48,14 @@ Objective: TODO
 
 ## Callout Script: Start of Autonomy Attempt
 
-TODO
+MCC: “Prepare for the start of the autonomy attempt”
+
+Stations: “[Station] Ready”
+
+MCC: “All stations report GO/NO-GO”
+
+MCC: “Starting in 3, 2, 1.. Execute”
+
 
 ## Callout Script: End of Autonomy Attempt (Success/Failure)
 
@@ -56,11 +63,14 @@ Objective: TODO
 
 Success:
 
-TODO
+MCC: “Run complete, confirm rover is safe”
+
+Stations: “[Station] Safe”
+
 
 Failure:
 
-TODO
+MCC: “Run failed, disengage autonomy”
 
 ## Callout Script: Anomaly Detection
 
