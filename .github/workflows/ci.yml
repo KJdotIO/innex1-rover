@@ -80,6 +80,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+      packages: read
     outputs:
       image: ${{ steps.resolve.outputs.image }}
       prebuilt: ${{ steps.resolve.outputs.prebuilt }}
@@ -103,6 +104,8 @@ jobs:
             fi
           fi
 
+          echo "Published ROS CI image lookup failed; using ros:humble-ros-base instead."
+          cat /tmp/ci-image-inspect.err || true
           echo "image=ros:humble-ros-base" >> "$GITHUB_OUTPUT"
           echo "prebuilt=false" >> "$GITHUB_OUTPUT"
           echo "image_reason=Falling back because the published ROS CI image is unavailable" >> "$GITHUB_OUTPUT"
@@ -117,6 +120,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      packages: read
     container:
       image: ${{ needs.resolve-build-image.outputs.image }}
 
