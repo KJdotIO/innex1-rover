@@ -1,6 +1,7 @@
 """Excavation controller skeleton."""
 
 from enum import Enum
+from math import isfinite
 from time import monotonic
 
 import rclpy
@@ -67,7 +68,8 @@ class ExcavationController(Node):
         self._last_fault_code = ExcavationStatus.FAULT_NONE
         self._latest_telemetry = None
         self._active_run = ActiveRun.NONE
-        self._jog_deadline = None
+        self._jog_duration_s = None
+        self._jog_started_at = None
 
         self._command_pub = self.create_publisher(
             ExcavationCommand,
@@ -122,7 +124,8 @@ class ExcavationController(Node):
     def _clear_active_run(self):
         """Clear any latched run mode or jog deadline."""
         self._active_run = ActiveRun.NONE
-        self._jog_deadline = None
+        self._jog_duration_s = None
+        self._jog_started_at = None
 
     def _publish_status(self):
         """Publish the current excavation controller state."""
@@ -221,7 +224,12 @@ class ExcavationController(Node):
             )
             return response
 
-        if duration <= 0.0 or duration > max_duration:
+        if (
+            not isfinite(duration)
+            or not isfinite(max_duration)
+            or duration <= 0.0
+            or duration > max_duration
+        ):
             response = ExcavationJog.Response()
             response.success = False
             response.message = (
@@ -230,7 +238,8 @@ class ExcavationController(Node):
             return response
 
         self._active_run = ActiveRun.JOG
-        self._jog_deadline = monotonic() + duration
+        self._jog_duration_s = duration
+        self._jog_started_at = None
         self._publish_command(ExcavationCommand.COMMAND_START)
         self._set_state(ExcavationState.STARTING)
 
@@ -267,6 +276,8 @@ class ExcavationController(Node):
             and self._latest_telemetry.motor_enabled
         ):
             self._set_state(ExcavationState.EXCAVATING)
+            if self._active_run is ActiveRun.JOG and self._jog_duration_s is not None:
+                self._jog_started_at = monotonic()
         elif (
             self._state is ExcavationState.STOPPING
             and not self._latest_telemetry.motor_enabled
@@ -278,10 +289,11 @@ class ExcavationController(Node):
                 self._set_state(ExcavationState.IDLE)
 
         if (
-            self._state in (ExcavationState.STARTING, ExcavationState.EXCAVATING)
+            self._state is ExcavationState.EXCAVATING
             and self._active_run is ActiveRun.JOG
-            and self._jog_deadline is not None
-            and monotonic() >= self._jog_deadline
+            and self._jog_duration_s is not None
+            and self._jog_started_at is not None
+            and monotonic() - self._jog_started_at >= self._jog_duration_s
         ):
             self._clear_active_run()
             self._publish_command(ExcavationCommand.COMMAND_STOP)

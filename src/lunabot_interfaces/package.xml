@@ -4,7 +4,7 @@
   <name>lunabot_interfaces</name>
   <version>0.1.0</version>
   <description>ROS 2 interface contracts for mission actions and hardware-facing mechanism bridges.</description>
-  <maintainer email="lunabotics@le.ac.uk">Leicester Lunabotics Team</maintainer>
+  <maintainer email="ko129@student.le.ac.uk">Leicester Lunabotics Team</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

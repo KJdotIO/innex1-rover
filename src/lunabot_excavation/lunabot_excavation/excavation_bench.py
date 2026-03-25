@@ -2,6 +2,7 @@
 
 import argparse
 from threading import Event
+from time import monotonic
 
 import rclpy
 from rclpy.node import Node
@@ -89,8 +90,8 @@ class ExcavationBench(Node):
         """Wait for one excavation status message."""
         self._status_event.clear()
         self._status_msg = None
-        end_time = self.get_clock().now().nanoseconds + int(timeout_s * 1e9)
-        while rclpy.ok() and self.get_clock().now().nanoseconds < end_time:
+        end_time = monotonic() + timeout_s
+        while rclpy.ok() and monotonic() < end_time:
             rclpy.spin_once(self, timeout_sec=0.1)
             if self._status_event.is_set():
                 return self._status_msg
@@ -172,6 +173,9 @@ def main(args=None):
             response = node._call_jog(parsed.duration, parsed.timeout)
             print(response.message)
             exit_code = 0 if response.success else 1
+    except RuntimeError as exc:
+        print(f"error: {exc}")
+        exit_code = 1
     finally:
         node.destroy_node()
         rclpy.shutdown()
