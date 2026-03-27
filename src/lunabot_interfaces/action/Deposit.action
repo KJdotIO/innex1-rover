@@ -3,26 +3,34 @@
 uint8 MODE_AUTO=0
 uint8 MODE_TELEOP_ASSIST=1
 
+# Mission intent fields define the desired rover behavior.
 uint8 mode
+#timeout_s <= 0.0 means no deadline
 float64 timeout_s
+
+# Planner hints refine execution, but they are not CAD-style geometry inputs.
 float64 dump_duration_s
 bool require_close_after_dump
 ---
 # Result
 # Result reason codes
 uint8 REASON_SUCCESS=0
+# REASON_TIMEOUT means the goal exceeded its deadline.
 uint8 REASON_TIMEOUT=1
 uint8 REASON_ESTOP=2
 uint8 REASON_DRIVER_FAULT=3
 uint8 REASON_LIMIT_NOT_REACHED=4
 uint8 REASON_INTERLOCK_BLOCKED=5
+# REASON_CANCELED means the client or higher-level controller canceled the goal.
 uint8 REASON_CANCELED=6
 uint8 REASON_FORCED_FAILURE=7
+# REASON_SHUTDOWN means the action server stopped before normal completion.
 uint8 REASON_SHUTDOWN=8
 
 bool success
 uint8 reason_code
 string failure_reason
+# Estimated value; 0.0 means unknown or not measured.
 float32 residual_fill_fraction_estimate
 float64 duration_s
 ---
