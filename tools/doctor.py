@@ -23,6 +23,45 @@ from typing import Callable, List
 
 ROOT = Path(__file__).resolve().parents[1]
 
+REQUIRED_TOPICS = {
+    "/imu/data_raw",
+    "/odom",
+    "/camera_front/image",
+    "/camera_front/camera_info",
+    "/ouster/points",
+    "/map",
+    "/odometry/local",
+    "/tf",
+    "/tf_static",
+}
+
+REQUIRED_NODES = {
+    "/apriltag",
+    "/bt_navigator",
+    "/controller_server",
+    "/ekf_filter_node_map",
+    "/map_server",
+    "/planner_server",
+    "/tag_pose_publisher",
+}
+
+REQUIRED_ACTIONS = {
+    "/navigate_to_pose",
+}
+
+REQUIRED_TF_LINKS = [
+    ("map", "odom"),
+    ("odom", "base_footprint"),
+    ("base_footprint", "base_link"),
+    ("base_link", "ouster_link"),
+]
+
+RUNTIME_MARKERS = {
+    "/bt_navigator",
+    "/planner_server",
+    "/controller_server",
+}
+
 
 @dataclass
 class CheckResult:
@@ -124,19 +163,7 @@ def check_required_topics() -> CheckResult:
         )
 
     seen = set(t.strip() for t in proc.stdout.splitlines() if t.strip())
-    required = {
-        "/camera_front/points",
-        "/tf",
-        "/tf_static",
-        "/imu/data_raw",
-        "/odom",
-        "/camera_front/image",
-        "/camera_front/camera_info",
-        "/ouster/points",
-        "/map",
-        "/odometry/local"
-    }
-    missing = sorted(required - seen)
+    missing = sorted(REQUIRED_TOPICS - seen)
     if not missing:
         return CheckResult("PASS", "Required topics", "All required topics found")
     return CheckResult(
@@ -185,6 +212,70 @@ def check_nav2_lifecycle() -> CheckResult:
     )
 
 
+
+
+def check_required_nodes() -> CheckResult:
+    proc = run_cmd(["ros2", "node", "list"], timeout=8)
+    if proc.returncode != 0:
+        return CheckResult(
+            "WARN",
+            "Required nodes",
+            "Skipped: unable to query ROS nodes",
+            "Run after launching navigation stack.",
+        )
+
+    seen = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
+    missing = sorted(REQUIRED_NODES - seen)
+    if not missing:
+        return CheckResult("PASS", "Required nodes", "All required nodes found")
+    return CheckResult(
+        "WARN",
+        "Required nodes",
+        f"Missing nodes: {', '.join(missing)}",
+        "Check bringup launch and crashed nodes before mission run.",
+    )
+
+
+def check_required_actions() -> CheckResult:
+    proc = run_cmd(["ros2", "action", "list"], timeout=8)
+    if proc.returncode != 0:
+        return CheckResult(
+            "WARN",
+            "Required actions",
+            "Skipped: unable to query ROS actions",
+            "Run after launching navigation stack.",
+        )
+
+    seen = set(a.strip() for a in proc.stdout.splitlines() if a.strip())
+    missing = sorted(REQUIRED_ACTIONS - seen)
+    if not missing:
+        return CheckResult("PASS", "Required actions", "All required actions found")
+    return CheckResult(
+        "WARN",
+        "Required actions",
+        f"Missing actions: {', '.join(missing)}",
+        "Check Nav2/action server startup before mission run.",
+    )
+
+
+def check_required_tf_links() -> CheckResult:
+    missing = []
+    for parent, child in REQUIRED_TF_LINKS:
+        proc = run_cmd(["ros2", "run", "tf2_ros", "tf2_echo", parent, child], timeout=4)
+        output = f"{proc.stdout}\n{proc.stderr}".lower()
+        if not any(token in output for token in ["translation:", "rotation:", "at time"]):
+            missing.append(f"{parent}->{child}")
+
+    if not missing:
+        return CheckResult("PASS", "Required TF links", "All required TF links resolved")
+    return CheckResult(
+        "WARN",
+        "Required TF links",
+        f"Missing TF links: {', '.join(missing)}",
+        "Check localisation, robot_state_publisher, and frame names before mission run.",
+    )
+
+
 def run_checks(checks: List[Callable[[], CheckResult]]) -> List[CheckResult]:
     results: List[CheckResult] = []
     for check in checks:
@@ -229,12 +320,7 @@ def should_run_runtime_checks() -> bool:
         return False
 
     nodes = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
-    runtime_markers = {
-        "/bt_navigator",
-        "/planner_server",
-        "/controller_server",
-    }
-    return any(marker in nodes for marker in runtime_markers)
+    return any(marker in nodes for marker in RUNTIME_MARKERS)
 
 
 def main() -> int:
@@ -271,6 +357,9 @@ def main() -> int:
     runtime_checks: List[Callable[[], CheckResult]] = [
         check_ros_graph_available,
         check_required_topics,
+        check_required_nodes,
+        check_required_actions,
+        check_required_tf_links,
         check_nav2_lifecycle,
     ]
 
