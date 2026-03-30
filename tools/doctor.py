@@ -125,11 +125,16 @@ def check_required_topics() -> CheckResult:
 
     seen = set(t.strip() for t in proc.stdout.splitlines() if t.strip())
     required = {
-        "/odometry/filtered",
-        "/hazards/front",
         "/camera_front/points",
         "/tf",
         "/tf_static",
+        "/imu/data_raw",
+        "/odom",
+        "/camera_front/image",
+        "/camera_front/camera_info",
+        "/ouster/points",
+        "/map",
+        "/odometry/local"
     }
     missing = sorted(required - seen)
     if not missing:
@@ -228,7 +233,6 @@ def should_run_runtime_checks() -> bool:
         "/bt_navigator",
         "/planner_server",
         "/controller_server",
-        "/hazard_detection",
     }
     return any(marker in nodes for marker in runtime_markers)
 
