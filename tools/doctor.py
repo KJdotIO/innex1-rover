@@ -19,9 +19,12 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List
-
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+PREFLIGHT_CONFIG_PATH = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
+_PREFLIGHT_CACHE = None
+_PREFLIGHT_ERROR = None
 
 
 @dataclass
@@ -32,6 +35,80 @@ class CheckResult:
     suggestion: str = ""
 
 
+def _coerce_output(value: str | bytes | None) -> str:
+    """Normalize subprocess output to text.
+
+    `TimeoutExpired.stdout` / `.stderr` may still be bytes even when the
+    original subprocess was launched with `text=True`.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _load_preflight_config():
+    global _PREFLIGHT_CACHE, _PREFLIGHT_ERROR
+    if _PREFLIGHT_CACHE is not None or _PREFLIGHT_ERROR is not None:
+        return _PREFLIGHT_CACHE, _PREFLIGHT_ERROR
+
+    try:
+        data = yaml.safe_load(PREFLIGHT_CONFIG_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("preflight"), dict):
+            raise ValueError("missing top-level 'preflight' mapping")
+        _PREFLIGHT_CACHE = data["preflight"]
+        return _PREFLIGHT_CACHE, None
+    except Exception as exc:  # pylint: disable=broad-except
+        _PREFLIGHT_ERROR = str(exc)
+        return None, _PREFLIGHT_ERROR
+
+
+def _preflight_error_result(name: str) -> CheckResult:
+    _config, error = _load_preflight_config()
+    return CheckResult(
+        "WARN",
+        name,
+        f"Skipped: could not load {PREFLIGHT_CONFIG_PATH.name} ({error})",
+        "Fix the preflight config or doctor will drift from the real readiness checks.",
+    )
+
+
+def _configured_required_names(section: str, field: str = "name") -> set[str] | None:
+    config, error = _load_preflight_config()
+    if error is not None:
+        return None
+
+    names = set()
+    for item in config.get(section, []):
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get("critical", True)):
+            continue
+        value = item.get(field)
+        if value:
+            names.add(str(value))
+    return names
+
+
+def _configured_required_tf_links() -> list[tuple[str, str]] | None:
+    config, error = _load_preflight_config()
+    if error is not None:
+        return None
+
+    links = []
+    for item in config.get("required_tf_links", []):
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get("critical", True)):
+            continue
+        parent = item.get("parent")
+        child = item.get("child")
+        if parent and child:
+            links.append((str(parent), str(child)))
+    return links
+
+
 def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -39,8 +116,8 @@ def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
         return subprocess.CompletedProcess(
             cmd,
             returncode=124,
-            stdout=exc.stdout or "",
-            stderr=(exc.stderr or "") + "\ncommand timed out",
+            stdout=_coerce_output(exc.stdout),
+            stderr=_coerce_output(exc.stderr) + "\ncommand timed out",
         )
 
 
@@ -123,15 +200,12 @@ def check_required_topics() -> CheckResult:
             "Run after launching navigation stack.",
         )
 
+    required_topics = _configured_required_names("required_topics")
+    if required_topics is None:
+        return _preflight_error_result("Required topics")
+
     seen = set(t.strip() for t in proc.stdout.splitlines() if t.strip())
-    required = {
-        "/odometry/filtered",
-        "/hazards/front",
-        "/camera_front/points",
-        "/tf",
-        "/tf_static",
-    }
-    missing = sorted(required - seen)
+    missing = sorted(required_topics - seen)
     if not missing:
         return CheckResult("PASS", "Required topics", "All required topics found")
     return CheckResult(
@@ -180,6 +254,82 @@ def check_nav2_lifecycle() -> CheckResult:
     )
 
 
+
+
+def check_required_nodes() -> CheckResult:
+    proc = run_cmd(["ros2", "node", "list"], timeout=8)
+    if proc.returncode != 0:
+        return CheckResult(
+            "WARN",
+            "Required nodes",
+            "Skipped: unable to query ROS nodes",
+            "Run after launching navigation stack.",
+        )
+
+    required_nodes = _configured_required_names("required_nodes")
+    if required_nodes is None:
+        return _preflight_error_result("Required nodes")
+
+    seen = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
+    missing = sorted(required_nodes - seen)
+    if not missing:
+        return CheckResult("PASS", "Required nodes", "All required nodes found")
+    return CheckResult(
+        "WARN",
+        "Required nodes",
+        f"Missing nodes: {', '.join(missing)}",
+        "Check bringup launch and crashed nodes before mission run.",
+    )
+
+
+def check_required_actions() -> CheckResult:
+    proc = run_cmd(["ros2", "action", "list"], timeout=8)
+    if proc.returncode != 0:
+        return CheckResult(
+            "WARN",
+            "Required actions",
+            "Skipped: unable to query ROS actions",
+            "Run after launching navigation stack.",
+        )
+
+    required_actions = _configured_required_names("required_actions")
+    if required_actions is None:
+        return _preflight_error_result("Required actions")
+
+    seen = set(a.strip() for a in proc.stdout.splitlines() if a.strip())
+    missing = sorted(required_actions - seen)
+    if not missing:
+        return CheckResult("PASS", "Required actions", "All required actions found")
+    return CheckResult(
+        "WARN",
+        "Required actions",
+        f"Missing actions: {', '.join(missing)}",
+        "Check Nav2/action server startup before mission run.",
+    )
+
+
+def check_required_tf_links() -> CheckResult:
+    required_links = _configured_required_tf_links()
+    if required_links is None:
+        return _preflight_error_result("Required TF links")
+
+    missing = []
+    for parent, child in required_links:
+        proc = run_cmd(["ros2", "run", "tf2_ros", "tf2_echo", parent, child], timeout=4)
+        output = f"{proc.stdout}\n{proc.stderr}".lower()
+        if not any(token in output for token in ["translation:", "rotation:", "at time"]):
+            missing.append(f"{parent}->{child}")
+
+    if not missing:
+        return CheckResult("PASS", "Required TF links", "All required TF links resolved")
+    return CheckResult(
+        "WARN",
+        "Required TF links",
+        f"Missing TF links: {', '.join(missing)}",
+        "Check localisation, robot_state_publisher, and frame names before mission run.",
+    )
+
+
 def run_checks(checks: List[Callable[[], CheckResult]]) -> List[CheckResult]:
     results: List[CheckResult] = []
     for check in checks:
@@ -223,13 +373,11 @@ def should_run_runtime_checks() -> bool:
     if proc.returncode != 0:
         return False
 
+    runtime_markers = _configured_required_names("required_nodes")
+    if runtime_markers is None:
+        return False
+
     nodes = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
-    runtime_markers = {
-        "/bt_navigator",
-        "/planner_server",
-        "/controller_server",
-        "/hazard_detection",
-    }
     return any(marker in nodes for marker in runtime_markers)
 
 
@@ -258,6 +406,10 @@ def main() -> int:
             "Mission BT XML",
         ),
         lambda: check_path_exists(
+            PREFLIGHT_CONFIG_PATH,
+            "Preflight config",
+        ),
+        lambda: check_path_exists(
             ROOT / ".github/contracts/interface_contracts.json",
             "Interface contracts JSON",
         ),
@@ -267,6 +419,9 @@ def main() -> int:
     runtime_checks: List[Callable[[], CheckResult]] = [
         check_ros_graph_available,
         check_required_topics,
+        check_required_nodes,
+        check_required_actions,
+        check_required_tf_links,
         check_nav2_lifecycle,
     ]
 
