@@ -19,48 +19,12 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List
-
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-
-REQUIRED_TOPICS = {
-    "/imu/data_raw",
-    "/odom",
-    "/camera_front/image",
-    "/camera_front/camera_info",
-    "/ouster/points",
-    "/map",
-    "/odometry/local",
-    "/tf",
-    "/tf_static",
-}
-
-REQUIRED_NODES = {
-    "/apriltag",
-    "/bt_navigator",
-    "/controller_server",
-    "/ekf_filter_node_map",
-    "/map_server",
-    "/planner_server",
-    "/tag_pose_publisher",
-}
-
-REQUIRED_ACTIONS = {
-    "/navigate_to_pose",
-}
-
-REQUIRED_TF_LINKS = [
-    ("map", "odom"),
-    ("odom", "base_footprint"),
-    ("base_footprint", "base_link"),
-    ("base_link", "ouster_link"),
-]
-
-RUNTIME_MARKERS = {
-    "/bt_navigator",
-    "/planner_server",
-    "/controller_server",
-}
+PREFLIGHT_CONFIG_PATH = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
+_PREFLIGHT_CACHE = None
+_PREFLIGHT_ERROR = None
 
 
 @dataclass
@@ -69,6 +33,67 @@ class CheckResult:
     name: str
     detail: str
     suggestion: str = ""
+
+
+def _load_preflight_config():
+    global _PREFLIGHT_CACHE, _PREFLIGHT_ERROR
+    if _PREFLIGHT_CACHE is not None or _PREFLIGHT_ERROR is not None:
+        return _PREFLIGHT_CACHE, _PREFLIGHT_ERROR
+
+    try:
+        data = yaml.safe_load(PREFLIGHT_CONFIG_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("preflight"), dict):
+            raise ValueError("missing top-level 'preflight' mapping")
+        _PREFLIGHT_CACHE = data["preflight"]
+        return _PREFLIGHT_CACHE, None
+    except Exception as exc:  # pylint: disable=broad-except
+        _PREFLIGHT_ERROR = str(exc)
+        return None, _PREFLIGHT_ERROR
+
+
+def _preflight_error_result(name: str) -> CheckResult:
+    _config, error = _load_preflight_config()
+    return CheckResult(
+        "WARN",
+        name,
+        f"Skipped: could not load {PREFLIGHT_CONFIG_PATH.name} ({error})",
+        "Fix the preflight config or doctor will drift from the real readiness checks.",
+    )
+
+
+def _configured_required_names(section: str, field: str = "name") -> set[str] | None:
+    config, error = _load_preflight_config()
+    if error is not None:
+        return None
+
+    names = set()
+    for item in config.get(section, []):
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get("critical", True)):
+            continue
+        value = item.get(field)
+        if value:
+            names.add(str(value))
+    return names
+
+
+def _configured_required_tf_links() -> list[tuple[str, str]] | None:
+    config, error = _load_preflight_config()
+    if error is not None:
+        return None
+
+    links = []
+    for item in config.get("required_tf_links", []):
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get("critical", True)):
+            continue
+        parent = item.get("parent")
+        child = item.get("child")
+        if parent and child:
+            links.append((str(parent), str(child)))
+    return links
 
 
 def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
@@ -162,8 +187,12 @@ def check_required_topics() -> CheckResult:
             "Run after launching navigation stack.",
         )
 
+    required_topics = _configured_required_names("required_topics")
+    if required_topics is None:
+        return _preflight_error_result("Required topics")
+
     seen = set(t.strip() for t in proc.stdout.splitlines() if t.strip())
-    missing = sorted(REQUIRED_TOPICS - seen)
+    missing = sorted(required_topics - seen)
     if not missing:
         return CheckResult("PASS", "Required topics", "All required topics found")
     return CheckResult(
@@ -224,8 +253,12 @@ def check_required_nodes() -> CheckResult:
             "Run after launching navigation stack.",
         )
 
+    required_nodes = _configured_required_names("required_nodes")
+    if required_nodes is None:
+        return _preflight_error_result("Required nodes")
+
     seen = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
-    missing = sorted(REQUIRED_NODES - seen)
+    missing = sorted(required_nodes - seen)
     if not missing:
         return CheckResult("PASS", "Required nodes", "All required nodes found")
     return CheckResult(
@@ -246,8 +279,12 @@ def check_required_actions() -> CheckResult:
             "Run after launching navigation stack.",
         )
 
+    required_actions = _configured_required_names("required_actions")
+    if required_actions is None:
+        return _preflight_error_result("Required actions")
+
     seen = set(a.strip() for a in proc.stdout.splitlines() if a.strip())
-    missing = sorted(REQUIRED_ACTIONS - seen)
+    missing = sorted(required_actions - seen)
     if not missing:
         return CheckResult("PASS", "Required actions", "All required actions found")
     return CheckResult(
@@ -259,8 +296,12 @@ def check_required_actions() -> CheckResult:
 
 
 def check_required_tf_links() -> CheckResult:
+    required_links = _configured_required_tf_links()
+    if required_links is None:
+        return _preflight_error_result("Required TF links")
+
     missing = []
-    for parent, child in REQUIRED_TF_LINKS:
+    for parent, child in required_links:
         proc = run_cmd(["ros2", "run", "tf2_ros", "tf2_echo", parent, child], timeout=4)
         output = f"{proc.stdout}\n{proc.stderr}".lower()
         if not any(token in output for token in ["translation:", "rotation:", "at time"]):
@@ -319,8 +360,12 @@ def should_run_runtime_checks() -> bool:
     if proc.returncode != 0:
         return False
 
+    runtime_markers = _configured_required_names("required_nodes")
+    if runtime_markers is None:
+        return False
+
     nodes = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
-    return any(marker in nodes for marker in RUNTIME_MARKERS)
+    return any(marker in nodes for marker in runtime_markers)
 
 
 def main() -> int:
@@ -346,6 +391,10 @@ def main() -> int:
         lambda: check_path_exists(
             ROOT / "src/lunabot_navigation/behavior_trees/mission_navigate_to_pose_bt.xml",
             "Mission BT XML",
+        ),
+        lambda: check_path_exists(
+            PREFLIGHT_CONFIG_PATH,
+            "Preflight config",
         ),
         lambda: check_path_exists(
             ROOT / ".github/contracts/interface_contracts.json",
