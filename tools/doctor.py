@@ -35,6 +35,19 @@ class CheckResult:
     suggestion: str = ""
 
 
+def _coerce_output(value: str | bytes | None) -> str:
+    """Normalize subprocess output to text.
+
+    `TimeoutExpired.stdout` / `.stderr` may still be bytes even when the
+    original subprocess was launched with `text=True`.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
 def _load_preflight_config():
     global _PREFLIGHT_CACHE, _PREFLIGHT_ERROR
     if _PREFLIGHT_CACHE is not None or _PREFLIGHT_ERROR is not None:
@@ -103,8 +116,8 @@ def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
         return subprocess.CompletedProcess(
             cmd,
             returncode=124,
-            stdout=exc.stdout or "",
-            stderr=(exc.stderr or "") + "\ncommand timed out",
+            stdout=_coerce_output(exc.stdout),
+            stderr=_coerce_output(exc.stderr) + "\ncommand timed out",
         )
 
 
