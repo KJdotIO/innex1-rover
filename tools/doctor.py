@@ -67,16 +67,27 @@ def _load_preflight_config():
 
 def _validate_preflight_config(config: dict) -> None:
     """Validate the doctor-facing preflight config shape."""
-    list_sections = (
-        "required_topics",
-        "required_nodes",
-        "required_actions",
-        "required_tf_links",
-    )
-    for section in list_sections:
-        section_items = config.get(section, [])
+    required_sections = {
+        "required_topics": {"name"},
+        "required_nodes": {"name"},
+        "required_actions": {"name"},
+        "required_tf_links": {"parent", "child"},
+    }
+    for section, required_keys in required_sections.items():
+        if section not in config:
+            raise ValueError(f"missing preflight.{section}")
+        section_items = config[section]
         if not isinstance(section_items, list):
-            raise ValueError(f"preflight.{section} must be a list")
+             raise ValueError(f"preflight.{section} must be a list")
+        for index, item in enumerate(section_items):
+            if not isinstance(item, dict):
+                raise ValueError(f"preflight.{section}[{index}] must be a mapping")
+            missing_keys = required_keys - item.keys()
+            if missing_keys:
+                missing = ", ".join(sorted(missing_keys))
+                raise ValueError(
+                    f"preflight.{section}[{index}] missing keys: {missing}"
+                )
 
 
 def _preflight_error_result(name: str) -> CheckResult:
