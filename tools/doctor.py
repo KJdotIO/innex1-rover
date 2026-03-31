@@ -255,8 +255,9 @@ def check_required_topics() -> CheckResult:
     required_topics = _configured_required_names("required_topics")
     if required_topics is None:
         return _preflight_error_result("Required topics")
+    required_topics = {_normalize_ros_name(name) for name in required_topics}
 
-    seen = set(t.strip() for t in proc.stdout.splitlines() if t.strip())
+    seen = set(_normalize_ros_name(t) for t in proc.stdout.splitlines() if t.strip())
     missing = sorted(required_topics - seen)
     if not missing:
         return CheckResult("PASS", "Required topics", "All required topics found")
@@ -356,8 +357,9 @@ def check_required_actions() -> CheckResult:
     required_actions = _configured_required_names("required_actions")
     if required_actions is None:
         return _preflight_error_result("Required actions")
+    required_actions = {_normalize_ros_name(name) for name in required_actions}
 
-    seen = set(a.strip() for a in proc.stdout.splitlines() if a.strip())
+    seen = set(_normalize_ros_name(a) for a in proc.stdout.splitlines() if a.strip())
     missing = sorted(required_actions - seen)
     if not missing:
         return CheckResult("PASS", "Required actions", "All required actions found")
