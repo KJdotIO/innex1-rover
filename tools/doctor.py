@@ -57,10 +57,13 @@ def _load_preflight_config():
         data = yaml.safe_load(PREFLIGHT_CONFIG_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or not isinstance(data.get("preflight"), dict):
             raise ValueError("missing top-level 'preflight' mapping")
-        _PREFLIGHT_CACHE = data["preflight"]
-        _validate_preflight_config(_PREFLIGHT_CACHE)
+        preflight = data["preflight"]
+        _validate_preflight_config(preflight)
+        PREFLIGHT_CACHE = preflight
+
         return _PREFLIGHT_CACHE, None
     except Exception as exc:  # pylint: disable=broad-except
+        _PREFLIGHT_CACHE = None
         _PREFLIGHT_ERROR = str(exc)
         return None, _PREFLIGHT_ERROR
 
@@ -218,8 +221,10 @@ def check_open3d_available() -> CheckResult:
 
 
 def check_preflight_config_load() -> CheckResult:
-    """Verify that the preflight config exists and can be parsed into the expected shape."""
-    _config, error = _load_preflight_config()
+    """Preflight config load check.
+    Verify the preflight config exists and matches the expected schema.
+    """
+    config, error = _load_preflight_config()
     if error is None:
         return CheckResult("PASS", "Preflight config load", f"Loaded {PREFLIGHT_CONFIG_PATH.name}")
     return CheckResult(
