@@ -59,7 +59,7 @@ def _load_preflight_config():
             raise ValueError("missing top-level 'preflight' mapping")
         preflight = data["preflight"]
         _validate_preflight_config(preflight)
-        PREFLIGHT_CACHE = preflight
+        _PREFLIGHT_CACHE = preflight
 
         return _PREFLIGHT_CACHE, None
     except Exception as exc:  # pylint: disable=broad-except
@@ -224,7 +224,7 @@ def check_preflight_config_load() -> CheckResult:
     """Preflight config load check.
     Verify the preflight config exists and matches the expected schema.
     """
-    config, error = _load_preflight_config()
+    _, error = _load_preflight_config()
     if error is None:
         return CheckResult("PASS", "Preflight config load", f"Loaded {PREFLIGHT_CONFIG_PATH.name}")
     return CheckResult(
