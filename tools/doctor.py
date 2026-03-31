@@ -57,11 +57,40 @@ def _load_preflight_config():
         data = yaml.safe_load(PREFLIGHT_CONFIG_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or not isinstance(data.get("preflight"), dict):
             raise ValueError("missing top-level 'preflight' mapping")
-        _PREFLIGHT_CACHE = data["preflight"]
+        preflight = data["preflight"]
+        _validate_preflight_config(preflight)
+        _PREFLIGHT_CACHE = preflight
+
         return _PREFLIGHT_CACHE, None
     except Exception as exc:  # pylint: disable=broad-except
+        _PREFLIGHT_CACHE = None
         _PREFLIGHT_ERROR = str(exc)
         return None, _PREFLIGHT_ERROR
+
+
+def _validate_preflight_config(config: dict) -> None:
+    """Validate the doctor-facing preflight config shape."""
+    required_sections = {
+        "required_topics": {"name"},
+        "required_nodes": {"name"},
+        "required_actions": {"name"},
+        "required_tf_links": {"parent", "child"},
+    }
+    for section, required_keys in required_sections.items():
+        if section not in config:
+            raise ValueError(f"missing preflight.{section}")
+        section_items = config[section]
+        if not isinstance(section_items, list):
+             raise ValueError(f"preflight.{section} must be a list")
+        for index, item in enumerate(section_items):
+            if not isinstance(item, dict):
+                raise ValueError(f"preflight.{section}[{index}] must be a mapping")
+            missing_keys = required_keys - item.keys()
+            if missing_keys:
+                missing = ", ".join(sorted(missing_keys))
+                raise ValueError(
+                    f"preflight.{section}[{index}] missing keys: {missing}"
+                )
 
 
 def _preflight_error_result(name: str) -> CheckResult:
@@ -79,8 +108,12 @@ def _configured_required_names(section: str, field: str = "name") -> set[str] | 
     if error is not None:
         return None
 
+    section_items = config.get(section, [])
+    if not isinstance(section_items, list):
+        return None
+
     names = set()
-    for item in config.get(section, []):
+    for item in section_items:
         if not isinstance(item, dict):
             continue
         if not bool(item.get("critical", True)):
@@ -96,8 +129,12 @@ def _configured_required_tf_links() -> list[tuple[str, str]] | None:
     if error is not None:
         return None
 
+    section_items = config.get("required_tf_links", [])
+    if not isinstance(section_items, list):
+        return None
+
     links = []
-    for item in config.get("required_tf_links", []):
+    for item in section_items:
         if not isinstance(item, dict):
             continue
         if not bool(item.get("critical", True)):
@@ -107,6 +144,11 @@ def _configured_required_tf_links() -> list[tuple[str, str]] | None:
         if parent and child:
             links.append((str(parent), str(child)))
     return links
+
+
+def _normalize_ros_name(name: str) -> str:
+    """Normalize ROS graph names so config and CLI output compare consistently."""
+    return name.strip().lstrip("/")
 
 
 def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
@@ -178,6 +220,21 @@ def check_open3d_available() -> CheckResult:
     )
 
 
+def check_preflight_config_load() -> CheckResult:
+    """Preflight config load check.
+    Verify the preflight config exists and matches the expected schema.
+    """
+    _, error = _load_preflight_config()
+    if error is None:
+        return CheckResult("PASS", "Preflight config load", f"Loaded {PREFLIGHT_CONFIG_PATH.name}")
+    return CheckResult(
+        "FAIL",
+        "Preflight config load",
+        f"Could not load {PREFLIGHT_CONFIG_PATH.name}: {error}",
+        "Fix the preflight config schema or syntax before relying on doctor results.",
+    )
+
+
 def check_ros_graph_available() -> CheckResult:
     proc = run_cmd(["ros2", "topic", "list"], timeout=8)
     if proc.returncode == 0:
@@ -203,8 +260,9 @@ def check_required_topics() -> CheckResult:
     required_topics = _configured_required_names("required_topics")
     if required_topics is None:
         return _preflight_error_result("Required topics")
+    required_topics = {_normalize_ros_name(name) for name in required_topics}
 
-    seen = set(t.strip() for t in proc.stdout.splitlines() if t.strip())
+    seen = set(_normalize_ros_name(t) for t in proc.stdout.splitlines() if t.strip())
     missing = sorted(required_topics - seen)
     if not missing:
         return CheckResult("PASS", "Required topics", "All required topics found")
@@ -257,6 +315,10 @@ def check_nav2_lifecycle() -> CheckResult:
 
 
 def check_required_nodes() -> CheckResult:
+    """Check required nodes.
+
+    Verify that all critical configured nodes are present in the ROS graph.
+    """
     proc = run_cmd(["ros2", "node", "list"], timeout=8)
     if proc.returncode != 0:
         return CheckResult(
@@ -269,8 +331,9 @@ def check_required_nodes() -> CheckResult:
     required_nodes = _configured_required_names("required_nodes")
     if required_nodes is None:
         return _preflight_error_result("Required nodes")
+    required_nodes = {_normalize_ros_name(name) for name in required_nodes}
 
-    seen = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
+    seen = set(_normalize_ros_name(n) for n in proc.stdout.splitlines() if n.strip())
     missing = sorted(required_nodes - seen)
     if not missing:
         return CheckResult("PASS", "Required nodes", "All required nodes found")
@@ -283,6 +346,10 @@ def check_required_nodes() -> CheckResult:
 
 
 def check_required_actions() -> CheckResult:
+    """Check required actions.
+
+    Verify that all critical configured action servers are currently available.
+    """
     proc = run_cmd(["ros2", "action", "list"], timeout=8)
     if proc.returncode != 0:
         return CheckResult(
@@ -295,8 +362,9 @@ def check_required_actions() -> CheckResult:
     required_actions = _configured_required_names("required_actions")
     if required_actions is None:
         return _preflight_error_result("Required actions")
+    required_actions = {_normalize_ros_name(name) for name in required_actions}
 
-    seen = set(a.strip() for a in proc.stdout.splitlines() if a.strip())
+    seen = set(_normalize_ros_name(a) for a in proc.stdout.splitlines() if a.strip())
     missing = sorted(required_actions - seen)
     if not missing:
         return CheckResult("PASS", "Required actions", "All required actions found")
@@ -309,6 +377,10 @@ def check_required_actions() -> CheckResult:
 
 
 def check_required_tf_links() -> CheckResult:
+    """Check required TF links.
+
+    Verify that all critical configured TF parent-child links can be resolved.
+    """
     required_links = _configured_required_tf_links()
     if required_links is None:
         return _preflight_error_result("Required TF links")
@@ -363,7 +435,7 @@ def final_exit_code(results: List[CheckResult]) -> int:
     return 0
 
 
-def should_run_runtime_checks() -> bool:
+def should_run_runtime_checks() -> tuple[bool, CheckResult | None]:
     """Decide whether runtime checks are meaningful right now.
 
     Runtime checks are intended for a launched stack. If nothing relevant is up,
@@ -371,14 +443,15 @@ def should_run_runtime_checks() -> bool:
     """
     proc = run_cmd(["ros2", "node", "list"], timeout=8)
     if proc.returncode != 0:
-        return False
+        return False, None
 
     runtime_markers = _configured_required_names("required_nodes")
     if runtime_markers is None:
-        return False
+        return False, _preflight_error_result("Runtime checks")
+    runtime_markers = {_normalize_ros_name(name) for name in runtime_markers}
 
-    nodes = set(n.strip() for n in proc.stdout.splitlines() if n.strip())
-    return any(marker in nodes for marker in runtime_markers)
+    nodes = set(_normalize_ros_name(n) for n in proc.stdout.splitlines() if n.strip())
+    return any(marker in nodes for marker in runtime_markers), None
 
 
 def main() -> int:
@@ -409,6 +482,7 @@ def main() -> int:
             PREFLIGHT_CONFIG_PATH,
             "Preflight config",
         ),
+        check_preflight_config_load,
         lambda: check_path_exists(
             ROOT / ".github/contracts/interface_contracts.json",
             "Interface contracts JSON",
@@ -417,6 +491,7 @@ def main() -> int:
     ]
 
     runtime_checks: List[Callable[[], CheckResult]] = [
+        check_preflight_config_load,
         check_ros_graph_available,
         check_required_topics,
         check_required_nodes,
@@ -437,10 +512,14 @@ def main() -> int:
         print_results(runtime_results, "Runtime checks")
         all_results.extend(runtime_results)
     elif args.mode == "all":
-        if should_run_runtime_checks():
+        should_run, runtime_skip_result = should_run_runtime_checks()
+        if should_run:
             runtime_results = run_checks(runtime_checks)
             print_results(runtime_results, "Runtime checks")
             all_results.extend(runtime_results)
+        elif runtime_skip_result is not None:
+            print_results([runtime_skip_result], "Runtime checks")
+            all_results.append(runtime_skip_result)
         else:
             skip_msg = CheckResult(
                 "PASS",
