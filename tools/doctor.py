@@ -473,6 +473,7 @@ def main() -> int:
     ]
 
     runtime_checks: List[Callable[[], CheckResult]] = [
+        check_preflight_config_load,
         check_ros_graph_available,
         check_required_topics,
         check_required_nodes,
