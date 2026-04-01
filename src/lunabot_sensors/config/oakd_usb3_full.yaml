@@ -1,0 +1,19 @@
+/**:
+  ros__parameters:
+    i_usb_speed: SUPER
+    driver:
+      i_publish_tf_from_calibration: false
+    pipeline_gen:
+      i_pipeline_type: RGBD
+      i_enable_imu: false
+      i_enable_sync: true
+      i_nn_type: none
+    rgb:
+      i_resolution: 720P
+      i_enable_lazy_publisher: false
+      i_synced: true
+    stereo:
+      i_enable_lazy_publisher: false
+      i_synced: true
+    pointcloud:
+      enable: true

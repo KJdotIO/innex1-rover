@@ -1,0 +1,65 @@
+preflight:
+  use_interface_contracts: true
+  use_sim_time: false
+
+  sim_time:
+    enabled: false
+    critical: false
+    timeout_s: 0.0
+    min_delta_s: 0.0
+
+  topic_message_timeout_s: 5.0
+  tf_timeout_s: 5.0
+  action_timeout_s: 5.0
+  node_timeout_s: 5.0
+
+  required_topics:
+    - name: /odom
+      type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: true
+    - name: /imu/data_raw
+      type: sensor_msgs/msg/Imu
+      min_messages: 1
+      critical: true
+    - name: /camera_front/image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: true
+    - name: /camera_front/camera_info
+      type: sensor_msgs/msg/CameraInfo
+      min_messages: 1
+      critical: true
+    - name: /camera_front/depth_image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: false
+    - name: /camera_front/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: false
+
+  required_tf_links:
+    - parent: base_footprint
+      child: base_link
+      critical: true
+    - parent: base_link
+      child: camera_front_link
+      critical: true
+    - parent: camera_front_link
+      child: camera_front_optical_frame
+      critical: true
+
+  required_actions: []
+
+  required_nodes:
+    - name: camera_contract_adapter
+      critical: true
+    - name: apriltag
+      critical: true
+    - name: ekf_filter_node_map
+      critical: true
+    - name: ekf_filter_node_odom
+      critical: true
+    - name: tag_pose_publisher
+      critical: true

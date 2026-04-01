@@ -1,0 +1,11 @@
+/**:
+  ros__parameters:
+    i_usb_speed: HIGH
+    driver:
+      i_publish_tf_from_calibration: false
+    pipeline_gen:
+      i_pipeline_type: RGB
+      i_enable_imu: false
+      i_nn_type: none
+    rgb:
+      i_enable_lazy_publisher: false

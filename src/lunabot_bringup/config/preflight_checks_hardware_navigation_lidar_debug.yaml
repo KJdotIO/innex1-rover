@@ -1,12 +1,12 @@
 preflight:
   use_interface_contracts: true
-  use_sim_time: true
+  use_sim_time: false
 
   sim_time:
-    enabled: true
-    critical: true
-    timeout_s: 5.0
-    min_delta_s: 0.2
+    enabled: false
+    critical: false
+    timeout_s: 0.0
+    min_delta_s: 0.0
 
   topic_message_timeout_s: 5.0
   tf_timeout_s: 5.0
@@ -26,14 +26,14 @@ preflight:
       type: sensor_msgs/msg/Image
       min_messages: 1
       critical: true
-    - name: /camera_front/depth_image
-      type: sensor_msgs/msg/Image
-      min_messages: 1
-      critical: false
     - name: /camera_front/camera_info
       type: sensor_msgs/msg/CameraInfo
       min_messages: 1
       critical: true
+    - name: /camera_front/depth_image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: false
     - name: /camera_front/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
@@ -64,13 +64,13 @@ preflight:
       child: base_link
       critical: true
     - parent: base_link
-      child: ouster_link
-      critical: true
-    - parent: base_link
       child: camera_front_link
       critical: true
     - parent: camera_front_link
       child: camera_front_optical_frame
+      critical: true
+    - parent: base_link
+      child: ouster_link
       critical: true
 
   required_actions:
@@ -81,7 +81,11 @@ preflight:
   required_nodes:
     - name: bt_navigator
       critical: true
+    - name: camera_contract_adapter
+      critical: true
     - name: controller_server
+      critical: true
+    - name: ekf_filter_node_odom
       critical: true
     - name: map_server
       critical: true

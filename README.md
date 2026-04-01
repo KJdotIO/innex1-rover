@@ -56,6 +56,18 @@ echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
 
+## OAK-D Pro on Humble
+
+The hardware camera path targets the DepthAI v3 ROS driver on Humble.
+
+Recommended setup:
+- install `ros-$ROS_DISTRO-depthai-ros-v3`
+- if you need the newest Humble builds before they hit stable apt, install `ros2-testing-apt-source` first
+- make sure the OAK-D Pro has a good cable and enough power before blaming software
+- keep the first bring-up on the `usb2_degraded` profile unless you know the USB 3 path is healthy
+
+The wrapper launch added in this repo expects `depthai_ros_driver_v3` and its `driver.launch.py` entrypoint.
+
 ## Clone and build workspace
 
 ```bash
@@ -92,10 +104,31 @@ source ~/innex1-rover/install/setup.bash
 ros2 launch lunabot_bringup navigation.launch.py
 ```
 
+### Hardware camera bring-up
+
+Localisation-first hardware bring-up:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/innex1-rover/install/setup.bash
+ros2 launch lunabot_bringup hardware_localisation.launch.py
+```
+
+That launch is not the whole robot. It brings up the OAK wrapper plus the localisation stack, and still expects the base robot drivers that provide `/odom`, `/imu/data_raw`, and the TF chain to be running elsewhere.
+
+Full hardware navigation bring-up still expects the Ouster path to be present:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/innex1-rover/install/setup.bash
+ros2 launch lunabot_bringup hardware_navigation.launch.py
+```
+
 Note on launch files:
 - `navigation.launch.py` already includes `lunabot_bringup/launch/localisation.launch.py`.
 - So for normal nav testing, launch **navigation only**.
 - Launch `localisation.launch.py` separately only when you explicitly want localisation in isolation.
+- Hardware launches default to `use_sim_time:=false` and keep `enable_visual_slam:=false`.
 
 ### 3) Manual teleop (new terminal)
 
@@ -114,6 +147,29 @@ python3 tools/doctor.py                 # setup checks (default)
 python3 tools/doctor.py --mode all      # setup + runtime (runtime auto-skips if stack not up)
 python3 tools/doctor.py --mode runtime  # force runtime checks
 ```
+
+Hardware camera readiness:
+
+```bash
+python3 tools/doctor.py --mode all \
+  --config src/lunabot_bringup/config/preflight_checks_hardware_localisation.yaml
+ros2 run lunabot_bringup preflight_check \
+  --config src/lunabot_bringup/config/preflight_checks_hardware_localisation.yaml
+```
+
+The localisation hardware profile still expects the rover's main IMU on `/imu/data_raw`. OAK IMU fusion is deliberately not part of the first pass.
+If you deliberately run `lidar_costmap_phase:=true`, use `preflight_checks_hardware_localisation_lidar_debug.yaml` instead.
+
+Full hardware navigation readiness:
+
+```bash
+python3 tools/doctor.py --mode all \
+  --config src/lunabot_bringup/config/preflight_checks_hardware_navigation.yaml
+ros2 run lunabot_bringup preflight_check \
+  --config src/lunabot_bringup/config/preflight_checks_hardware_navigation.yaml
+```
+
+If you deliberately run `lidar_costmap_phase:=true`, use `preflight_checks_hardware_navigation_lidar_debug.yaml` instead.
 
 Exit codes:
 - `0`: all checks passed
@@ -156,6 +212,7 @@ src/
 ├── lunabot_localisation/    # EKF + global correction path
 ├── lunabot_navigation/      # Nav2 config + mission BT assets
 ├── lunabot_perception/      # Hazard detection pipeline
+├── lunabot_sensors/         # Hardware sensor wrappers
 ├── lunabot_simulation/      # Gazebo world/bridge launch
 └── lunabot_teleop/          # Manual control
 ```
