@@ -1,5 +1,8 @@
 """Launch the OAK-D Pro on the repo's stable front-camera contract."""
 
+from pathlib import Path
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
@@ -13,15 +16,69 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def _validate_profile(context, *_args, **_kwargs):
-    """Fail early when the requested OAK profile is unsupported."""
-    profile = LaunchConfiguration("profile").perform(context)
-    if profile in {"usb2_degraded", "usb3_full"}:
-        return []
-    raise RuntimeError(
-        "Unsupported OAK-D Pro profile '"
-        f"{profile}'. Expected 'usb2_degraded' or 'usb3_full'."
+SUPPORTED_PROFILES = {
+    "usb2_degraded": {
+        "params_file": "oakd_usb2_degraded.yaml",
+        "pointcloud_enable": "false",
+    },
+    "usb3_full": {
+        "params_file": "oakd_usb3_full.yaml",
+        "pointcloud_enable": "true",
+    },
+}
+
+
+def _profile_settings(profile: str) -> dict[str, str]:
+    """Return launch settings for a supported OAK profile."""
+    try:
+        return SUPPORTED_PROFILES[profile]
+    except KeyError as exc:
+        raise ValueError(
+            "Unsupported OAK-D Pro profile "
+            f"'{profile}'. Expected one of: {', '.join(SUPPORTED_PROFILES)}."
+        ) from exc
+
+
+def _require_non_empty(name: str, value: str) -> None:
+    """Reject empty launch arguments that would produce silent miswiring."""
+    if value.strip():
+        return
+    raise ValueError(f"Launch argument '{name}' must not be empty.")
+
+
+def _existing_package_file(package_name: str, relative_path: str) -> Path:
+    """Resolve a package file and raise a clear error if it is missing."""
+    package_share = Path(get_package_share_directory(package_name))
+    resolved = package_share / relative_path
+    if resolved.exists():
+        return resolved
+    raise FileNotFoundError(
+        f"Required file '{relative_path}' was not found in package "
+        f"'{package_name}' ({package_share})."
     )
+
+
+def _validate_launch_environment(context, *_args, **_kwargs):
+    """Fail early when launch prerequisites are missing or misconfigured."""
+    profile = LaunchConfiguration("profile").perform(context)
+    _profile_settings(profile)
+
+    required_args = {
+        "rgb_image_topic": LaunchConfiguration("rgb_image_topic").perform(context),
+        "rgb_camera_info_topic": LaunchConfiguration("rgb_camera_info_topic").perform(
+            context
+        ),
+        "depth_image_topic": LaunchConfiguration("depth_image_topic").perform(context),
+        "point_cloud_topic": LaunchConfiguration("point_cloud_topic").perform(context),
+        "optical_frame_id": LaunchConfiguration("optical_frame_id").perform(context),
+    }
+    for name, value in required_args.items():
+        _require_non_empty(name, value)
+
+    _existing_package_file("lunabot_sensors", "config/oakd_usb2_degraded.yaml")
+    _existing_package_file("lunabot_sensors", "config/oakd_usb3_full.yaml")
+    _existing_package_file("depthai_ros_driver_v3", "launch/driver.launch.py")
+    return []
 
 
 def generate_launch_description():
@@ -36,6 +93,7 @@ def generate_launch_description():
     point_cloud_topic = LaunchConfiguration("point_cloud_topic")
     optical_frame_id = LaunchConfiguration("optical_frame_id")
     point_cloud_frame_id = LaunchConfiguration("point_cloud_frame_id")
+    startup_warn_timeout_s = LaunchConfiguration("startup_warn_timeout_s")
 
     usb2_params = PathJoinSubstitution(
         [pkg_sensors, "config", "oakd_usb2_degraded.yaml"]
@@ -97,12 +155,22 @@ def generate_launch_description():
                     "Leave empty unless the cloud transform has been verified."
                 ),
             ),
-            OpaqueFunction(function=_validate_profile),
+            DeclareLaunchArgument(
+                "startup_warn_timeout_s",
+                default_value="10.0",
+                description=(
+                    "Seconds to wait before warning that the required RGB streams "
+                    "have not appeared yet."
+                ),
+            ),
+            OpaqueFunction(function=_validate_launch_environment),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(depthai_launch),
                 launch_arguments={
                     "params_file": usb2_params,
-                    "pointcloud.enable": "false",
+                    "pointcloud.enable": _profile_settings("usb2_degraded")[
+                        "pointcloud_enable"
+                    ],
                     "publish_tf_from_calibration": "false",
                 }.items(),
                 condition=usb2_condition,
@@ -111,7 +179,9 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(depthai_launch),
                 launch_arguments={
                     "params_file": usb3_params,
-                    "pointcloud.enable": "true",
+                    "pointcloud.enable": _profile_settings("usb3_full")[
+                        "pointcloud_enable"
+                    ],
                     "publish_tf_from_calibration": "false",
                 }.items(),
                 condition=usb3_condition,
@@ -130,6 +200,7 @@ def generate_launch_description():
                         "point_cloud_topic": point_cloud_topic,
                         "optical_frame_id": optical_frame_id,
                         "point_cloud_frame_id": point_cloud_frame_id,
+                        "startup_warn_timeout_s": startup_warn_timeout_s,
                     }
                 ],
             ),

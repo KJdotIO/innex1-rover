@@ -25,5 +25,8 @@ It does not own localisation, EKF fusion, AprilTag logic, or Nav2 costmaps. Thos
 - `lunabot_sensors/camera_contract_adapter.py`: normalises public camera topics and image header frame IDs.
 - `config/oakd_usb2_degraded.yaml`: safe USB 2 profile for RGB plus intrinsics.
 - `config/oakd_usb3_full.yaml`: fuller profile for depth and point cloud after hardware validation.
+- `tools/check_oak_launch.py`: smoke-checks the installed OAK launch path without needing the camera.
 
 Point cloud data is republished on `/camera_front/points`, but the upstream frame is preserved by default unless you explicitly set `point_cloud_frame_id`. That is deliberate: changing the frame label without transforming the points would be fiction with extra steps.
+
+The adapter now warns once if the guaranteed RGB streams still have not appeared after startup. That is mostly there to catch the awkward middle state where the DepthAI container starts fine, but the actual upstream topic names or profile do not match what the wrapper expects.

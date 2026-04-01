@@ -155,6 +155,7 @@ python3 tools/doctor.py --mode all \
   --config src/lunabot_bringup/config/preflight_checks_hardware_localisation.yaml
 ros2 run lunabot_bringup preflight_check \
   --config src/lunabot_bringup/config/preflight_checks_hardware_localisation.yaml
+python3 tools/check_oak_launch.py --profile usb2_degraded
 ```
 
 The localisation hardware profile still expects the rover's main IMU on `/imu/data_raw`. OAK IMU fusion is deliberately not part of the first pass.
@@ -175,6 +176,24 @@ Exit codes:
 - `0`: all checks passed
 - `1`: warnings present
 - `2`: failures present
+
+## First hardware run checklist
+
+Before you plug the camera in:
+- run `python3 tools/check_oak_launch.py --profile usb2_degraded`
+- if you want the full no-device smoke test as well, run `python3 tools/check_oak_launch.py --profile usb2_degraded --runtime`
+- make sure the base robot stack is already publishing `/odom`, `/imu/data_raw`, and the usual TF chain
+
+Once the OAK-D Pro is attached:
+- launch `ros2 launch lunabot_bringup hardware_localisation.launch.py`
+- expect `/camera_front/image` and `/camera_front/camera_info` first
+- on USB 2, treat missing depth and point cloud as normal unless you’ve explicitly proved otherwise
+- if the adapter warns that the required RGB streams are missing, check the upstream OAK topic names before assuming anything deeper is broken
+
+Bad signs:
+- `/camera_front/image` never appears
+- `camera_contract_adapter` warns after startup that no RGB streams were seen
+- frame names start leaking through as `oak_*` or `camera_link`
 
 ## Visualisation options
 
