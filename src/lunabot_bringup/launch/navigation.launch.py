@@ -5,15 +5,14 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.actions import EmitEvent
 from launch.actions import LogInfo
 from launch.actions import GroupAction
 from launch.actions import IncludeLaunchDescription
+from launch.actions import OpaqueFunction
 from launch.actions import RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.conditions import UnlessCondition
 from launch.event_handlers import OnProcessExit
-from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PythonExpression
@@ -21,6 +20,28 @@ from launch_ros.actions import Node
 from launch_ros.actions import SetRemap
 
 from lunabot_bringup.launch_gate import select_preflight_config_path
+
+
+def _is_truthy(value):
+    """Return a launch expression that accepts common truthy strings."""
+    return PythonExpression(
+        [
+            "'",
+            value,
+            "'.strip().lower() in ['1', 'true', 'yes', 'on']",
+        ]
+    )
+
+
+def _is_falsey(value):
+    """Return a launch expression that accepts common falsey strings."""
+    return PythonExpression(
+        [
+            "'",
+            value,
+            "'.strip().lower() in ['0', 'false', 'no', 'off']",
+        ]
+    )
 
 
 def _build_nav2_start_actions(
@@ -81,10 +102,13 @@ def _handle_preflight_exit(
                 "Fix the reported readiness checks and relaunch."
             )
         ),
-        EmitEvent(
-            event=Shutdown(reason="Navigation preflight launch gate failed")
-        ),
+        OpaqueFunction(function=_raise_preflight_launch_failure),
     ]
+
+
+def _raise_preflight_launch_failure(_context):
+    """Abort launch with a non-zero exit when the preflight gate fails."""
+    raise RuntimeError("Navigation preflight launch gate failed")
 
 
 def generate_launch_description():
@@ -220,11 +244,11 @@ def generate_launch_description():
         condition=IfCondition(
             PythonExpression(
                 [
-                    "'",
-                    enforce_preflight,
-                    "'.lower() == 'true' and '",
-                    lidar_costmap_phase,
-                    "'.lower() == 'false'",
+                    "(",
+                    _is_truthy(enforce_preflight),
+                    ") and (",
+                    _is_falsey(lidar_costmap_phase),
+                    ")",
                 ]
             )
         ),
@@ -246,11 +270,11 @@ def generate_launch_description():
         condition=IfCondition(
             PythonExpression(
                 [
-                    "'",
-                    enforce_preflight,
-                    "'.lower() == 'true' and '",
-                    lidar_costmap_phase,
-                    "'.lower() == 'true'",
+                    "(",
+                    _is_truthy(enforce_preflight),
+                    ") and (",
+                    _is_truthy(lidar_costmap_phase),
+                    ")",
                 ]
             )
         ),
@@ -268,7 +292,7 @@ def generate_launch_description():
                 enable_teleop,
             ),
         ),
-        condition=IfCondition(enforce_preflight),
+        condition=IfCondition(_is_truthy(enforce_preflight)),
     )
 
     preflight_gate_lidar_debug_handler = RegisterEventHandler(
@@ -283,14 +307,14 @@ def generate_launch_description():
                 enable_teleop,
             ),
         ),
-        condition=IfCondition(enforce_preflight),
+        condition=IfCondition(_is_truthy(enforce_preflight)),
     )
 
     direct_nav2_start = GroupAction(
         _build_nav2_start_actions(
             pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
         ),
-        condition=UnlessCondition(enforce_preflight),
+        condition=IfCondition(_is_falsey(enforce_preflight)),
     )
 
     return LaunchDescription(

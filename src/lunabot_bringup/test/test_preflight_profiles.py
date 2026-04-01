@@ -1,5 +1,11 @@
-"""Unit tests for phase-scoped preflight filtering."""
+"""Unit tests for phase-scoped preflight filtering and CLI helpers."""
 
+import sys
+
+import pytest
+
+from lunabot_bringup.preflight_check import _parse_bool_text
+from lunabot_bringup.preflight_check import _strip_ros_cli_args
 from lunabot_bringup.preflight_profiles import filter_preflight_config
 from lunabot_bringup.preflight_profiles import validate_phase
 
@@ -74,3 +80,56 @@ def test_validate_phase_rejects_unknown_phase_name():
         assert "Unsupported preflight phase" in str(exc)
     else:
         raise AssertionError("Expected invalid phase name to raise ValueError")
+
+
+def test_strip_ros_cli_args_keeps_only_executable_flags():
+    cli_args = _strip_ros_cli_args(
+        [
+            "--phase",
+            "launch",
+            "--use-sim-time",
+            "false",
+            "--ros-args",
+            "-r",
+            "__node:=preflight_gate",
+        ]
+    )
+
+    assert cli_args == ["--phase", "launch", "--use-sim-time", "false"]
+
+
+def test_strip_ros_cli_args_uses_process_argv_when_args_omitted(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "/tmp/preflight_check",
+            "--phase",
+            "launch",
+            "--ros-args",
+            "-r",
+            "__node:=preflight_gate",
+        ],
+    )
+
+    assert _strip_ros_cli_args(None) == ["--phase", "launch"]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("true", True),
+        ("True", True),
+        ("1", True),
+        ("false", False),
+        ("False", False),
+        ("0", False),
+    ],
+)
+def test_parse_bool_text_accepts_common_launch_values(text, expected):
+    assert _parse_bool_text(text) is expected
+
+
+def test_parse_bool_text_rejects_invalid_value():
+    with pytest.raises(Exception):
+        _parse_bool_text("maybe")
