@@ -1,12 +1,12 @@
 preflight:
   use_interface_contracts: true
-  use_sim_time: true
+  use_sim_time: false
 
   sim_time:
-    enabled: true
-    critical: true
-    timeout_s: 5.0
-    min_delta_s: 0.2
+    enabled: false
+    critical: false
+    timeout_s: 0.0
+    min_delta_s: 0.0
 
   topic_message_timeout_s: 5.0
   tf_timeout_s: 5.0
@@ -14,44 +14,30 @@ preflight:
   node_timeout_s: 5.0
 
   required_topics:
-    - name: /imu/data_raw
-      type: sensor_msgs/msg/Imu
-      min_messages: 1
-      critical: true
     - name: /odom
       type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: true
+    - name: /imu/data_raw
+      type: sensor_msgs/msg/Imu
       min_messages: 1
       critical: true
     - name: /camera_front/image
       type: sensor_msgs/msg/Image
       min_messages: 1
       critical: true
-    - name: /camera_front/depth_image
-      type: sensor_msgs/msg/Image
-      min_messages: 1
-      critical: false
     - name: /camera_front/camera_info
       type: sensor_msgs/msg/CameraInfo
       min_messages: 1
       critical: true
+    - name: /camera_front/depth_image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: false
     - name: /camera_front/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: false
-    - name: /ouster/points
-      type: sensor_msgs/msg/PointCloud2
-      min_messages: 1
-      critical: true
-    - name: /map
-      type: nav_msgs/msg/OccupancyGrid
-      min_messages: 1
-      critical: true
-      reliability: reliable
-      durability: transient_local
-    - name: /odometry/local
-      type: nav_msgs/msg/Odometry
-      min_messages: 1
-      critical: true
 
   required_tf_links:
     - parent: map
@@ -64,26 +50,16 @@ preflight:
       child: base_link
       critical: true
     - parent: base_link
-      child: ouster_link
-      critical: true
-    - parent: base_link
       child: camera_front_link
       critical: true
     - parent: camera_front_link
       child: camera_front_optical_frame
       critical: true
 
-  required_actions:
-    - name: /navigate_to_pose
-      type: nav2_msgs/action/NavigateToPose
-      critical: true
+  required_actions: []
 
   required_nodes:
-    - name: bt_navigator
+    - name: camera_contract_adapter
       critical: true
-    - name: controller_server
-      critical: true
-    - name: map_server
-      critical: true
-    - name: planner_server
+    - name: ekf_filter_node_odom
       critical: true

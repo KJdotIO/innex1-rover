@@ -1,7 +1,9 @@
 preflight:
   use_interface_contracts: true
+  use_sim_time: true
 
   sim_time:
+    enabled: true
     critical: true
     timeout_s: 5.0
     min_delta_s: 0.2
@@ -63,6 +65,12 @@ preflight:
       critical: true
     - parent: base_link
       child: ouster_link
+      critical: true
+    - parent: base_link
+      child: camera_front_link
+      critical: true
+    - parent: camera_front_link
+      child: camera_front_optical_frame
       critical: true
 
   required_actions:

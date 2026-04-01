@@ -1,6 +1,30 @@
 {
   "topics": [
     {
+      "name": "/camera_front/image",
+      "type": "sensor_msgs/msg/Image",
+      "kind": "publisher",
+      "source": "src/lunabot_sensors/lunabot_sensors/camera_contract_adapter.py"
+    },
+    {
+      "name": "/camera_front/camera_info",
+      "type": "sensor_msgs/msg/CameraInfo",
+      "kind": "publisher",
+      "source": "src/lunabot_sensors/lunabot_sensors/camera_contract_adapter.py"
+    },
+    {
+      "name": "/camera_front/depth_image",
+      "type": "sensor_msgs/msg/Image",
+      "kind": "publisher",
+      "source": "src/lunabot_sensors/lunabot_sensors/camera_contract_adapter.py"
+    },
+    {
+      "name": "/camera_front/points",
+      "type": "sensor_msgs/msg/PointCloud2",
+      "kind": "publisher",
+      "source": "src/lunabot_sensors/lunabot_sensors/camera_contract_adapter.py"
+    },
+    {
       "name": "/mission/excavate",
       "type": "lunabot_interfaces/action/Excavate",
       "kind": "action_server",
@@ -47,9 +71,27 @@
       "source": "src/lunabot_description/urdf/lunabot.urdf.xacro",
       "parent_pattern": "base_link",
       "child_pattern": "ouster_link"
+    },
+    {
+      "parent": "base_link",
+      "child": "camera_front_link",
+      "kind": "xacro_joint",
+      "source": "src/lunabot_description/urdf/lunabot.urdf.xacro",
+      "parent_pattern": "base_link",
+      "child_pattern": "camera_front_link"
+    },
+    {
+      "parent": "camera_front_link",
+      "child": "camera_front_optical_frame",
+      "kind": "xacro_joint",
+      "source": "src/lunabot_description/urdf/lunabot.urdf.xacro",
+      "parent_pattern": "camera_front_link",
+      "child_pattern": "camera_front_optical_frame"
     }
   ],
   "deferred_topics": [
+    "/camera_front/depth_image",
+    "/camera_front/points",
     "/ouster/points",
     "/mission/state",
     "/mission/autonomy_mode",

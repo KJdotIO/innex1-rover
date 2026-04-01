@@ -22,7 +22,9 @@ from typing import Callable, List
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-PREFLIGHT_CONFIG_PATH = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
+DEFAULT_PREFLIGHT_CONFIG_PATH = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
+PREFLIGHT_CONFIG_ENV = "LUNABOT_PREFLIGHT_CONFIG"
+PREFLIGHT_CONFIG_PATH = DEFAULT_PREFLIGHT_CONFIG_PATH
 _PREFLIGHT_CACHE = None
 _PREFLIGHT_ERROR = None
 
@@ -46,6 +48,27 @@ def _coerce_output(value: str | bytes | None) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
+
+
+def _set_preflight_config_path(path: Path) -> None:
+    """Set the active preflight config path and clear cached load state."""
+    global PREFLIGHT_CONFIG_PATH, _PREFLIGHT_CACHE, _PREFLIGHT_ERROR
+    PREFLIGHT_CONFIG_PATH = path
+    _PREFLIGHT_CACHE = None
+    _PREFLIGHT_ERROR = None
+
+
+def _resolve_preflight_config_path(explicit_path: str | None) -> Path:
+    """Resolve the preflight config path from CLI, env, or defaults."""
+    if explicit_path:
+        return Path(explicit_path)
+    config_from_env = os.environ.get(PREFLIGHT_CONFIG_ENV)
+    if config_from_env:
+        return Path(config_from_env)
+    source_config = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
+    if source_config.exists():
+        return source_config
+    return DEFAULT_PREFLIGHT_CONFIG_PATH
 
 
 def _load_preflight_config():
@@ -312,6 +335,19 @@ def check_nav2_lifecycle() -> CheckResult:
     )
 
 
+def _should_check_nav2_lifecycle() -> bool:
+    """Return whether the active preflight profile actually expects Nav2."""
+    required_nodes = _configured_required_names("required_nodes")
+    required_actions = _configured_required_names("required_actions")
+    if required_nodes is None or required_actions is None:
+        return True
+
+    nav2_nodes = {"bt_navigator", "planner_server", "controller_server"}
+    has_nav2_nodes = any(node in required_nodes for node in nav2_nodes)
+    has_nav2_action = "/navigate_to_pose" in required_actions
+    return has_nav2_nodes or has_nav2_action
+
+
 
 
 def check_required_nodes() -> CheckResult:
@@ -462,7 +498,13 @@ def main() -> int:
         default="setup",
         help="Which checks to run",
     )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to the preflight config YAML that doctor should follow.",
+    )
     args = parser.parse_args()
+    _set_preflight_config_path(_resolve_preflight_config_path(args.config))
 
     setup_checks: List[Callable[[], CheckResult]] = [
         check_python_version,
@@ -497,8 +539,9 @@ def main() -> int:
         check_required_nodes,
         check_required_actions,
         check_required_tf_links,
-        check_nav2_lifecycle,
     ]
+    if _should_check_nav2_lifecycle():
+        runtime_checks.append(check_nav2_lifecycle)
 
     all_results: List[CheckResult] = []
 

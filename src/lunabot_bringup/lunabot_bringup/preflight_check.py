@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from dataclasses import asdict
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ import yaml
 EXIT_OK = 0
 EXIT_CRITICAL_FAILURE = 2
 EXIT_INTERNAL_ERROR = 3
+PREFLIGHT_CONFIG_ENV = "LUNABOT_PREFLIGHT_CONFIG"
 
 ACTION_TYPE_MAP: dict[str, type] = {
     "nav2_msgs/action/NavigateToPose": NavigateToPose,
@@ -55,9 +57,26 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def _repo_contract_path() -> Path:
-    """Locate interface contract file when run from repo root."""
-    return Path.cwd() / ".github" / "contracts" / "interface_contracts.json"
+def _repo_contract_path() -> Path | None:
+    """Locate the interface contract file without depending on shell cwd."""
+    module_path = Path(__file__).resolve()
+    candidates: list[Path] = [
+        parent / ".github" / "contracts" / "interface_contracts.json"
+        for parent in module_path.parents
+    ]
+    candidates.extend(
+        base / ".github" / "contracts" / "interface_contracts.json"
+        for base in [Path.cwd(), *Path.cwd().parents]
+    )
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, Any]:
@@ -65,18 +84,21 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
     preflight = config.setdefault("preflight", {})
     use_contracts = bool(preflight.get("use_interface_contracts", True))
     if not use_contracts:
-        logger.info("Interface contract merge disabled by config")
+        if logger is not None:
+            logger.info("Interface contract merge disabled by config")
         return config
 
     contract_path = _repo_contract_path()
-    if not contract_path.exists():
-        logger.info("No local interface contract file found")
+    if contract_path is None:
+        if logger is not None:
+            logger.info("No interface contract file found")
         return config
 
     try:
         contract = json.loads(contract_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        logger.warning(f"Could not parse {contract_path}: {exc}")
+        if logger is not None:
+            logger.warning(f"Could not parse {contract_path}: {exc}")
         return config
 
     topics = preflight.setdefault("required_topics", [])
@@ -97,7 +119,8 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
                 "critical": True,
             }
         )
-        logger.info(f"Added contract topic check: {item.get('name')}")
+        if logger is not None:
+            logger.info(f"Added contract topic check: {item.get('name')}")
         topic_keys.add(key)
 
     tf_links = preflight.setdefault("required_tf_links", [])
@@ -117,7 +140,8 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         )
         parent = item.get("parent")
         child = item.get("child")
-        logger.info(f"Added contract TF check: {parent}->{child}")
+        if logger is not None:
+            logger.info(f"Added contract TF check: {parent}->{child}")
         tf_keys.add(key)
 
     return config
@@ -128,9 +152,13 @@ class PreflightChecker(Node):
 
     def __init__(self, config: dict[str, Any]):
         """Create checker node with merged runtime config."""
+        self._config = _merge_contract_requirements(config, logger=None)
+        self._use_sim_time = _configured_use_sim_time(self._config)
         super().__init__(
             "preflight_check",
-            parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, True)],
+            parameter_overrides=[
+                Parameter("use_sim_time", Parameter.Type.BOOL, self._use_sim_time)
+            ],
         )
         self._config = _merge_contract_requirements(config, self.get_logger())
         self._results: list[CheckResult] = []
@@ -161,11 +189,22 @@ class PreflightChecker(Node):
         """Check that simulated clock advances."""
         preflight = self._config["preflight"]
         sim_cfg = preflight.get("sim_time", {})
+        enabled = bool(sim_cfg.get("enabled", self._use_sim_time))
         timeout_s = float(sim_cfg.get("timeout_s", 5.0))
         min_delta_s = float(sim_cfg.get("min_delta_s", 0.2))
         critical = bool(sim_cfg.get("critical", True))
 
         started = time.monotonic()
+        if not enabled:
+            self._record(
+                "sim_time",
+                critical,
+                True,
+                "skipped (/clock not required in wall-time mode)",
+                started,
+            )
+            return
+
         start_ns = self.get_clock().now().nanoseconds
         deadline = started + timeout_s
 
@@ -496,10 +535,41 @@ def _arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _configured_use_sim_time(config: dict[str, Any]) -> bool:
+    """Return whether the preflight checker should use simulated time."""
+    preflight = config.get("preflight", {})
+    if "use_sim_time" in preflight:
+        return bool(preflight["use_sim_time"])
+    sim_cfg = preflight.get("sim_time", {})
+    if "enabled" in sim_cfg:
+        return bool(sim_cfg["enabled"])
+    return True
+
+
+def _source_config_path() -> Path:
+    """Return the source-tree preflight config path when available."""
+    return Path(__file__).resolve().parents[1] / "config" / "preflight_checks.yaml"
+
+
 def _default_config_path() -> Path:
-    """Resolve installed preflight config path."""
+    """Resolve the default preflight config path."""
+    source_path = _source_config_path()
+    if source_path.exists():
+        return source_path
     share_dir = Path(get_package_share_directory("lunabot_bringup"))
     return share_dir / "config" / "preflight_checks.yaml"
+
+
+def _resolve_config_path(explicit_path: Path | None) -> Path:
+    """Resolve the preflight config path from CLI, env, or defaults."""
+    if explicit_path is not None:
+        return explicit_path
+
+    config_from_env = os.environ.get(PREFLIGHT_CONFIG_ENV)
+    if config_from_env:
+        return Path(config_from_env)
+
+    return _default_config_path()
 
 
 def main(args: list[str] | None = None) -> None:
@@ -514,7 +584,7 @@ def main(args: list[str] | None = None) -> None:
     rclpy.init(args=None)
     checker = None
     try:
-        config_path = cli_args.config or _default_config_path()
+        config_path = _resolve_config_path(cli_args.config)
         if not config_path.exists():
             raise FileNotFoundError(f"Preflight config not found: {config_path}")
 
