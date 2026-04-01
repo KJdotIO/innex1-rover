@@ -26,6 +26,10 @@ from tf2_ros import Buffer
 from tf2_ros import TransformListener
 import yaml
 
+from lunabot_bringup.preflight_profiles import filter_preflight_config
+from lunabot_bringup.preflight_profiles import PHASE_FULL
+from lunabot_bringup.preflight_profiles import VALID_PHASES
+
 
 EXIT_OK = 0
 EXIT_CRITICAL_FAILURE = 2
@@ -95,6 +99,7 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
                 "type": item.get("type"),
                 "min_messages": 1,
                 "critical": True,
+                "phases": item.get("phases"),
             }
         )
         logger.info(f"Added contract topic check: {item.get('name')}")
@@ -113,6 +118,7 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
                 "parent": item.get("parent"),
                 "child": item.get("child"),
                 "critical": True,
+                "phases": item.get("phases"),
             }
         )
         parent = item.get("parent")
@@ -126,13 +132,21 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
 class PreflightChecker(Node):
     """Execute preflight checks before autonomy startup."""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(
+        self,
+        config: dict[str, Any],
+        phase: str = PHASE_FULL,
+        use_sim_time: bool = True,
+    ):
         """Create checker node with merged runtime config."""
         super().__init__(
             "preflight_check",
-            parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, True)],
+            parameter_overrides=[
+                Parameter("use_sim_time", Parameter.Type.BOOL, bool(use_sim_time))
+            ],
         )
-        self._config = _merge_contract_requirements(config, self.get_logger())
+        merged_config = _merge_contract_requirements(config, self.get_logger())
+        self._config = filter_preflight_config(merged_config, phase)
         self._results: list[CheckResult] = []
 
     def _record(
@@ -161,6 +175,10 @@ class PreflightChecker(Node):
         """Check that simulated clock advances."""
         preflight = self._config["preflight"]
         sim_cfg = preflight.get("sim_time", {})
+        if not bool(self.get_parameter("use_sim_time").value):
+            return
+        if not bool(sim_cfg.get("enabled", True)):
+            return
         timeout_s = float(sim_cfg.get("timeout_s", 5.0))
         min_delta_s = float(sim_cfg.get("min_delta_s", 0.2))
         critical = bool(sim_cfg.get("critical", True))
@@ -493,6 +511,21 @@ def _arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Write JSON report to this file",
     )
+    parser.add_argument(
+        "--phase",
+        default=PHASE_FULL,
+        choices=sorted(VALID_PHASES),
+        help=(
+            "Preflight phase to run. Use 'launch' for the bringup gate or "
+            "'full' for the full stack check."
+        ),
+    )
+    parser.add_argument(
+        "--use-sim-time",
+        default="true",
+        choices=("true", "false"),
+        help="Whether the preflight checker should require a live /clock.",
+    )
     return parser
 
 
@@ -519,7 +552,11 @@ def main(args: list[str] | None = None) -> None:
             raise FileNotFoundError(f"Preflight config not found: {config_path}")
 
         config = _load_yaml(config_path)
-        checker = PreflightChecker(config)
+        checker = PreflightChecker(
+            config,
+            phase=cli_args.phase,
+            use_sim_time=(cli_args.use_sim_time == "true"),
+        )
         results = checker.run()
 
         _print_summary(results)

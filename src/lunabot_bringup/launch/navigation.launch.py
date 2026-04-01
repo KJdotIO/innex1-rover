@@ -5,15 +5,86 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import EmitEvent
+from launch.actions import LogInfo
 from launch.actions import GroupAction
 from launch.actions import IncludeLaunchDescription
-from launch.actions import TimerAction
+from launch.actions import RegisterEventHandler
 from launch.conditions import IfCondition
 from launch.conditions import UnlessCondition
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 from launch_ros.actions import SetRemap
+
+from lunabot_bringup.launch_gate import select_preflight_config_path
+
+
+def _build_nav2_start_actions(
+    pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
+):
+    """Return Nav2 start actions for direct or muxed operation."""
+    nav2_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
+        ),
+        launch_arguments={
+            "use_sim_time": use_sim_time,
+            "params_file": nav_params_path,
+            "autostart": "true",
+        }.items(),
+        condition=UnlessCondition(enable_teleop),
+    )
+
+    nav2_launch_group = GroupAction(
+        [
+            SetRemap(src="cmd_vel", dst="cmd_vel_nav"),
+            SetRemap(src="cmd_vel_smoothed", dst="cmd_vel_nav"),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
+                ),
+                launch_arguments={
+                    "use_sim_time": use_sim_time,
+                    "params_file": nav_params_path,
+                    "autostart": "true",
+                }.items(),
+            ),
+        ],
+        condition=IfCondition(enable_teleop),
+    )
+
+    return [nav2_launch, nav2_launch_group]
+
+
+def _handle_preflight_exit(
+    event,
+    _context,
+    pkg_nav2_bringup,
+    nav_params_path,
+    use_sim_time,
+    enable_teleop,
+):
+    """Start Nav2 only when the launch-gate preflight passes."""
+    if event.returncode == 0:
+        return _build_nav2_start_actions(
+            pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
+        )
+
+    return [
+        LogInfo(
+            msg=(
+                "Preflight launch gate failed; Nav2 will not start. "
+                "Fix the reported readiness checks and relaunch."
+            )
+        ),
+        EmitEvent(
+            event=Shutdown(reason="Navigation preflight launch gate failed")
+        ),
+    ]
 
 
 def generate_launch_description():
@@ -38,12 +109,33 @@ def generate_launch_description():
     twist_mux_params_path = os.path.join(
         pkg_bringup, "config", "twist_mux.yaml"
     )
+    preflight_config_path = os.path.join(
+        pkg_bringup, "config", "preflight_checks.yaml"
+    )
+    preflight_lidar_debug_config_path = os.path.join(
+        pkg_bringup, "config", "preflight_checks_lidar_debug.yaml"
+    )
+    default_preflight_config = select_preflight_config_path(
+        False,
+        preflight_config_path,
+        preflight_lidar_debug_config_path,
+    )
+    default_preflight_lidar_debug_config = select_preflight_config_path(
+        True,
+        preflight_config_path,
+        preflight_lidar_debug_config_path,
+    )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
     enable_teleop = LaunchConfiguration("enable_teleop")
+    enforce_preflight = LaunchConfiguration("enforce_preflight")
+    preflight_config = LaunchConfiguration("preflight_config")
+    preflight_lidar_debug_config = LaunchConfiguration(
+        "preflight_lidar_debug_config"
+    )
     joy_device_id = LaunchConfiguration("joy_device_id")
 
     localisation_launch = IncludeLaunchDescription(
@@ -55,17 +147,6 @@ def generate_launch_description():
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
-        }.items(),
-    )
-
-    nav2_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
-        ),
-        launch_arguments={
-            "use_sim_time": use_sim_time,
-            "params_file": nav_params_path,
-            "autostart": "true",
         }.items(),
     )
 
@@ -123,25 +204,93 @@ def generate_launch_description():
         condition=IfCondition(enable_teleop),
     )
 
-    nav2_launch_group = GroupAction(
-        [
-            SetRemap(src="cmd_vel", dst="cmd_vel_nav"),
-            SetRemap(src="cmd_vel_smoothed", dst="cmd_vel_nav"),
-            nav2_launch,
+    preflight_gate = Node(
+        package="lunabot_bringup",
+        executable="preflight_check",
+        name="preflight_gate",
+        output="screen",
+        arguments=[
+            "--phase",
+            "launch",
+            "--use-sim-time",
+            use_sim_time,
+            "--config",
+            preflight_config,
         ],
-        condition=IfCondition(enable_teleop),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    enforce_preflight,
+                    "'.lower() == 'true' and '",
+                    lidar_costmap_phase,
+                    "'.lower() == 'false'",
+                ]
+            )
+        ),
     )
 
-    # Delay Nav2 startup slightly so sim time / TF / sensor streams can settle.
-    delayed_nav2_launch = TimerAction(
-        period=5.0,
-        actions=[nav2_launch],
-        condition=UnlessCondition(enable_teleop),
+    preflight_gate_lidar_debug = Node(
+        package="lunabot_bringup",
+        executable="preflight_check",
+        name="preflight_gate_lidar_debug",
+        output="screen",
+        arguments=[
+            "--phase",
+            "launch",
+            "--use-sim-time",
+            use_sim_time,
+            "--config",
+            preflight_lidar_debug_config,
+        ],
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    enforce_preflight,
+                    "'.lower() == 'true' and '",
+                    lidar_costmap_phase,
+                    "'.lower() == 'true'",
+                ]
+            )
+        ),
     )
-    delayed_muxed_nav2_launch = TimerAction(
-        period=5.0,
-        actions=[nav2_launch_group],
-        condition=IfCondition(enable_teleop),
+
+    preflight_gate_handler = RegisterEventHandler(
+        OnProcessExit(
+            target_action=preflight_gate,
+            on_exit=lambda event, context: _handle_preflight_exit(
+                event,
+                context,
+                pkg_nav2_bringup,
+                nav_params_path,
+                use_sim_time,
+                enable_teleop,
+            ),
+        ),
+        condition=IfCondition(enforce_preflight),
+    )
+
+    preflight_gate_lidar_debug_handler = RegisterEventHandler(
+        OnProcessExit(
+            target_action=preflight_gate_lidar_debug,
+            on_exit=lambda event, context: _handle_preflight_exit(
+                event,
+                context,
+                pkg_nav2_bringup,
+                nav_params_path,
+                use_sim_time,
+                enable_teleop,
+            ),
+        ),
+        condition=IfCondition(enforce_preflight),
+    )
+
+    direct_nav2_start = GroupAction(
+        _build_nav2_start_actions(
+            pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
+        ),
+        condition=UnlessCondition(enforce_preflight),
     )
 
     return LaunchDescription(
@@ -193,6 +342,27 @@ def generate_launch_description():
                 ),
             ),
             DeclareLaunchArgument(
+                "enforce_preflight",
+                default_value="true",
+                description=(
+                    "Run the launch-gate preflight checks before starting Nav2."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "preflight_config",
+                default_value=default_preflight_config,
+                description=(
+                    "Preflight config used for the normal launch-gate path."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "preflight_lidar_debug_config",
+                default_value=default_preflight_lidar_debug_config,
+                description=(
+                    "Preflight config used when lidar_costmap_phase is enabled."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "joy_device_id",
                 default_value="0",
                 description=(
@@ -204,8 +374,11 @@ def generate_launch_description():
             localisation_launch,
             teleop_launch,
             twist_mux,
-            delayed_nav2_launch,
-            delayed_muxed_nav2_launch,
+            preflight_gate,
+            preflight_gate_lidar_debug,
+            preflight_gate_handler,
+            preflight_gate_lidar_debug_handler,
+            direct_nav2_start,
             rviz,
         ]
     )
