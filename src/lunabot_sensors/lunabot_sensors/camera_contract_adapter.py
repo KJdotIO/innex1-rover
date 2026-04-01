@@ -20,7 +20,6 @@ class CameraContractAdapter(Node):
         self.declare_parameter("point_cloud_topic", "/oak/points")
         self.declare_parameter("optical_frame_id", "camera_front_optical_frame")
         self.declare_parameter("point_cloud_frame_id", "")
-        self.declare_parameter("use_sim_time", False)
 
         self.optical_frame_id = str(self.get_parameter("optical_frame_id").value)
         self.point_cloud_frame_id = str(

@@ -103,6 +103,7 @@ def generate_launch_description():
                 launch_arguments={
                     "params_file": usb2_params,
                     "pointcloud.enable": "false",
+                    "publish_tf_from_calibration": "false",
                 }.items(),
                 condition=usb2_condition,
             ),
@@ -111,6 +112,7 @@ def generate_launch_description():
                 launch_arguments={
                     "params_file": usb3_params,
                     "pointcloud.enable": "true",
+                    "publish_tf_from_calibration": "false",
                 }.items(),
                 condition=usb3_condition,
             ),
