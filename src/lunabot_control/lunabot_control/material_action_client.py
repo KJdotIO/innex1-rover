@@ -17,6 +17,9 @@ class MaterialActionClient(Node):
         self.declare_parameter("excavate_timeout_s", 12.0)
         self.declare_parameter("deposit_timeout_s", 10.0)
         self.declare_parameter("dump_duration_s", 3.0)
+        self.declare_parameter("excavate_target_fill_fraction", 0.8)
+        self.declare_parameter("excavate_max_drive_speed_mps", 0.2)
+        self.declare_parameter("deposit_require_close_after_dump", True)
 
         self._excavate_client = ActionClient(
             self,
@@ -42,8 +45,12 @@ class MaterialActionClient(Node):
         excavate_goal = Excavate.Goal()
         excavate_goal.mode = Excavate.Goal.MODE_AUTO
         excavate_goal.timeout_s = float(self.get_parameter("excavate_timeout_s").value)
-        excavate_goal.target_fill_fraction = 0.8
-        excavate_goal.max_drive_speed_mps = 0.2
+        excavate_goal.target_fill_fraction = float(
+            self.get_parameter("excavate_target_fill_fraction").value
+        )
+        excavate_goal.max_drive_speed_mps = float(
+            self.get_parameter("excavate_max_drive_speed_mps").value
+        )
 
         self.get_logger().info("Sending excavation goal")
         send_goal_future = self._excavate_client.send_goal_async(excavate_goal)
@@ -69,7 +76,9 @@ class MaterialActionClient(Node):
         deposit_goal.dump_duration_s = float(
             self.get_parameter("dump_duration_s").value
         )
-        deposit_goal.require_close_after_dump = True
+        deposit_goal.require_close_after_dump = bool(
+            self.get_parameter("deposit_require_close_after_dump").value
+        )
 
         self.get_logger().info("Sending deposition goal")
         send_goal_future = self._deposit_client.send_goal_async(deposit_goal)

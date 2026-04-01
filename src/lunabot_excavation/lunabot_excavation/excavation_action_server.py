@@ -1,5 +1,6 @@
 """Excavation action adapter."""
 
+from math import isfinite
 from time import monotonic, sleep
 
 import rclpy
@@ -93,9 +94,36 @@ class ExcavationActionServer(Node):
         """Store the latest excavation telemetry sample."""
         self._latest_telemetry = msg
 
-    def goal_callback(self, _goal_request):
-        """Accept excavation goals for controller-backed execution."""
-        return GoalResponse.ACCEPT
+    @staticmethod
+    def _is_valid_excavation_goal(goal_request):
+        """Return True when the goal satisfies the excavation action contract."""
+        mode = goal_request.mode
+        timeout_s = float(goal_request.timeout_s)
+        target_fill_fraction = float(goal_request.target_fill_fraction)
+        max_drive_speed_mps = float(goal_request.max_drive_speed_mps)
+
+        if mode not in (
+            Excavate.Goal.MODE_AUTO,
+            Excavate.Goal.MODE_TELEOP_ASSIST,
+        ):
+            return False
+        if not isfinite(timeout_s):
+            return False
+        if not isfinite(target_fill_fraction):
+            return False
+        if not 0.0 <= target_fill_fraction <= 1.0:
+            return False
+        if not isfinite(max_drive_speed_mps):
+            return False
+        if max_drive_speed_mps < 0.0:
+            return False
+        return True
+
+    def goal_callback(self, goal_request):
+        """Accept only excavation goals that match the supported contract."""
+        if self._is_valid_excavation_goal(goal_request):
+            return GoalResponse.ACCEPT
+        return GoalResponse.REJECT
 
     def cancel_callback(self, _goal_handle):
         """Accept cancellation so the mechanism can be stopped safely."""
@@ -112,6 +140,7 @@ class ExcavationActionServer(Node):
         result.success = bool(success)
         result.reason_code = int(reason_code)
         result.failure_reason = str(reason)
+        # The action contract uses 0.0 to mean unknown or not measured.
         result.collected_mass_kg_estimate = 0.0
         result.duration_s = float(duration_s)
         return result
@@ -138,6 +167,7 @@ class ExcavationActionServer(Node):
         feedback = Excavate.Feedback()
         feedback.phase = STATE_TO_PHASE.get(state, Excavate.Feedback.PHASE_PRECHECK)
         feedback.elapsed_s = float(elapsed)
+        # The action contract uses 0.0 to mean unknown or not measured.
         feedback.fill_fraction_estimate = 0.0
         feedback.excavation_motor_current_a = (
             float(telemetry.motor_current_a)
@@ -170,7 +200,9 @@ class ExcavationActionServer(Node):
             return Excavate.Result.REASON_DRIVER_FAULT, "Excavation driver fault active"
         return Excavate.Result.REASON_INTERLOCK_BLOCKED, "Excavation controller faulted"
 
-    def _wait_for_ready_or_fault(self, timeout_s: float, goal_handle, start_time: float):
+    def _wait_for_ready_or_fault(
+        self, timeout_s: float, goal_handle, start_time: float
+    ):
         """Wait until the controller is ready, faulted, canceled, or timed out."""
         while rclpy.ok():
             elapsed = monotonic() - start_time
@@ -179,9 +211,15 @@ class ExcavationActionServer(Node):
                 return "cancel", elapsed
             if timeout_s > 0.0 and elapsed >= timeout_s:
                 return "timeout", elapsed
-            if self._status is not None and self._status.state == ExcavationStatus.STATE_READY:
+            if (
+                self._status is not None
+                and self._status.state == ExcavationStatus.STATE_READY
+            ):
                 return "ready", elapsed
-            if self._status is not None and self._status.state == ExcavationStatus.STATE_FAULT:
+            if (
+                self._status is not None
+                and self._status.state == ExcavationStatus.STATE_FAULT
+            ):
                 return "fault", elapsed
 
             self._publish_feedback(goal_handle, elapsed)
@@ -343,7 +381,10 @@ class ExcavationActionServer(Node):
                     elapsed,
                 )
 
-            if self._status is not None and self._status.state == ExcavationStatus.STATE_FAULT:
+            if (
+                self._status is not None
+                and self._status.state == ExcavationStatus.STATE_FAULT
+            ):
                 goal_handle.abort()
                 code, reason = self._fault_reason()
                 return self._result(False, code, reason, elapsed)

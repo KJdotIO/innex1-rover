@@ -7,6 +7,21 @@ This package contains mechanism-agnostic action contracts for excavation and dep
 - `/mission/excavate` uses `lunabot_interfaces/action/Excavate`
 - `/mission/deposit` uses `lunabot_interfaces/action/Deposit`
 
+## Action Semantics
+
+- `mode` and `timeout_s` are mission intent fields.
+- `target_fill_fraction`, `max_drive_speed_mps`, `dump_duration_s`, and `require_close_after_dump` are planner hints.
+- These goals describe rover behavior and execution constraints, not CAD-style geometry or trajectory inputs.
+- `timeout_s > 0.0` enables a deadline of that many seconds.
+- `timeout_s <= 0.0` means no deadline / no timeout enforcement.
+- Estimate fields use `0.0` to mean unknown or not measured.
+
+### Result Reason Codes
+
+- `REASON_TIMEOUT`: the goal exceeded its deadline.
+- `REASON_CANCELED`: the client or higher-level controller canceled the goal.
+- `REASON_SHUTDOWN`: the action server or node stopped before normal completion.
+
 ## Excavation Contract
 
 Issue [#137](https://github.com/KJdotIO/innex1-rover/issues/137) freezes the first excavation
