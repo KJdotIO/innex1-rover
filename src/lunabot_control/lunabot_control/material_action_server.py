@@ -1,5 +1,6 @@
 """Stub action server for the deposition mission phase."""
 
+from math import isfinite
 from time import monotonic, sleep
 
 import rclpy
@@ -12,7 +13,7 @@ from lunabot_interfaces.action import Deposit
 
 
 class MaterialActionServer(Node):
-    """Provide a deposition action stub while excavation uses the real controller path."""
+    """Provide a deposition action stub for mission and integration testing."""
 
     def __init__(self):
         """Initialise action servers and simulation parameters."""
@@ -41,9 +42,31 @@ class MaterialActionServer(Node):
         self._deposit_server.destroy()
         super().destroy_node()
 
-    def goal_callback(self, _goal_request):
-        """Accept each goal request for bench and integration testing."""
-        return GoalResponse.ACCEPT
+    @staticmethod
+    def _is_valid_deposit_goal(goal_request):
+        """Return True when the goal satisfies the deposit action contract."""
+        mode = goal_request.mode
+        timeout_s = float(goal_request.timeout_s)
+        dump_duration_s = float(goal_request.dump_duration_s)
+
+        if mode not in (
+            Deposit.Goal.MODE_AUTO,
+            Deposit.Goal.MODE_TELEOP_ASSIST,
+        ):
+            return False
+        if not isfinite(timeout_s):
+            return False
+        if not isfinite(dump_duration_s):
+            return False
+        if dump_duration_s < 0.0:
+            return False
+        return True
+
+    def goal_callback(self, goal_request):
+        """Accept only deposit goals that match the supported contract."""
+        if self._is_valid_deposit_goal(goal_request):
+            return GoalResponse.ACCEPT
+        return GoalResponse.REJECT
 
     def cancel_callback(self, _goal_handle):
         """Accept each cancel request so clients can stop long-running goals."""
@@ -67,6 +90,7 @@ class MaterialActionServer(Node):
         result.success = bool(success)
         result.reason_code = int(reason_code)
         result.failure_reason = str(reason)
+        # The action contract uses 0.0 to mean unknown or not measured.
         result.residual_fill_fraction_estimate = float(residual_fill)
         result.duration_s = float(duration_s)
         return result
