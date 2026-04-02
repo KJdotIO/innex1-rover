@@ -153,8 +153,6 @@ class TagPosePublisher(Node):
         detection_stamp_ns = self._stamp_to_ns(camera_to_detected_tag.header.stamp)
         if detection_stamp_ns == self.last_processed_stamp_ns:
             return
-        # Consume this stamp even when rejected to avoid reprocessing the same sample.
-        self.last_processed_stamp_ns = detection_stamp_ns
 
         if self.latest_detection_stamp_ns is None:
             self.get_logger().debug("Dropping tag detection without matching metadata")
@@ -167,6 +165,10 @@ class TagPosePublisher(Node):
                 f"(tf_vs_msg={sync_error_sec:.3f}s)"
             )
             return
+
+        # Past this point the metadata and TF sample are aligned strongly enough
+        # that retries are no longer useful.
+        self.last_processed_stamp_ns = detection_stamp_ns
 
         if self.latest_detection_hamming > self.max_hamming:
             self.get_logger().debug(

@@ -60,6 +60,7 @@ class StartZoneLocaliser(Node):
         self.declare_parameter("angular_speed_rad_s", 0.25)
         self.declare_parameter("max_search_duration_s", 30.0)
         self.declare_parameter("max_search_yaw_rad", 2.0 * math.pi)
+        self.declare_parameter("candidate_alignment_angular_speed_rad_s", 0.08)
         self.declare_parameter("candidate_settle_duration_s", 0.5)
         self.declare_parameter("stable_window_duration_s", 1.0)
         self.declare_parameter("stable_window_min_samples", 5)
@@ -87,6 +88,9 @@ class StartZoneLocaliser(Node):
             self.get_parameter("max_search_duration_s").value
         )
         self.max_search_yaw_rad = float(self.get_parameter("max_search_yaw_rad").value)
+        self.candidate_alignment_angular_speed_rad_s = float(
+            self.get_parameter("candidate_alignment_angular_speed_rad_s").value
+        )
         self.candidate_settle_duration_s = float(
             self.get_parameter("candidate_settle_duration_s").value
         )
@@ -514,7 +518,9 @@ class StartZoneLocaliser(Node):
                 REASON_UNSTABLE,
                 "Tag detected; waiting for a stable lock window.",
             )
-            self._stop_search_motion()
+            self._publish_search_cmd(
+                self.search_sign * self.candidate_alignment_angular_speed_rad_s
+            )
 
             candidate_elapsed_ns = 0
             if self.candidate_entered_ns is not None:

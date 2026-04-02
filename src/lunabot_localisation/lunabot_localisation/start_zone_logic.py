@@ -80,7 +80,8 @@ class StableLockTracker:
         newest = self._samples[-1]
         if newest.stamp_ns > now_ns:
             return False
-        if newest.stamp_ns - oldest.stamp_ns < window_ns:
+        required_span_ns = max(0, window_ns - max_gap_ns)
+        if newest.stamp_ns - oldest.stamp_ns < required_span_ns:
             return False
 
         prev_stamp_ns = None

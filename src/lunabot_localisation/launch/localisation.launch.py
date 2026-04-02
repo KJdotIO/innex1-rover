@@ -27,6 +27,12 @@ def generate_launch_description():
         pkg_localisation, "config", "ekf_lidar_phase.yaml"
     )
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
+    tag_pose_bridge_yaml = os.path.join(
+        pkg_localisation, "config", "tag_pose_bridge.yaml"
+    )
+    tag_pose_bridge_sim_yaml = os.path.join(
+        pkg_localisation, "config", "tag_pose_bridge_sim.yaml"
+    )
     start_zone_localisation_yaml = os.path.join(
         pkg_localisation, "config", "start_zone_localisation.yaml"
     )
@@ -230,12 +236,47 @@ def generate_launch_description():
                 name="tag_pose_publisher",
                 output="screen",
                 parameters=[
+                    tag_pose_bridge_sim_yaml,
                     {
                         "use_sim_time": use_sim_time,
                         "detections_topic": "/camera_front/tags",
                     }
                 ],
-                condition=UnlessCondition(lidar_costmap_phase),
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            lidar_costmap_phase,
+                            "' == 'false' and '",
+                            use_sim_time,
+                            "' == 'true'",
+                        ]
+                    )
+                ),
+            ),
+            Node(
+                package="lunabot_localisation",
+                executable="tag_pose_publisher",
+                name="tag_pose_publisher",
+                output="screen",
+                parameters=[
+                    tag_pose_bridge_yaml,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "detections_topic": "/camera_front/tags",
+                    }
+                ],
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            lidar_costmap_phase,
+                            "' == 'false' and '",
+                            use_sim_time,
+                            "' != 'true'",
+                        ]
+                    )
+                ),
             ),
             Node(
                 package="lunabot_localisation",

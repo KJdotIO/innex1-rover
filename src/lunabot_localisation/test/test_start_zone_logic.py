@@ -23,6 +23,36 @@ def test_tracker_accepts_stable_lock_window():
     )
 
 
+def test_tracker_accepts_window_with_timer_slack():
+    tracker = StableLockTracker()
+    for idx in range(5):
+        tracker.add_sample(_sample(idx * 250_000_000, 1.0, 2.0, 0.1))
+
+    assert tracker.has_stable_lock(
+        now_ns=1_010_000_000,
+        window_ns=1_000_000_000,
+        min_samples=5,
+        max_gap_ns=250_000_000,
+        max_translation_spread_m=0.15,
+        max_yaw_spread_rad=0.2,
+    )
+
+
+def test_tracker_rejects_short_burst_inside_window():
+    tracker = StableLockTracker()
+    for stamp_ns in (700_000_000, 800_000_000, 900_000_000, 1_000_000_000):
+        tracker.add_sample(_sample(stamp_ns, 1.0, 2.0, 0.1))
+
+    assert not tracker.has_stable_lock(
+        now_ns=1_010_000_000,
+        window_ns=800_000_000,
+        min_samples=4,
+        max_gap_ns=350_000_000,
+        max_translation_spread_m=0.15,
+        max_yaw_spread_rad=0.2,
+    )
+
+
 def test_tracker_rejects_large_sample_gap():
     tracker = StableLockTracker()
     tracker.add_sample(_sample(0, 1.0, 2.0, 0.1))

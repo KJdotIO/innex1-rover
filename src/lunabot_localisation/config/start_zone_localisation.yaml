@@ -11,12 +11,13 @@
     target_frame: base_footprint
     search_direction: left
     angular_speed_rad_s: 0.25
+    candidate_alignment_angular_speed_rad_s: 0.08
     max_search_duration_s: 30.0
     max_search_yaw_rad: 6.283185307179586
-    candidate_settle_duration_s: 0.5
-    stable_window_duration_s: 1.0
-    stable_window_min_samples: 5
-    max_sample_gap_s: 0.25
+    candidate_settle_duration_s: 0.35
+    stable_window_duration_s: 0.8
+    stable_window_min_samples: 4
+    max_sample_gap_s: 0.35
     max_lock_translation_spread_m: 0.15
     max_lock_yaw_spread_rad: 0.20
     tf_missing_timeout_s: 5.0
