@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from dataclasses import asdict
 from dataclasses import dataclass
@@ -21,10 +22,15 @@ from rclpy.qos import QoSHistoryPolicy
 from rclpy.qos import QoSProfile
 from rclpy.qos import QoSReliabilityPolicy
 from rclpy.time import Time
+from rclpy.utilities import remove_ros_args
 from rosidl_runtime_py.utilities import get_message
 from tf2_ros import Buffer
 from tf2_ros import TransformListener
 import yaml
+
+from lunabot_bringup.preflight_profiles import filter_preflight_config
+from lunabot_bringup.preflight_profiles import PHASE_FULL
+from lunabot_bringup.preflight_profiles import VALID_PHASES
 
 
 EXIT_OK = 0
@@ -34,6 +40,9 @@ EXIT_INTERNAL_ERROR = 3
 ACTION_TYPE_MAP: dict[str, type] = {
     "nav2_msgs/action/NavigateToPose": NavigateToPose,
 }
+
+TRUE_STRINGS = {"1", "true", "yes", "on"}
+FALSE_STRINGS = {"0", "false", "no", "off"}
 
 
 @dataclass
@@ -95,6 +104,7 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
                 "type": item.get("type"),
                 "min_messages": 1,
                 "critical": True,
+                "phases": item.get("phases"),
             }
         )
         logger.info(f"Added contract topic check: {item.get('name')}")
@@ -113,6 +123,7 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
                 "parent": item.get("parent"),
                 "child": item.get("child"),
                 "critical": True,
+                "phases": item.get("phases"),
             }
         )
         parent = item.get("parent")
@@ -126,13 +137,21 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
 class PreflightChecker(Node):
     """Execute preflight checks before autonomy startup."""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(
+        self,
+        config: dict[str, Any],
+        phase: str = PHASE_FULL,
+        use_sim_time: bool = True,
+    ):
         """Create checker node with merged runtime config."""
         super().__init__(
             "preflight_check",
-            parameter_overrides=[Parameter("use_sim_time", Parameter.Type.BOOL, True)],
+            parameter_overrides=[
+                Parameter("use_sim_time", Parameter.Type.BOOL, bool(use_sim_time))
+            ],
         )
-        self._config = _merge_contract_requirements(config, self.get_logger())
+        merged_config = _merge_contract_requirements(config, self.get_logger())
+        self._config = filter_preflight_config(merged_config, phase)
         self._results: list[CheckResult] = []
 
     def _record(
@@ -161,6 +180,10 @@ class PreflightChecker(Node):
         """Check that simulated clock advances."""
         preflight = self._config["preflight"]
         sim_cfg = preflight.get("sim_time", {})
+        if not bool(self.get_parameter("use_sim_time").value):
+            return
+        if not bool(sim_cfg.get("enabled", True)):
+            return
         timeout_s = float(sim_cfg.get("timeout_s", 5.0))
         min_delta_s = float(sim_cfg.get("min_delta_s", 0.2))
         critical = bool(sim_cfg.get("critical", True))
@@ -493,6 +516,22 @@ def _arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Write JSON report to this file",
     )
+    parser.add_argument(
+        "--phase",
+        default=PHASE_FULL,
+        choices=sorted(VALID_PHASES),
+        help=(
+            "Preflight phase to run. Use 'launch' for the bringup gate or "
+            "'full' for the full stack check."
+        ),
+    )
+    parser.add_argument(
+        "--use-sim-time",
+        type=_parse_bool_text,
+        default=True,
+        metavar="{true,false}",
+        help="Whether the preflight checker should require a live /clock.",
+    )
     return parser
 
 
@@ -502,6 +541,24 @@ def _default_config_path() -> Path:
     return share_dir / "config" / "preflight_checks.yaml"
 
 
+def _parse_bool_text(value: str) -> bool:
+    """Parse common launch-style boolean strings."""
+    normalised = value.strip().lower()
+    if normalised in TRUE_STRINGS:
+        return True
+    if normalised in FALSE_STRINGS:
+        return False
+    raise argparse.ArgumentTypeError(
+        f"Expected a boolean value, got: {value}"
+    )
+
+
+def _strip_ros_cli_args(args: list[str] | None) -> list[str]:
+    """Return only the CLI flags owned by this executable."""
+    argv = sys.argv if args is None else ["preflight_check", *args]
+    return remove_ros_args(args=argv)[1:]
+
+
 def main(args: list[str] | None = None) -> None:
     """
     Run CLI entry point.
@@ -509,9 +566,9 @@ def main(args: list[str] | None = None) -> None:
     Parse arguments, execute checks, print summary, and exit.
     """
     parser = _arg_parser()
-    cli_args = parser.parse_args(args=args)
+    cli_args = parser.parse_args(args=_strip_ros_cli_args(args))
 
-    rclpy.init(args=None)
+    rclpy.init(args=args)
     checker = None
     try:
         config_path = cli_args.config or _default_config_path()
@@ -519,7 +576,11 @@ def main(args: list[str] | None = None) -> None:
             raise FileNotFoundError(f"Preflight config not found: {config_path}")
 
         config = _load_yaml(config_path)
-        checker = PreflightChecker(config)
+        checker = PreflightChecker(
+            config,
+            phase=cli_args.phase,
+            use_sim_time=cli_args.use_sim_time,
+        )
         results = checker.run()
 
         _print_summary(results)

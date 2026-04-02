@@ -69,13 +69,17 @@ preflight:
     - name: /navigate_to_pose
       type: nav2_msgs/action/NavigateToPose
       critical: true
+      phases: [runtime]
 
   required_nodes:
     - name: bt_navigator
       critical: true
+      phases: [runtime]
     - name: controller_server
       critical: true
+      phases: [runtime]
     - name: map_server
       critical: true
     - name: planner_server
       critical: true
+      phases: [runtime]
