@@ -34,22 +34,27 @@ class SimCameraInfoPublisher(Node):
             else ReliabilityPolicy.BEST_EFFORT
         )
 
-        sensor_qos = QoSProfile(
+        publisher_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
             depth=10,
             reliability=reliability,
+        )
+        subscriber_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
         )
 
         self.publisher = self.create_publisher(
             CameraInfo,
             str(self.get_parameter("camera_info_topic").value),
-            sensor_qos,
+            publisher_qos,
         )
         self.create_subscription(
             Image,
             str(self.get_parameter("image_topic").value),
             self.on_image,
-            sensor_qos,
+            subscriber_qos,
         )
 
         self.fx = self.width / (2.0 * math.tan(self.hfov / 2.0))
