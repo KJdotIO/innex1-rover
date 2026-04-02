@@ -194,6 +194,21 @@ def generate_launch_description():
         }.items(),
     )
 
+    depth_to_point_cloud = Node(
+        package="depth_image_proc",
+        executable="point_cloud_xyz_node",
+        name="camera_front_point_cloud_xyz",
+        output="screen",
+        remappings=[
+            ("image_rect", "/camera_front/depth_image"),
+            ("camera_info", "/camera_front/camera_info"),
+            ("points", "/camera_front/points"),
+        ],
+        parameters=[
+            {"use_sim_time": use_sim_time},
+        ],
+    )
+
     terrain_hazard_node = Node(
         package="lunabot_perception",
         executable="terrain_hazard_detector",
@@ -447,6 +462,7 @@ def generate_launch_description():
             map_server,
             map_lifecycle_manager,
             localisation_launch,
+            depth_to_point_cloud,
             terrain_hazard_node,
             navigate_to_pose_gate,
             teleop_launch,

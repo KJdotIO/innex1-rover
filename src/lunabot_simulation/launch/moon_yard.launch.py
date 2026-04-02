@@ -141,16 +141,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    camera_points_bridge = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        name="camera_points_bridge",
-        arguments=[
-            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
-        ],
-        output="screen",
-    )
-
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -192,6 +182,5 @@ def generate_launch_description():
             clock_bridge,
             robot_bridge,
             camera_bridge,
-            camera_points_bridge,
         ]
     )
