@@ -89,9 +89,10 @@ class TerrainHazardDetector(Node):
         self.log_period = Duration(
             seconds=float(self.get_parameter("log_period_sec").value)
         )
-        self.last_log_time = self.get_clock().now() - self.log_period
-        self.last_confidence_time = self.get_clock().now()
-        self.last_input_time = self.get_clock().now() - self.stale_timeout
+        now_ns = self.get_clock().now().nanoseconds
+        self.last_log_time_ns = now_ns
+        self.last_confidence_time_ns = now_ns
+        self.last_input_time_ns = now_ns
 
         self.grid = GridSpec(
             min_x=float(self.get_parameter("grid_min_x").value),
@@ -212,7 +213,7 @@ class TerrainHazardDetector(Node):
     def point_cloud_callback(self, msg: PointCloud2) -> None:
         """Convert a front point cloud into a hazard grid."""
         now = self.get_clock().now()
-        self.last_input_time = now
+        self.last_input_time_ns = now.nanoseconds
 
         points = self.decode_points(msg)
         if points is None or points.shape[0] < self.min_input_points:
@@ -261,12 +262,15 @@ class TerrainHazardDetector(Node):
         unknown &= ~hazards
         self.publish_outputs(msg.header, hazards, unknown, sensor_ready=True)
 
-        if now - self.last_log_time >= self.log_period:
+        if (
+            self._elapsed_ns(now.nanoseconds, self.last_log_time_ns)
+            >= self.log_period.nanoseconds
+        ):
             self.get_logger().info(
                 "Published %d crater hazard cells from %d front camera points."
                 % (int(hazards.sum()), roi_points.shape[0])
             )
-            self.last_log_time = now
+            self.last_log_time_ns = now.nanoseconds
 
     def decode_points(self, msg: PointCloud2) -> np.ndarray | None:
         """Decode x, y, z points from a PointCloud2 message."""
@@ -364,17 +368,20 @@ class TerrainHazardDetector(Node):
 
     def confidence_scale(self, now: Time) -> float:
         """Scale confidence updates by elapsed time rather than callback count."""
-        elapsed = max(
-            (now - self.last_confidence_time).nanoseconds / 1e9,
-            0.0,
-        )
-        self.last_confidence_time = now
+        elapsed_ns = self._elapsed_ns(now.nanoseconds, self.last_confidence_time_ns)
+        elapsed = max(elapsed_ns / 1e9, 0.0)
+        self.last_confidence_time_ns = now.nanoseconds
         return max(elapsed * self.reference_frame_rate, 0.25)
 
     def handle_stale_input(self) -> None:
         """Publish an all-unknown grid when the depth stream goes stale."""
         now = self.get_clock().now()
-        if now - self.last_input_time < self.stale_timeout:
+        if now.nanoseconds <= 0:
+            return
+        if (
+            self._elapsed_ns(now.nanoseconds, self.last_input_time_ns)
+            < self.stale_timeout.nanoseconds
+        ):
             return
 
         self.publish_unknown(self.make_header(now), now, sensor_ready=False)
@@ -440,6 +447,13 @@ class TerrainHazardDetector(Node):
         header.stamp = now.to_msg()
         header.frame_id = self.base_frame
         return header
+
+    @staticmethod
+    def _elapsed_ns(now_ns: int, then_ns: int) -> int:
+        """Return a safe elapsed time that tolerates sim time starting late."""
+        if now_ns <= 0 or then_ns <= 0 or now_ns < then_ns:
+            return 0
+        return now_ns - then_ns
 
 
 def main(args: Iterable[str] | None = None) -> None:
