@@ -33,6 +33,8 @@ setup(
             'start_zone_localiser = '
             'lunabot_localisation.start_zone_localiser:main',
             'tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main',
+            'sim_camera_info_publisher = '
+            'lunabot_localisation.sim_camera_info_publisher:main',
             'stereo_camera_info_publisher = '
             'lunabot_localisation.stereo_camera_info_publisher:main',
             'visual_odometry_gate = lunabot_localisation.visual_odometry_gate:main',

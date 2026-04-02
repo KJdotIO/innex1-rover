@@ -194,6 +194,42 @@ def generate_launch_description():
         }.items(),
     )
 
+    camera_rgb_info = Node(
+        package="lunabot_localisation",
+        executable="sim_camera_info_publisher",
+        name="camera_front_rgb_info",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "image_topic": "/camera_front/image",
+                "camera_info_topic": "/camera_front/camera_info",
+                "frame_id": "camera_front_optical_frame",
+                "width": 640,
+                "height": 480,
+                "hfov": 1.57,
+            }
+        ],
+    )
+
+    camera_depth_info = Node(
+        package="lunabot_localisation",
+        executable="sim_camera_info_publisher",
+        name="camera_front_depth_info",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "image_topic": "/camera_front/depth_image",
+                "camera_info_topic": "/camera_front/depth_camera_info",
+                "frame_id": "camera_front_optical_frame",
+                "width": 640,
+                "height": 480,
+                "hfov": 1.57,
+            }
+        ],
+    )
+
     depth_to_point_cloud = Node(
         package="depth_image_proc",
         executable="point_cloud_xyz_node",
@@ -201,7 +237,7 @@ def generate_launch_description():
         output="screen",
         remappings=[
             ("image_rect", "/camera_front/depth_image"),
-            ("camera_info", "/camera_front/camera_info"),
+            ("camera_info", "/camera_front/depth_camera_info"),
             ("points", "/camera_front/points"),
         ],
         parameters=[
@@ -462,6 +498,8 @@ def generate_launch_description():
             map_server,
             map_lifecycle_manager,
             localisation_launch,
+            camera_rgb_info,
+            camera_depth_info,
             depth_to_point_cloud,
             terrain_hazard_node,
             navigate_to_pose_gate,
