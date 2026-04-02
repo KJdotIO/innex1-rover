@@ -1,4 +1,4 @@
-"""Local Nav2 navigation launch with the public goal action remapped."""
+"""Local Nav2 navigation launch."""
 
 import os
 
@@ -18,7 +18,7 @@ from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
-    """Launch Nav2 with the public NavigateToPose server hidden behind a gate."""
+    """Launch Nav2 with its standard NavigateToPose action surface."""
     bringup_dir = get_package_share_directory("nav2_bringup")
 
     namespace = LaunchConfiguration("namespace")
@@ -41,11 +41,11 @@ def generate_launch_description():
         "velocity_smoother",
     ]
 
+    # Humble does not reliably remap action names for Nav2's rclcpp_action
+    # servers, so the readiness gate uses a distinct public action instead.
     remappings = [
         ("/tf", "tf"),
         ("/tf_static", "tf_static"),
-        ("navigate_to_pose", "navigate_to_pose_nav2"),
-        ("/navigate_to_pose", "/navigate_to_pose_nav2"),
     ]
 
     param_substitutions = {

@@ -16,7 +16,7 @@ def test_filter_preflight_config_keeps_all_checks_in_full_phase():
             "required_topics": [
                 {"name": "/imu/data_raw", "type": "sensor_msgs/msg/Imu"},
                 {
-                    "name": "/navigate_to_pose",
+                    "name": "/navigate_to_pose_gate",
                     "type": "nav2_msgs/action/NavigateToPose",
                     "phases": ["runtime"],
                 },
@@ -37,7 +37,7 @@ def test_filter_preflight_config_drops_runtime_only_checks_from_launch_phase():
     config = {
         "preflight": {
             "required_actions": [
-                {"name": "/navigate_to_pose", "phases": ["runtime"]},
+                {"name": "/navigate_to_pose_gate", "phases": ["runtime"]},
             ],
             "required_nodes": [
                 {"name": "map_server"},

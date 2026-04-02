@@ -26,14 +26,14 @@ def _parse_bool(value) -> bool:
 
 
 class NavigateToPoseGate(Node):
-    """Expose the public NavigateToPose action only when localisation is ready."""
+    """Expose an autonomy-only NavigateToPose action gated by localisation."""
 
     def __init__(self) -> None:
         super().__init__("navigate_to_pose_gate")
 
         self.declare_parameter("status_topic", "/localisation/start_zone_status")
-        self.declare_parameter("public_action_name", "/navigate_to_pose")
-        self.declare_parameter("internal_action_name", "/navigate_to_pose_nav2")
+        self.declare_parameter("public_action_name", "/navigate_to_pose_gate")
+        self.declare_parameter("internal_action_name", "/navigate_to_pose")
         self.declare_parameter("readiness_timeout_s", 5.0)
         self.declare_parameter("gate_enabled", True)
 
@@ -59,6 +59,9 @@ class NavigateToPoseGate(Node):
             NavigateToPose,
             self.internal_action_name,
         )
+        # Humble cannot reliably hide or rename Nav2's own action server via
+        # remapping, so this node exposes a separate action surface that the
+        # rover's autonomy stack must call explicitly.
         self._action_server = ActionServer(
             self,
             NavigateToPose,
@@ -66,6 +69,12 @@ class NavigateToPoseGate(Node):
             execute_callback=self._execute_goal,
             goal_callback=self._on_goal,
             cancel_callback=self._on_cancel,
+        )
+
+        self.get_logger().info(
+            "NavigateToPose readiness gate active on "
+            f"{self.public_action_name}; native Nav2 action "
+            f"{self.internal_action_name} remains available for tooling."
         )
 
     def _on_status(self, msg: LocalisationStartZoneStatus) -> None:
