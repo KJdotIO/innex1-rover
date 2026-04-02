@@ -70,6 +70,10 @@ preflight:
       type: nav2_msgs/action/NavigateToPose
       critical: true
       phases: [runtime]
+    - name: /navigate_to_pose_gate
+      type: nav2_msgs/action/NavigateToPose
+      critical: true
+      phases: [runtime]
 
   required_nodes:
     - name: bt_navigator

@@ -21,6 +21,7 @@ def generate_launch_description():
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_localisation, "launch", "localisation.launch.py")
@@ -30,6 +31,7 @@ def generate_launch_description():
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
+            "cmd_vel_topic": cmd_vel_topic,
         }.items(),
     )
     return LaunchDescription(
@@ -59,6 +61,11 @@ def generate_launch_description():
                     "Launch the apriltag_draw overlay for annotated front camera "
                     "debugging."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "cmd_vel_topic",
+                default_value="cmd_vel",
+                description="Velocity command topic used by the start-zone localiser.",
             ),
             localisation_launch,
         ]

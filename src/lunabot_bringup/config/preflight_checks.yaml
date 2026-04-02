@@ -50,6 +50,10 @@ preflight:
       type: nav_msgs/msg/Odometry
       min_messages: 1
       critical: true
+    - name: /localisation/start_zone_status
+      type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+      min_messages: 1
+      critical: false
 
   required_tf_links:
     - parent: map
@@ -70,6 +74,10 @@ preflight:
       type: nav2_msgs/action/NavigateToPose
       critical: true
       phases: [runtime]
+    - name: /navigate_to_pose_gate
+      type: nav2_msgs/action/NavigateToPose
+      critical: true
+      phases: [runtime]
 
   required_nodes:
     - name: apriltag
@@ -84,7 +92,12 @@ preflight:
       critical: true
     - name: map_server
       critical: true
+    - name: start_zone_localiser
+      critical: true
     - name: planner_server
+      critical: true
+      phases: [runtime]
+    - name: navigate_to_pose_gate
       critical: true
       phases: [runtime]
     - name: tag_pose_publisher

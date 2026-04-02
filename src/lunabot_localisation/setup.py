@@ -30,6 +30,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'start_zone_localiser = '
+            'lunabot_localisation.start_zone_localiser:main',
             'tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main',
             'stereo_camera_info_publisher = '
             'lunabot_localisation.stereo_camera_info_publisher:main',
