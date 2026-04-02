@@ -8,6 +8,7 @@ import tf2_ros
 import tf2_geometry_msgs
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, TransformStamped
 from rclpy.duration import Duration
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
@@ -284,12 +285,22 @@ class TagPosePublisher(Node):
 def main(args=None):
     """Run the AprilTag pose bridge node."""
     rclpy.init(args=args)
-    node = TagPosePublisher()
+    node = None
+    executor = None
     try:
-        rclpy.spin(node)
+        node = TagPosePublisher()
+        executor = MultiThreadedExecutor(num_threads=2)
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
+        if executor is not None:
+            executor.shutdown()
+        if node is not None:
+            node.destroy_node()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:  # pragma: no cover - shutdown can already be in progress
+            pass

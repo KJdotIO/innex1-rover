@@ -10,6 +10,7 @@ from lunabot_interfaces.msg import LocalisationStartZoneStatus
 from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.duration import Duration
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy
 from rclpy.qos import HistoryPolicy
@@ -593,13 +594,20 @@ class StartZoneLocaliser(Node):
 def main(args=None) -> None:
     """Run the start-zone localiser node."""
     rclpy.init(args=args)
-    node = StartZoneLocaliser()
+    node = None
+    executor = None
     try:
-        rclpy.spin(node)
+        node = StartZoneLocaliser()
+        executor = MultiThreadedExecutor(num_threads=2)
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
+        if executor is not None:
+            executor.shutdown()
+        if node is not None:
+            node.destroy_node()
         try:
             if rclpy.ok():
                 rclpy.shutdown()
