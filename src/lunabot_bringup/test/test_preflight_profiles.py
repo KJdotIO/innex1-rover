@@ -15,6 +15,13 @@ def test_filter_preflight_config_keeps_all_checks_in_full_phase():
         "preflight": {
             "required_topics": [
                 {"name": "/imu/data_raw", "type": "sensor_msgs/msg/Imu"},
+            ],
+            "required_actions": [
+                {
+                    "name": "/navigate_to_pose",
+                    "type": "nav2_msgs/action/NavigateToPose",
+                    "phases": ["runtime"],
+                },
                 {
                     "name": "/navigate_to_pose_gate",
                     "type": "nav2_msgs/action/NavigateToPose",
@@ -37,7 +44,16 @@ def test_filter_preflight_config_drops_runtime_only_checks_from_launch_phase():
     config = {
         "preflight": {
             "required_actions": [
-                {"name": "/navigate_to_pose_gate", "phases": ["runtime"]},
+                {
+                    "name": "/navigate_to_pose",
+                    "type": "nav2_msgs/action/NavigateToPose",
+                    "phases": ["runtime"],
+                },
+                {
+                    "name": "/navigate_to_pose_gate",
+                    "type": "nav2_msgs/action/NavigateToPose",
+                    "phases": ["runtime"],
+                },
             ],
             "required_nodes": [
                 {"name": "map_server"},
@@ -53,6 +69,31 @@ def test_filter_preflight_config_drops_runtime_only_checks_from_launch_phase():
     assert filtered["preflight"]["required_nodes"] == [
         {"name": "map_server"},
         {"name": "apriltag", "phases": ["launch", "runtime"]},
+    ]
+
+
+def test_filter_preflight_config_keeps_runtime_actions_in_runtime_phase():
+    config = {
+        "preflight": {
+            "required_actions": [
+                {
+                    "name": "/navigate_to_pose",
+                    "type": "nav2_msgs/action/NavigateToPose",
+                    "phases": ["runtime"],
+                },
+                {
+                    "name": "/navigate_to_pose_gate",
+                    "type": "nav2_msgs/action/NavigateToPose",
+                    "phases": ["runtime"],
+                },
+            ],
+        }
+    }
+
+    filtered = filter_preflight_config(config, "runtime")
+
+    assert filtered["preflight"]["required_actions"] == config["preflight"][
+        "required_actions"
     ]
 
 
