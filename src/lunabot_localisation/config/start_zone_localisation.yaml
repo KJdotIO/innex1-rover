@@ -22,4 +22,4 @@
     max_lock_yaw_spread_rad: 0.20
     tf_missing_timeout_s: 5.0
     set_pose_service_wait_s: 0.1
-    set_pose_timeout_s: 2.0
+    set_pose_timeout_s: 5.0

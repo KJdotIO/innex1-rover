@@ -69,7 +69,7 @@ class StartZoneLocaliser(Node):
         self.declare_parameter("max_lock_yaw_spread_rad", 0.20)
         self.declare_parameter("tf_missing_timeout_s", 5.0)
         self.declare_parameter("set_pose_service_wait_s", 0.1)
-        self.declare_parameter("set_pose_timeout_s", 2.0)
+        self.declare_parameter("set_pose_timeout_s", 5.0)
 
         self.status_topic = self.get_parameter("status_topic").value
         self.cmd_vel_topic = self.get_parameter("cmd_vel_topic").value
@@ -162,6 +162,7 @@ class StartZoneLocaliser(Node):
         self.set_pose_attempt_started_ns: int | None = None
         self.discarded_set_pose_future = None
         self.discarded_set_pose_started_ns: int | None = None
+        self.last_set_pose_service_check_ns: int | None = None
         self.search_motion_active = False
         self.last_timer_now_ns: int | None = None
 
@@ -270,6 +271,7 @@ class StartZoneLocaliser(Node):
             self.discarded_set_pose_started_ns = None
         self.pending_set_pose_future = None
         self.set_pose_attempt_started_ns = None
+        self.last_set_pose_service_check_ns = None
         self._set_state(
             STATE_SEARCHING,
             REASON_SEARCHING,
@@ -337,9 +339,27 @@ class StartZoneLocaliser(Node):
         if self.set_pose_attempt_started_ns is None:
             self.set_pose_attempt_started_ns = now_ns
 
-        if not self.set_pose_client.wait_for_service(
-            timeout_sec=self.set_pose_service_wait_s
+        if (
+            self.last_set_pose_service_check_ns is not None
+            and self.set_pose_service_wait_s > 0.0
+            and float(now_ns - self.last_set_pose_service_check_ns) / 1e9
+            < self.set_pose_service_wait_s
         ):
+            self._set_state(
+                STATE_CANDIDATE_LOCK,
+                REASON_UNSTABLE,
+                f"Stable tag lock acquired; waiting for {self.set_pose_service}.",
+            )
+            return
+
+        self.last_set_pose_service_check_ns = now_ns
+        service_is_ready = False
+        if hasattr(self.set_pose_client, "service_is_ready"):
+            service_is_ready = self.set_pose_client.service_is_ready()
+        else:  # pragma: no cover - compatibility fallback
+            service_is_ready = self.set_pose_client.wait_for_service(timeout_sec=0.0)
+
+        if not service_is_ready:
             if (
                 float(now_ns - self.set_pose_attempt_started_ns) / 1e9
                 >= self.set_pose_timeout_s
@@ -347,20 +367,21 @@ class StartZoneLocaliser(Node):
                 self._set_state(
                     STATE_FAILED,
                     REASON_SET_POSE_FAILED,
-                    "Global EKF /set_pose service never became available.",
+                    f"Global EKF {self.set_pose_service} service never became available.",
                 )
                 self._stop_search_motion()
             else:
                 self._set_state(
                     STATE_CANDIDATE_LOCK,
                     REASON_UNSTABLE,
-                    "Stable tag lock acquired; waiting for the global EKF service.",
+                    f"Stable tag lock acquired; waiting for {self.set_pose_service}.",
                 )
             return
 
         request = SetPose.Request()
         request.pose = self.latest_seed_pose
         self.pending_set_pose_future = self.set_pose_client.call_async(request)
+        self.last_set_pose_service_check_ns = None
         self._stop_search_motion()
         self._set_state(
             STATE_CANDIDATE_LOCK,
@@ -396,11 +417,13 @@ class StartZoneLocaliser(Node):
                 f"Global EKF /set_pose failed: {exc}",
             )
             self.pending_set_pose_future = None
+            self.last_set_pose_service_check_ns = None
             self._stop_search_motion()
             return True
 
         self.pending_set_pose_future = None
         self.set_pose_attempt_started_ns = None
+        self.last_set_pose_service_check_ns = None
         self.ready_since_ns = now_ns
         self._set_state(
             STATE_READY,

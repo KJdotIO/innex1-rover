@@ -145,7 +145,10 @@ def generate_launch_description():
                 name="ekf_filter_node_odom",
                 output="screen",
                 parameters=[ekf_lidar_phase_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[("odometry/filtered", "/odometry/local")],
+                remappings=[
+                    ("odometry/filtered", "/odometry/local"),
+                    ("set_pose", "/ekf_filter_node_odom/set_pose"),
+                ],
             ),
             # During the lidar debug phase there is no global localisation source,
             # so publish an identity map->odom transform to keep Nav2 / RViz happy.
@@ -171,7 +174,10 @@ def generate_launch_description():
                 name="ekf_filter_node_map",
                 output="screen",
                 parameters=[ekf_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[("odometry/filtered", "/odometry/global")],
+                remappings=[
+                    ("odometry/filtered", "/odometry/global"),
+                    ("set_pose", "/ekf_filter_node_map/set_pose"),
+                ],
                 condition=UnlessCondition(lidar_costmap_phase),
             ),
             # RTAB-Map SLAM (optional, map building only, no TF publishing)
