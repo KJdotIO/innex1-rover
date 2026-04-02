@@ -20,16 +20,24 @@ class SimCameraInfoPublisher(Node):
         self.declare_parameter("image_topic", "/camera_front/image")
         self.declare_parameter("camera_info_topic", "/camera_front/camera_info")
         self.declare_parameter("frame_id", "camera_front_optical_frame")
+        self.declare_parameter("reliability", "reliable")
 
         self.width = int(self.get_parameter("width").value)
         self.height = int(self.get_parameter("height").value)
         self.hfov = float(self.get_parameter("hfov").value)
         self.frame_id = str(self.get_parameter("frame_id").value)
 
+        reliability_name = str(self.get_parameter("reliability").value).strip().lower()
+        reliability = (
+            ReliabilityPolicy.RELIABLE
+            if reliability_name == "reliable"
+            else ReliabilityPolicy.BEST_EFFORT
+        )
+
         sensor_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
             depth=10,
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=reliability,
         )
 
         self.publisher = self.create_publisher(

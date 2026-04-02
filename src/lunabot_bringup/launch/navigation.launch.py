@@ -208,6 +208,7 @@ def generate_launch_description():
                 "width": 640,
                 "height": 480,
                 "hfov": 1.57,
+                "reliability": "reliable",
             }
         ],
     )
@@ -226,6 +227,7 @@ def generate_launch_description():
                 "width": 640,
                 "height": 480,
                 "hfov": 1.57,
+                "reliability": "reliable",
             }
         ],
     )

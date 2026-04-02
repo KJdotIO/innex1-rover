@@ -129,16 +129,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    camera_bridge = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        name="camera_bridge",
-        arguments=[
-            "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-        ],
-        output="screen",
-    )
-
     rgb_image_bridge = Node(
         package="ros_gz_image",
         executable="image_bridge",
@@ -195,7 +185,6 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
-            camera_bridge,
             rgb_image_bridge,
             depth_image_bridge,
         ]
