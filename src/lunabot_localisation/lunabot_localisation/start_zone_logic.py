@@ -89,7 +89,7 @@ class StableLockTracker:
         max_distance = 0.0
         samples = list(self._samples)
         for index, sample in enumerate(samples):
-            for other in samples[index + 1 :]:
+            for other in samples[index + 1:]:
                 dx = other.x - sample.x
                 dy = other.y - sample.y
                 max_distance = max(max_distance, math.hypot(dx, dy))
@@ -100,6 +100,6 @@ class StableLockTracker:
         max_delta = 0.0
         samples = list(self._samples)
         for index, sample in enumerate(samples):
-            for other in samples[index + 1 :]:
+            for other in samples[index + 1:]:
                 max_delta = max(max_delta, abs(angle_delta(other.yaw, sample.yaw)))
         return max_delta
