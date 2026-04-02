@@ -109,7 +109,7 @@ class NavigateToPoseGate(Node):
             )
             return GoalResponse.REJECT
 
-        return GoalResponse.ACCEPT_AND_EXECUTE
+        return GoalResponse.ACCEPT
 
     def _on_cancel(self, _goal_handle) -> CancelResponse:
         """Accept cancellation requests and mirror them to Nav2."""
