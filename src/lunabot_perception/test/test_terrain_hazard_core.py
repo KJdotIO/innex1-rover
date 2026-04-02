@@ -56,6 +56,44 @@ def test_detect_drop_cells_marks_supported_crater_cell():
     assert not unknown[1, 1]
 
 
+def test_detect_drop_cells_accepts_sparse_supported_crater_cell():
+    grid = GridSpec(min_x=0.0, max_x=0.8, min_y=0.0, max_y=0.8, resolution=0.2)
+    counts = np.zeros((grid.height, grid.width), dtype=np.int32)
+    min_height = np.zeros((grid.height, grid.width), dtype=np.float32)
+    max_height = np.zeros((grid.height, grid.width), dtype=np.float32)
+
+    supported_cells = (
+        (1, 1),
+        (1, 2),
+        (2, 1),
+        (2, 2),
+        (1, 3),
+        (3, 1),
+    )
+    for y_idx, x_idx in supported_cells:
+        counts[y_idx, x_idx] = 2
+
+    min_height[2, 2] = -0.22
+    max_height[2, 2] = -0.22
+
+    hazards, unknown = detect_drop_cells(
+        min_height=min_height,
+        max_height=max_height,
+        counts=counts,
+        min_points_per_cell=2,
+        neighborhood_radius_cells=1,
+        min_neighbor_cells=4,
+        drop_threshold=0.14,
+        roughness_threshold=0.10,
+        edge_margin_cells=0,
+        max_detection_x=1.0,
+        grid=grid,
+    )
+
+    assert hazards[2, 2]
+    assert not unknown[2, 2]
+
+
 def test_detect_drop_cells_marks_sparse_cells_unknown():
     grid = GridSpec(min_x=0.0, max_x=0.4, min_y=0.0, max_y=0.4, resolution=0.2)
     counts = np.zeros((grid.height, grid.width), dtype=np.int32)

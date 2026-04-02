@@ -181,34 +181,34 @@ class TerrainHazardDetector(Node):
         self.declare_parameter("hazard_points_topic", "/terrain_hazard/points")
         self.declare_parameter("hazard_grid_topic", "/terrain_hazard/grid")
         self.declare_parameter("hazard_ready_topic", "/terrain_hazard/ready")
-        self.declare_parameter("grid_min_x", 0.40)
+        self.declare_parameter("grid_min_x", 0.30)
         self.declare_parameter("grid_max_x", 2.40)
         self.declare_parameter("grid_min_y", -1.00)
         self.declare_parameter("grid_max_y", 1.00)
         self.declare_parameter("grid_resolution", 0.10)
-        self.declare_parameter("min_points_per_cell", 3)
+        self.declare_parameter("min_points_per_cell", 2)
         self.declare_parameter("neighborhood_radius_cells", 2)
-        self.declare_parameter("min_neighbor_cells", 6)
+        self.declare_parameter("min_neighbor_cells", 4)
         self.declare_parameter("drop_threshold_m", 0.14)
         self.declare_parameter("roughness_threshold_m", 0.10)
-        self.declare_parameter("min_cluster_cells", 4)
+        self.declare_parameter("min_cluster_cells", 3)
         self.declare_parameter("hazard_padding_cells", 1)
         self.declare_parameter("confidence_add", 0.45)
         self.declare_parameter("confidence_decay", 0.82)
         self.declare_parameter("confidence_clear", 0.20)
         self.declare_parameter("publish_threshold", 0.90)
-        self.declare_parameter("reference_frame_rate", 5.0)
+        self.declare_parameter("reference_frame_rate", 15.0)
         self.declare_parameter("max_detection_x", 2.10)
         self.declare_parameter("edge_margin_cells", 1)
         self.declare_parameter("min_valid_z", -1.50)
         self.declare_parameter("max_valid_z", 1.00)
-        self.declare_parameter("self_filter_x", 0.70)
+        self.declare_parameter("self_filter_x", 0.55)
         self.declare_parameter("self_filter_y", 0.40)
         self.declare_parameter("self_filter_z", -0.30)
         self.declare_parameter("hazard_marker_height", 0.20)
         self.declare_parameter("stale_timeout_s", 1.0)
         self.declare_parameter("log_period_sec", 5.0)
-        self.declare_parameter("min_input_points", 50)
+        self.declare_parameter("min_input_points", 20)
 
     def point_cloud_callback(self, msg: PointCloud2) -> None:
         """Convert a front point cloud into a hazard grid."""
@@ -318,35 +318,68 @@ class TerrainHazardDetector(Node):
         header: Header,
     ) -> np.ndarray | None:
         """Transform the point cloud into the rover base frame."""
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                self.base_frame,
-                header.frame_id,
-                Time.from_msg(header.stamp),
-                timeout=Duration(seconds=0.1),
-            )
-            rotation = quaternion_to_matrix(transform.transform.rotation)
-        except (TransformException, ValueError) as exc:
-            self.get_logger().warn(
-                f"Failed to transform terrain points into {self.base_frame}: {exc}"
-            )
+        if not header.frame_id:
+            self.get_logger().warn("Terrain point cloud arrived without a frame id.")
             return None
 
-        translation = np.array(
-            [
-                transform.transform.translation.x,
-                transform.transform.translation.y,
-                transform.transform.translation.z,
-            ],
-            dtype=np.float32,
-        )
-        if not np.all(np.isfinite(translation)):
-            self.get_logger().warn("Received a non-finite transform translation.")
-            return None
+        if header.frame_id == self.base_frame:
+            transformed = points
+        else:
+            transform = None
+            lookup_errors: list[str] = []
+            lookup_times = [Time.from_msg(header.stamp)]
+            if lookup_times[0].nanoseconds > 0:
+                lookup_times.append(Time())
 
-        transformed = (points @ rotation.T) + translation
+            for lookup_time in lookup_times:
+                try:
+                    transform = self.tf_buffer.lookup_transform(
+                        self.base_frame,
+                        header.frame_id,
+                        lookup_time,
+                        timeout=Duration(seconds=0.1),
+                    )
+                    break
+                except TransformException as exc:
+                    lookup_errors.append(str(exc))
+
+            if transform is None:
+                joined_errors = " | ".join(lookup_errors)
+                self.get_logger().warn(
+                    f"Failed to transform terrain points into {self.base_frame}: {joined_errors}"
+                )
+                return None
+
+            try:
+                rotation = quaternion_to_matrix(transform.transform.rotation)
+            except ValueError as exc:
+                self.get_logger().warn(
+                    f"Failed to transform terrain points into {self.base_frame}: {exc}"
+                )
+                return None
+
+            translation = np.array(
+                [
+                    transform.transform.translation.x,
+                    transform.transform.translation.y,
+                    transform.transform.translation.z,
+                ],
+                dtype=np.float32,
+            )
+            if not np.all(np.isfinite(translation)):
+                self.get_logger().warn("Received a non-finite transform translation.")
+                return None
+
+            transformed = (points @ rotation.T) + translation
+
         finite_mask = np.all(np.isfinite(transformed), axis=1)
-        return transformed[finite_mask]
+        transformed = transformed[finite_mask]
+        if transformed.shape[0] == 0:
+            self.get_logger().warn(
+                "Terrain point cloud produced no finite points after frame transform."
+            )
+            return None
+        return transformed
 
     def crop_points(self, points: np.ndarray) -> np.ndarray:
         """Keep only plausible terrain points inside the local grid."""

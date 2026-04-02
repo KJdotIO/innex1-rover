@@ -4,31 +4,31 @@ terrain_hazard_detector:
     input_topic: /camera_front/points
     hazard_points_topic: /terrain_hazard/points
     hazard_grid_topic: /terrain_hazard/grid
-    grid_min_x: 0.40
+    grid_min_x: 0.30
     grid_max_x: 2.40
     grid_min_y: -1.00
     grid_max_y: 1.00
     grid_resolution: 0.10
-    min_points_per_cell: 3
+    min_points_per_cell: 2
     neighborhood_radius_cells: 2
-    min_neighbor_cells: 6
+    min_neighbor_cells: 4
     drop_threshold_m: 0.14
     roughness_threshold_m: 0.10
-    min_cluster_cells: 4
+    min_cluster_cells: 3
     hazard_padding_cells: 1
     confidence_add: 0.45
     confidence_decay: 0.82
     confidence_clear: 0.20
     publish_threshold: 0.90
-    reference_frame_rate: 5.0
+    reference_frame_rate: 15.0
     max_detection_x: 2.10
     edge_margin_cells: 1
     min_valid_z: -1.50
     max_valid_z: 1.00
-    self_filter_x: 0.70
+    self_filter_x: 0.55
     self_filter_y: 0.40
     self_filter_z: -0.30
     hazard_marker_height: 0.20
     stale_timeout_s: 1.0
     log_period_sec: 5.0
-    min_input_points: 50
+    min_input_points: 20
