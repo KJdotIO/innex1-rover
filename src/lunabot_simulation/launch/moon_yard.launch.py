@@ -7,10 +7,50 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
+from launch.actions import OpaqueFunction
+from launch.actions import SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+
+def configure_world_and_env(context, *_args, **_kwargs):
+    """Prepare the world file and rendering environment for the current host."""
+    world_path = LaunchConfiguration("world").perform(context)
+    render_engine = LaunchConfiguration("render_engine").perform(context).strip()
+    software_rendering = (
+        LaunchConfiguration("software_rendering").perform(context).strip().lower()
+        == "true"
+    )
+
+    actions = []
+    if software_rendering:
+        actions.extend(
+            [
+                SetEnvironmentVariable("LIBGL_ALWAYS_SOFTWARE", "1"),
+                SetEnvironmentVariable("MESA_LOADER_DRIVER_OVERRIDE", "llvmpipe"),
+            ]
+        )
+
+    if render_engine:
+        with open(world_path, "r", encoding="utf-8") as world_file:
+            content = world_file.read()
+        patched_content = content.replace(
+            "<render_engine>ogre2</render_engine>",
+            f"<render_engine>{render_engine}</render_engine>",
+        ).replace(
+            "<render_engine>ogre</render_engine>",
+            f"<render_engine>{render_engine}</render_engine>",
+        )
+        if patched_content != content:
+            tmp_world = os.path.join(tempfile.gettempdir(), f"moon_yard_{render_engine}.sdf")
+            with open(tmp_world, "w", encoding="utf-8") as world_file:
+                world_file.write(patched_content)
+            world_path = tmp_world
+
+    context.launch_configurations["world"] = world_path
+    return actions
 
 
 def generate_launch_description():
@@ -18,21 +58,6 @@ def generate_launch_description():
     pkg_lunabot_description = get_package_share_directory("lunabot_description")
     pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
     world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
-
-    # switches to ogre 1 preflight if on mac. doesnt affect linux
-    if platform.system() == "Darwin":
-        with open(world_path, "r") as f:
-            content = f.read()
-        if "<render_engine>ogre2</render_engine>" in content:
-            patched_content = content.replace(
-                "<render_engine>ogre2</render_engine>",
-                "<render_engine>ogre</render_engine>",
-            )
-            tmp_world = os.path.join(tempfile.gettempdir(), "moon_yard_mac.sdf")
-            with open(tmp_world, "w") as f:
-                f.write(patched_content)
-            world_path = tmp_world
-            print(f"macOS detected: Using patched Ogre1 world at {world_path}")
 
     # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our custom models
     models_path = os.path.join(pkg_lunabot_simulation, "models")
@@ -146,6 +171,16 @@ def generate_launch_description():
                 description="Absolute path to the Gazebo world file.",
             ),
             DeclareLaunchArgument(
+                "render_engine",
+                default_value="ogre" if platform.system() == "Darwin" else "ogre",
+                description="Gazebo rendering engine to patch into the world file.",
+            ),
+            DeclareLaunchArgument(
+                "software_rendering",
+                default_value="true" if platform.system() != "Darwin" else "false",
+                description="Force software rendering for headless simulation hosts.",
+            ),
+            DeclareLaunchArgument(
                 "spawn_x",
                 default_value="0.0",
                 description="Robot spawn x position in world coordinates.",
@@ -165,6 +200,7 @@ def generate_launch_description():
                 default_value="0.0",
                 description="Robot spawn yaw in radians.",
             ),
+            OpaqueFunction(function=configure_world_and_env),
             gz_sim,
             robot_state_publisher,
             spawn_robot,
