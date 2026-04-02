@@ -184,6 +184,7 @@ def generate_launch_description():
                 description="Robot spawn yaw in radians.",
             ),
             SetEnvironmentVariable("DISPLAY", "", condition=IfCondition(headless_rendering)),
+            SetEnvironmentVariable("LIBGL_DRI3_DISABLE", "1", condition=IfCondition(headless_rendering)),
             gz_sim,
             gz_sim_headless,
             robot_state_publisher,
