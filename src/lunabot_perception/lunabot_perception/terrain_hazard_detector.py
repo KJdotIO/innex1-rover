@@ -217,16 +217,31 @@ class TerrainHazardDetector(Node):
 
         points = self.decode_points(msg)
         if points is None or points.shape[0] < self.min_input_points:
+            self.log_sparse_input(
+                now,
+                stage="decoded",
+                point_count=0 if points is None else int(points.shape[0]),
+            )
             self.publish_unknown(msg.header, now, sensor_ready=False)
             return
 
         transformed = self.transform_points(points, msg.header)
         if transformed is None or transformed.shape[0] < self.min_input_points:
+            self.log_sparse_input(
+                now,
+                stage="transformed",
+                point_count=0 if transformed is None else int(transformed.shape[0]),
+            )
             self.publish_unknown(msg.header, now, sensor_ready=False)
             return
 
         roi_points = self.crop_points(transformed)
         if roi_points.shape[0] < self.min_input_points:
+            self.log_sparse_input(
+                now,
+                stage="cropped",
+                point_count=int(roi_points.shape[0]),
+            )
             self.publish_unknown(msg.header, now, sensor_ready=False)
             return
 
@@ -271,6 +286,20 @@ class TerrainHazardDetector(Node):
                 % (int(hazards.sum()), roi_points.shape[0])
             )
             self.last_log_time_ns = now.nanoseconds
+
+    def log_sparse_input(self, now: Time, *, stage: str, point_count: int) -> None:
+        """Throttle sparse-input diagnostics so the live logs stay readable."""
+        if (
+            self._elapsed_ns(now.nanoseconds, self.last_log_time_ns)
+            < self.log_period.nanoseconds
+        ):
+            return
+
+        self.get_logger().info(
+            "Terrain hazard input stayed below threshold after %s stage: %d points "
+            "(minimum %d)." % (stage, point_count, self.min_input_points)
+        )
+        self.last_log_time_ns = now.nanoseconds
 
     def decode_points(self, msg: PointCloud2) -> np.ndarray | None:
         """Decode x, y, z points from a PointCloud2 message."""
