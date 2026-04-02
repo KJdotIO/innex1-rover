@@ -6,11 +6,12 @@ READY_REASON = "LOCALISATION_READY"
 
 def is_localisation_ready(
     status,
-    _last_update_ns: int | None,
+    last_update_ns: int | None,
     now_ns: int,
     freshness_ns: int,
 ) -> bool:
     """Return whether the latest status still counts as travel-ready."""
+    del last_update_ns
     if status is None:
         return False
 
