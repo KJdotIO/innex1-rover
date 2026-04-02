@@ -45,16 +45,14 @@ def _is_falsey(value):
 
 
 def _build_nav2_start_actions(
-    pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
+    pkg_bringup, nav_params_path, use_sim_time, enable_teleop
 ):
     """Return Nav2 start actions for direct or muxed operation."""
     nav2_launch = GroupAction(
         [
-            SetRemap(src="navigate_to_pose", dst="navigate_to_pose_nav2"),
-            SetRemap(src="/navigate_to_pose", dst="/navigate_to_pose_nav2"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
+                    os.path.join(pkg_bringup, "launch", "nav2_navigation.launch.py")
                 ),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
@@ -70,11 +68,9 @@ def _build_nav2_start_actions(
         [
             SetRemap(src="cmd_vel", dst="cmd_vel_nav"),
             SetRemap(src="cmd_vel_smoothed", dst="cmd_vel_nav"),
-            SetRemap(src="navigate_to_pose", dst="navigate_to_pose_nav2"),
-            SetRemap(src="/navigate_to_pose", dst="/navigate_to_pose_nav2"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
+                    os.path.join(pkg_bringup, "launch", "nav2_navigation.launch.py")
                 ),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
@@ -103,7 +99,7 @@ def _select_localiser_cmd_vel_topic(enable_teleop):
 def _handle_preflight_exit(
     event,
     _context,
-    pkg_nav2_bringup,
+    pkg_bringup,
     nav_params_path,
     use_sim_time,
     enable_teleop,
@@ -111,7 +107,7 @@ def _handle_preflight_exit(
     """Start Nav2 only when the launch-gate preflight passes."""
     if event.returncode == 0:
         return _build_nav2_start_actions(
-            pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
+            pkg_bringup, nav_params_path, use_sim_time, enable_teleop
         )
 
     return [
@@ -143,7 +139,6 @@ def generate_launch_description():
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
     pkg_nav = get_package_share_directory("lunabot_navigation")
-    pkg_nav2_bringup = get_package_share_directory("nav2_bringup")
     pkg_teleop = get_package_share_directory("lunabot_teleop")
 
     nav_params_path = os.path.join(pkg_nav, "config", "nav2_params.yaml")
@@ -327,7 +322,7 @@ def generate_launch_description():
             on_exit=lambda event, context: _handle_preflight_exit(
                 event,
                 context,
-                pkg_nav2_bringup,
+                pkg_bringup,
                 nav_params_path,
                 use_sim_time,
                 enable_teleop,
@@ -342,7 +337,7 @@ def generate_launch_description():
             on_exit=lambda event, context: _handle_preflight_exit(
                 event,
                 context,
-                pkg_nav2_bringup,
+                pkg_bringup,
                 nav_params_path,
                 use_sim_time,
                 enable_teleop,
@@ -353,7 +348,7 @@ def generate_launch_description():
 
     direct_nav2_start = GroupAction(
         _build_nav2_start_actions(
-            pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
+            pkg_bringup, nav_params_path, use_sim_time, enable_teleop
         ),
         condition=IfCondition(_is_falsey(enforce_preflight)),
     )

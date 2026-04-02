@@ -567,6 +567,12 @@ def main(args=None) -> None:
     node = StartZoneLocaliser()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:  # pragma: no cover - shutdown can already be in progress
+            pass
