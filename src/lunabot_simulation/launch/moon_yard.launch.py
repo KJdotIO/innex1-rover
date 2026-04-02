@@ -172,7 +172,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "render_engine",
-                default_value="ogre" if platform.system() == "Darwin" else "ogre",
+                default_value="ogre" if platform.system() == "Darwin" else "ogre2",
                 description="Gazebo rendering engine to patch into the world file.",
             ),
             DeclareLaunchArgument(
