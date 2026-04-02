@@ -7,6 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
+from launch.actions import SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -182,6 +183,7 @@ def generate_launch_description():
                 default_value="0.0",
                 description="Robot spawn yaw in radians.",
             ),
+            SetEnvironmentVariable("DISPLAY", "", condition=IfCondition(headless_rendering)),
             gz_sim,
             gz_sim_headless,
             robot_state_publisher,
