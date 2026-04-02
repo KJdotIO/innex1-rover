@@ -7,6 +7,8 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -45,6 +47,7 @@ def generate_launch_description():
     )
 
     world = LaunchConfiguration("world")
+    headless_rendering = LaunchConfiguration("headless_rendering")
     spawn_x = LaunchConfiguration("spawn_x")
     spawn_y = LaunchConfiguration("spawn_y")
     spawn_z = LaunchConfiguration("spawn_z")
@@ -56,6 +59,15 @@ def generate_launch_description():
             os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
         ),
         launch_arguments={"gz_args": ["-r -s '", world, "'"]}.items(),
+        condition=UnlessCondition(headless_rendering),
+    )
+
+    gz_sim_headless = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
+        ),
+        launch_arguments={"gz_args": ["-r -s --headless-rendering '", world, "'"]}.items(),
+        condition=IfCondition(headless_rendering),
     )
 
     robot_state_publisher = Node(
@@ -146,6 +158,11 @@ def generate_launch_description():
                 description="Absolute path to the Gazebo world file.",
             ),
             DeclareLaunchArgument(
+                "headless_rendering",
+                default_value="true" if platform.system() != "Darwin" else "false",
+                description="Enable Gazebo EGL headless rendering for sensor cameras.",
+            ),
+            DeclareLaunchArgument(
                 "spawn_x",
                 default_value="0.0",
                 description="Robot spawn x position in world coordinates.",
@@ -166,6 +183,7 @@ def generate_launch_description():
                 description="Robot spawn yaw in radians.",
             ),
             gz_sim,
+            gz_sim_headless,
             robot_state_publisher,
             spawn_robot,
             clock_bridge,
