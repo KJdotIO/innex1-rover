@@ -462,9 +462,15 @@ def main(args: Iterable[str] | None = None) -> None:
     node = TerrainHazardDetector()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:  # pragma: no cover - shutdown can already be in progress
+            pass
 
 
 if __name__ == "__main__":
