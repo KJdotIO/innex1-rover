@@ -29,7 +29,7 @@ def configure_world_and_env(context, *_args, **_kwargs):
         actions.extend(
             [
                 SetEnvironmentVariable("LIBGL_ALWAYS_SOFTWARE", "1"),
-                SetEnvironmentVariable("MESA_LOADER_DRIVER_OVERRIDE", "llvmpipe"),
+                SetEnvironmentVariable("MESA_LOADER_DRIVER_OVERRIDE", "swrast"),
             ]
         )
 
