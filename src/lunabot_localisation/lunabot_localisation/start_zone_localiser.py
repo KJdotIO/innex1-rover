@@ -151,12 +151,15 @@ class StartZoneLocaliser(Node):
         self.latest_seed_pose: PoseWithCovarianceStamped | None = None
         self.last_odom_yaw: float | None = None
         self.accumulated_search_yaw = 0.0
-        self.search_started_ns = self.get_clock().now().nanoseconds
+        self.search_started_ns: int | None = None
         self.ready_since_ns: int | None = None
         self.candidate_entered_ns: int | None = None
         self.pending_set_pose_future = None
         self.set_pose_attempt_started_ns: int | None = None
+        self.discarded_set_pose_future = None
+        self.discarded_set_pose_started_ns: int | None = None
         self.search_motion_active = False
+        self.last_timer_now_ns: int | None = None
 
         self.state = STATE_SEARCHING
         self.reason_code = REASON_SEARCHING
@@ -176,6 +179,9 @@ class StartZoneLocaliser(Node):
         stamp_ns = int(msg.header.stamp.sec) * 1_000_000_000 + int(
             msg.header.stamp.nanosec
         )
+        now_ns = self.get_clock().now().nanoseconds
+        if now_ns <= 0 or stamp_ns > (now_ns + self.max_sample_gap_ns):
+            return
         yaw = self._yaw_from_quaternion(msg.pose.pose.orientation)
         self.lock_tracker.add_sample(
             PoseSample(
@@ -239,6 +245,33 @@ class StartZoneLocaliser(Node):
         self.search_motion_active = False
         self._publish_cmd(0.0)
 
+    def _reset_after_clock_jump(self, now_ns: int) -> None:
+        """Clear transient state after ROS time starts late or jumps backwards."""
+        self._stop_search_motion()
+        self.search_started_ns = now_ns
+        self.accumulated_search_yaw = 0.0
+        self.candidate_entered_ns = None
+        self.ready_since_ns = None
+        self.latest_seed_pose = None
+        self.last_odom_yaw = None
+        self.last_timer_now_ns = now_ns
+        self.lock_tracker.clear()
+        if self.pending_set_pose_future is not None and (
+            not self.pending_set_pose_future.done()
+        ):
+            self.discarded_set_pose_future = self.pending_set_pose_future
+            self.discarded_set_pose_started_ns = now_ns
+        else:
+            self.discarded_set_pose_future = None
+            self.discarded_set_pose_started_ns = None
+        self.pending_set_pose_future = None
+        self.set_pose_attempt_started_ns = None
+        self._set_state(
+            STATE_SEARCHING,
+            REASON_SEARCHING,
+            "Searching for the start-zone AprilTag.",
+        )
+
     def _set_state(self, state: str, reason_code: str, reason_detail: str) -> None:
         """Update the public state and emit a concise log when it changes."""
         changed = (
@@ -255,6 +288,9 @@ class StartZoneLocaliser(Node):
     def _publish_status(self, now_ns: int) -> None:
         """Publish the current start-zone localisation status."""
         status = LocalisationStartZoneStatus()
+        if now_ns > 0:
+            status.stamp.sec = now_ns // 1_000_000_000
+            status.stamp.nanosec = now_ns % 1_000_000_000
         status.state = self.state
         status.ready = self.state == STATE_READY
         status.reason_code = self.reason_code
@@ -262,12 +298,21 @@ class StartZoneLocaliser(Node):
         if self.ready_since_ns is None:
             status.stable_lock_age_s = 0.0
         else:
-            status.stable_lock_age_s = float(now_ns - self.ready_since_ns) / 1e9
-        status.search_elapsed_s = float(now_ns - self.search_started_ns) / 1e9
+            status.stable_lock_age_s = max(
+                0.0, float(now_ns - self.ready_since_ns) / 1e9
+            )
+        if self.search_started_ns is None:
+            status.search_elapsed_s = 0.0
+        else:
+            status.search_elapsed_s = max(
+                0.0, float(now_ns - self.search_started_ns) / 1e9
+            )
         self.status_pub.publish(status)
 
     def _should_fail_timeout(self, now_ns: int) -> bool:
         """Return whether the bounded search window has been exhausted."""
+        if self.search_started_ns is None:
+            return False
         elapsed_s = float(now_ns - self.search_started_ns) / 1e9
         return (
             elapsed_s >= self.max_search_duration_s
@@ -361,12 +406,74 @@ class StartZoneLocaliser(Node):
         self._stop_search_motion()
         return True
 
+    def _handle_discarded_set_pose(self, now_ns: int) -> bool:
+        """Wait for a stale pre-rewind /set_pose request to clear."""
+        if self.discarded_set_pose_future is None:
+            return False
+
+        if not self.discarded_set_pose_future.done():
+            if (
+                self.discarded_set_pose_started_ns is not None
+                and float(now_ns - self.discarded_set_pose_started_ns) / 1e9
+                >= self.set_pose_timeout_s
+            ):
+                self.discarded_set_pose_future = None
+                self.discarded_set_pose_started_ns = None
+                self._set_state(
+                    STATE_FAILED,
+                    REASON_SET_POSE_FAILED,
+                    "An earlier EKF seed request did not settle after a clock reset.",
+                )
+                self._stop_search_motion()
+                return True
+
+            self._set_state(
+                STATE_SEARCHING,
+                REASON_SEARCHING,
+                "Waiting for an earlier EKF seed request to settle after a clock reset.",
+            )
+            self._stop_search_motion()
+            return True
+
+        try:
+            self.discarded_set_pose_future.result()
+        except Exception:  # pragma: no cover - defensive path
+            pass
+
+        self.discarded_set_pose_future = None
+        self.discarded_set_pose_started_ns = None
+        return True
+
     def _on_timer(self) -> None:
         """Run the bounded acquisition state machine and publish status."""
         now_ns = self.get_clock().now().nanoseconds
 
+        if now_ns <= 0:
+            self._stop_search_motion()
+            self.ready_since_ns = None
+            self._set_state(
+                STATE_SEARCHING,
+                REASON_SEARCHING,
+                "Searching for the start-zone AprilTag.",
+            )
+            self.search_started_ns = None
+            self.last_timer_now_ns = None
+            self._publish_status(now_ns)
+            return
+
+        if self.last_timer_now_ns is not None and now_ns < self.last_timer_now_ns:
+            self._reset_after_clock_jump(now_ns)
+        elif self.search_started_ns is None:
+            self._reset_after_clock_jump(now_ns)
+
+        self.last_timer_now_ns = now_ns
+
         if self.state in {STATE_READY, STATE_FAILED}:
             self._stop_search_motion()
+            self._publish_status(now_ns)
+            return
+
+        if self._handle_discarded_set_pose(now_ns):
             self._publish_status(now_ns)
             return
 
@@ -395,6 +502,7 @@ class StartZoneLocaliser(Node):
             return
 
         self.lock_tracker.prune(now_ns - self.stable_window_ns)
+        self.lock_tracker.prune_future(now_ns)
         latest_sample = self.lock_tracker.latest()
         has_fresh_sample = self.lock_tracker.is_fresh(now_ns, self.max_sample_gap_ns)
 

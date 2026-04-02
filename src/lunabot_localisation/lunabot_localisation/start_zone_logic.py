@@ -28,6 +28,10 @@ class StableLockTracker:
     def __init__(self) -> None:
         self._samples: deque[PoseSample] = deque()
 
+    def clear(self) -> None:
+        """Discard all tracked samples."""
+        self._samples.clear()
+
     def add_sample(self, sample: PoseSample) -> None:
         """Append a newly accepted pose sample."""
         self._samples.append(sample)
@@ -36,6 +40,11 @@ class StableLockTracker:
         """Discard samples older than the requested lower time bound."""
         while self._samples and self._samples[0].stamp_ns < min_stamp_ns:
             self._samples.popleft()
+
+    def prune_future(self, max_stamp_ns: int) -> None:
+        """Discard samples that lie beyond the current time horizon."""
+        while self._samples and self._samples[-1].stamp_ns > max_stamp_ns:
+            self._samples.pop()
 
     def latest(self) -> PoseSample | None:
         """Return the newest available sample, if any."""
@@ -47,6 +56,8 @@ class StableLockTracker:
         """Return whether the most recent sample is recent enough."""
         latest = self.latest()
         if latest is None:
+            return False
+        if latest.stamp_ns > now_ns:
             return False
         return (now_ns - latest.stamp_ns) <= max_gap_ns
 
@@ -67,6 +78,8 @@ class StableLockTracker:
 
         oldest = self._samples[0]
         newest = self._samples[-1]
+        if newest.stamp_ns > now_ns:
+            return False
         if newest.stamp_ns - oldest.stamp_ns < window_ns:
             return False
 

@@ -69,3 +69,22 @@ def test_tracker_rejects_yaw_spread():
         max_translation_spread_m=0.15,
         max_yaw_spread_rad=0.2,
     )
+
+
+def test_tracker_rejects_future_sample_as_fresh():
+    tracker = StableLockTracker()
+    tracker.add_sample(_sample(2_000_000_000, 1.0, 2.0, 0.1))
+
+    assert not tracker.is_fresh(now_ns=1_000_000_000, max_gap_ns=250_000_000)
+
+
+def test_tracker_prunes_future_samples():
+    tracker = StableLockTracker()
+    tracker.add_sample(_sample(500_000_000, 1.0, 2.0, 0.1))
+    tracker.add_sample(_sample(2_000_000_000, 1.0, 2.0, 0.1))
+
+    tracker.prune_future(1_000_000_000)
+
+    latest = tracker.latest()
+    assert latest is not None
+    assert latest.stamp_ns == 500_000_000

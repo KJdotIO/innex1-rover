@@ -46,7 +46,6 @@ class NavigateToPoseGate(Node):
         self.gate_enabled = _parse_bool(self.get_parameter("gate_enabled").value)
 
         self._latest_status = None
-        self._latest_status_ns = None
 
         self.create_subscription(
             LocalisationStartZoneStatus,
@@ -72,7 +71,6 @@ class NavigateToPoseGate(Node):
     def _on_status(self, msg: LocalisationStartZoneStatus) -> None:
         """Cache the latest localisation readiness summary."""
         self._latest_status = msg
-        self._latest_status_ns = self.get_clock().now().nanoseconds
 
     def _ready_for_travel(self) -> bool:
         """Return whether the latest localisation status permits travel goals."""
@@ -81,7 +79,7 @@ class NavigateToPoseGate(Node):
         now_ns = self.get_clock().now().nanoseconds
         return is_localisation_ready(
             self._latest_status,
-            self._latest_status_ns,
+            None,
             now_ns,
             self.readiness_timeout_ns,
         )

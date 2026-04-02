@@ -1,3 +1,4 @@
+builtin_interfaces/Time stamp
 string state
 bool ready
 string reason_code
