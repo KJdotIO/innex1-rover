@@ -1,0 +1,17 @@
+/**:
+  ros__parameters:
+    tag_frame: tag36h11:0
+    detected_tag_frame: tag36h11:0_detection
+    camera_frame: camera_front_optical_frame
+    target_frame: base_footprint
+    map_frame: map
+    tag_id: 0
+    detections_topic: /camera_front/tags
+    max_detection_age_sec: 0.35
+    max_tag_distance_m: 3.0
+    max_detection_sync_slop_sec: 0.05
+    max_hamming: 0
+    min_decision_margin: 35.0
+    correction_log_period_sec: 1.0
+    correction_log_min_translation_delta_m: 0.20
+    correction_log_min_yaw_delta_rad: 0.20
