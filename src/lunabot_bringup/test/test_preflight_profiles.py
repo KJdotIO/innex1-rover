@@ -195,6 +195,7 @@ def test_full_preflight_profile_requires_terrain_hazard_pipeline():
 
     assert required_topics["/camera_front/points"]["critical"] is True
     assert required_topics["/terrain_hazard/grid"]["critical"] is True
+    assert required_topics["/terrain_hazard/points"]["critical"] is True
     assert required_nodes["terrain_hazard_detector"]["critical"] is True
 
 
@@ -217,4 +218,5 @@ def test_lidar_debug_profile_keeps_terrain_hazard_optional():
 
     assert required_topics["/camera_front/points"]["critical"] is False
     assert required_topics["/terrain_hazard/grid"]["critical"] is False
+    assert required_topics["/terrain_hazard/points"]["critical"] is False
     assert required_nodes["terrain_hazard_detector"]["critical"] is False

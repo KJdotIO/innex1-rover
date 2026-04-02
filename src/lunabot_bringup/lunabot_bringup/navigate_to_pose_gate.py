@@ -7,6 +7,7 @@ import time
 from action_msgs.msg import GoalStatus
 from lunabot_bringup.localisation_readiness import is_localisation_ready
 from lunabot_interfaces.msg import LocalisationStartZoneStatus
+from nav_msgs.msg import OccupancyGrid
 from nav2_msgs.action import NavigateToPose
 import rclpy
 from rclpy.action import ActionClient
@@ -35,22 +36,35 @@ class NavigateToPoseGate(Node):
         self.declare_parameter("public_action_name", "/navigate_to_pose_gate")
         self.declare_parameter("internal_action_name", "/navigate_to_pose")
         self.declare_parameter("readiness_timeout_s", 5.0)
+        self.declare_parameter("hazard_topic", "/terrain_hazard/grid")
+        self.declare_parameter("hazard_timeout_s", 2.0)
         self.declare_parameter("gate_enabled", True)
 
         self.status_topic = self.get_parameter("status_topic").value
         self.public_action_name = self.get_parameter("public_action_name").value
         self.internal_action_name = self.get_parameter("internal_action_name").value
+        self.hazard_topic = self.get_parameter("hazard_topic").value
         self.readiness_timeout_ns = int(
             float(self.get_parameter("readiness_timeout_s").value) * 1e9
+        )
+        self.hazard_timeout_ns = int(
+            float(self.get_parameter("hazard_timeout_s").value) * 1e9
         )
         self.gate_enabled = _parse_bool(self.get_parameter("gate_enabled").value)
 
         self._latest_status = None
+        self._latest_hazard = None
 
         self.create_subscription(
             LocalisationStartZoneStatus,
             self.status_topic,
             self._on_status,
+            10,
+        )
+        self.create_subscription(
+            OccupancyGrid,
+            self.hazard_topic,
+            self._on_hazard,
             10,
         )
 
@@ -81,6 +95,22 @@ class NavigateToPoseGate(Node):
         """Cache the latest localisation readiness summary."""
         self._latest_status = msg
 
+    def _on_hazard(self, msg: OccupancyGrid) -> None:
+        """Cache the latest terrain hazard grid."""
+        self._latest_hazard = msg
+
+    def _hazard_ready_for_travel(self) -> bool:
+        """Return whether the latest terrain hazard grid is still fresh."""
+        if self._latest_hazard is None:
+            return False
+
+        stamp = self._latest_hazard.header.stamp
+        hazard_ns = int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+        now_ns = self.get_clock().now().nanoseconds
+        if hazard_ns <= 0 or now_ns <= 0 or now_ns < hazard_ns:
+            return False
+        return (now_ns - hazard_ns) <= self.hazard_timeout_ns
+
     def _ready_for_travel(self) -> bool:
         """Return whether the latest localisation status permits travel goals."""
         if not self.gate_enabled:
@@ -91,14 +121,14 @@ class NavigateToPoseGate(Node):
             None,
             now_ns,
             self.readiness_timeout_ns,
-        )
+        ) and self._hazard_ready_for_travel()
 
     def _on_goal(self, _goal) -> GoalResponse:
         """Accept travel goals only when localisation is ready and Nav2 is up."""
         if not self._ready_for_travel():
             self.get_logger().warn(
-                "Rejecting NavigateToPose goal because start-zone localisation "
-                "is not ready."
+                "Rejecting NavigateToPose goal because localisation or terrain "
+                "hazard readiness is not ready."
             )
             return GoalResponse.REJECT
 

@@ -79,6 +79,31 @@ def test_detect_drop_cells_marks_sparse_cells_unknown():
     assert unknown.all()
 
 
+def test_detect_drop_cells_keeps_edge_margin_unknown():
+    grid = GridSpec(min_x=0.0, max_x=0.6, min_y=0.0, max_y=0.6, resolution=0.2)
+    counts = np.full((grid.height, grid.width), 4, dtype=np.int32)
+    min_height = np.zeros((grid.height, grid.width), dtype=np.float32)
+    max_height = np.zeros((grid.height, grid.width), dtype=np.float32)
+
+    _, unknown = detect_drop_cells(
+        min_height=min_height,
+        max_height=max_height,
+        counts=counts,
+        min_points_per_cell=3,
+        neighborhood_radius_cells=1,
+        min_neighbor_cells=4,
+        drop_threshold=0.14,
+        roughness_threshold=0.10,
+        edge_margin_cells=1,
+        max_detection_x=1.0,
+        grid=grid,
+    )
+
+    assert unknown[0, 0]
+    assert unknown[0, 1]
+    assert unknown[1, 0]
+
+
 def test_filter_clusters_removes_tiny_groups():
     hazards = np.zeros((4, 4), dtype=bool)
     hazards[0, 0] = True

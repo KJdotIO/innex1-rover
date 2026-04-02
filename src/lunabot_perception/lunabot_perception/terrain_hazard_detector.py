@@ -154,7 +154,11 @@ class TerrainHazardDetector(Node):
             self.points_topic,
             10,
         )
-        self.hazard_grid_pub = self.create_publisher(OccupancyGrid, self.grid_topic, 10)
+        self.hazard_grid_pub = self.create_publisher(
+            OccupancyGrid,
+            self.grid_topic,
+            10,
+        )
         self.point_cloud_sub = self.create_subscription(
             PointCloud2,
             self.input_topic,
@@ -391,13 +395,14 @@ class TerrainHazardDetector(Node):
         header.stamp = input_header.stamp
         header.frame_id = self.base_frame
 
+        nav_hazard_mask = hazards | unknown
         hazard_points = [
             [
                 self.grid.min_x + (x_idx + 0.5) * self.grid.resolution,
                 self.grid.min_y + (y_idx + 0.5) * self.grid.resolution,
                 self.marker_height,
             ]
-            for y_idx, x_idx in np.argwhere(hazards)
+            for y_idx, x_idx in np.argwhere(nav_hazard_mask)
         ]
         self.hazard_points_pub.publish(
             point_cloud2.create_cloud_xyz32(header, hazard_points)

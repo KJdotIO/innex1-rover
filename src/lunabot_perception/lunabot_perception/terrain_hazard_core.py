@@ -76,7 +76,7 @@ def detect_drop_cells(
     """Classify cells into hazard or unknown using local terrain support."""
     hazards = np.zeros((grid.height, grid.width), dtype=bool)
     supported = counts >= min_points_per_cell
-    unknown = ~supported
+    unknown = np.ones((grid.height, grid.width), dtype=bool)
 
     for y_idx in range(edge_margin_cells, grid.height - edge_margin_cells):
         for x_idx in range(edge_margin_cells, grid.width - edge_margin_cells):
@@ -112,6 +112,7 @@ def detect_drop_cells(
                 unknown[y_idx, x_idx] = True
                 continue
 
+            unknown[y_idx, x_idx] = False
             if min_height[y_idx, x_idx] <= reference_height - drop_threshold:
                 hazards[y_idx, x_idx] = True
 

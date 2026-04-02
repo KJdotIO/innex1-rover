@@ -40,6 +40,10 @@ preflight:
       type: nav_msgs/msg/OccupancyGrid
       min_messages: 1
       critical: true
+    - name: /terrain_hazard/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: true
     - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
