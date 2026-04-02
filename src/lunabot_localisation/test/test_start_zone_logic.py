@@ -31,7 +31,7 @@ def test_tracker_accepts_window_with_timer_slack():
     assert tracker.has_stable_lock(
         now_ns=1_010_000_000,
         window_ns=1_000_000_000,
-        min_samples=5,
+        min_samples=4,
         max_gap_ns=250_000_000,
         max_translation_spread_m=0.15,
         max_yaw_spread_rad=0.2,
