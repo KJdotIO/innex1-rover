@@ -1,0 +1,24 @@
+/**:
+  ros__parameters:
+    status_topic: /localisation/start_zone_status
+    cmd_vel_topic: cmd_vel
+    odometry_topic: /odometry/local
+    tag_pose_topic: /tag_pose
+    set_pose_service: /ekf_filter_node_map/set_pose
+    map_frame: map
+    tag_frame: tag36h11:0
+    camera_frame: camera_front_optical_frame
+    target_frame: base_footprint
+    search_direction: left
+    angular_speed_rad_s: 0.25
+    max_search_duration_s: 30.0
+    max_search_yaw_rad: 6.283185307179586
+    candidate_settle_duration_s: 0.5
+    stable_window_duration_s: 1.0
+    stable_window_min_samples: 5
+    max_sample_gap_s: 0.25
+    max_lock_translation_spread_m: 0.15
+    max_lock_yaw_spread_rad: 0.20
+    tf_missing_timeout_s: 5.0
+    set_pose_service_wait_s: 0.1
+    set_pose_timeout_s: 2.0

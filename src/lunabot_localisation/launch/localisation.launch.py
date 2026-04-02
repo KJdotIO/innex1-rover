@@ -27,10 +27,18 @@ def generate_launch_description():
         pkg_localisation, "config", "ekf_lidar_phase.yaml"
     )
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
+    start_zone_localisation_yaml = os.path.join(
+        pkg_localisation, "config", "start_zone_localisation.yaml"
+    )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
+    tag_map_x = LaunchConfiguration("tag_map_x")
+    tag_map_y = LaunchConfiguration("tag_map_y")
+    tag_map_z = LaunchConfiguration("tag_map_z")
+    tag_map_yaw = LaunchConfiguration("tag_map_yaw")
 
     visual_slam_condition = IfCondition(
         PythonExpression(
@@ -88,6 +96,31 @@ def generate_launch_description():
                     "Launch the apriltag_draw overlay for annotated front camera "
                     "debugging."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "cmd_vel_topic",
+                default_value="cmd_vel",
+                description="Velocity command topic used by the start-zone localiser.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_x",
+                default_value="0.0",
+                description="Configured map-frame x position of the start-zone tag.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_y",
+                default_value="1.08",
+                description="Configured map-frame y position of the start-zone tag.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_z",
+                default_value="0.25",
+                description="Configured map-frame z position of the start-zone tag.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_yaw",
+                default_value="0.0",
+                description="Configured map-frame yaw of the start-zone tag.",
             ),
             # Visual odometry
             Node(
@@ -179,12 +212,12 @@ def generate_launch_description():
                 package="tf2_ros",
                 executable="static_transform_publisher",
                 arguments=[
-                    "--x", "0",
-                    "--y", "1.08",
-                    "--z", "0.25",
+                    "--x", tag_map_x,
+                    "--y", tag_map_y,
+                    "--z", tag_map_z,
                     "--roll", "0",
                     "--pitch", "0",
-                    "--yaw", "0",
+                    "--yaw", tag_map_yaw,
                     "--frame-id", "map",
                     "--child-frame-id", "tag36h11:0",
                 ],
@@ -201,6 +234,20 @@ def generate_launch_description():
                         "use_sim_time": use_sim_time,
                         "detections_topic": "/camera_front/tags",
                     }
+                ],
+                condition=UnlessCondition(lidar_costmap_phase),
+            ),
+            Node(
+                package="lunabot_localisation",
+                executable="start_zone_localiser",
+                name="start_zone_localiser",
+                output="screen",
+                parameters=[
+                    start_zone_localisation_yaml,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "cmd_vel_topic": cmd_vel_topic,
+                    },
                 ],
                 condition=UnlessCondition(lidar_costmap_phase),
             ),

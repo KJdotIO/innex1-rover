@@ -48,15 +48,21 @@ def _build_nav2_start_actions(
     pkg_nav2_bringup, nav_params_path, use_sim_time, enable_teleop
 ):
     """Return Nav2 start actions for direct or muxed operation."""
-    nav2_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
-        ),
-        launch_arguments={
-            "use_sim_time": use_sim_time,
-            "params_file": nav_params_path,
-            "autostart": "true",
-        }.items(),
+    nav2_launch = GroupAction(
+        [
+            SetRemap(src="navigate_to_pose", dst="navigate_to_pose_nav2"),
+            SetRemap(src="/navigate_to_pose", dst="/navigate_to_pose_nav2"),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
+                ),
+                launch_arguments={
+                    "use_sim_time": use_sim_time,
+                    "params_file": nav_params_path,
+                    "autostart": "true",
+                }.items(),
+            ),
+        ],
         condition=UnlessCondition(enable_teleop),
     )
 
@@ -64,6 +70,8 @@ def _build_nav2_start_actions(
         [
             SetRemap(src="cmd_vel", dst="cmd_vel_nav"),
             SetRemap(src="cmd_vel_smoothed", dst="cmd_vel_nav"),
+            SetRemap(src="navigate_to_pose", dst="navigate_to_pose_nav2"),
+            SetRemap(src="/navigate_to_pose", dst="/navigate_to_pose_nav2"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(pkg_nav2_bringup, "launch", "navigation_launch.py")
@@ -79,6 +87,17 @@ def _build_nav2_start_actions(
     )
 
     return [nav2_launch, nav2_launch_group]
+
+
+def _select_localiser_cmd_vel_topic(enable_teleop):
+    """Return the command topic used by the start-zone localiser."""
+    return PythonExpression(
+        [
+            "'cmd_vel_nav' if '",
+            enable_teleop,
+            "'.strip().lower() in ['1', 'true', 'yes', 'on'] else 'cmd_vel'",
+        ]
+    )
 
 
 def _handle_preflight_exit(
@@ -161,6 +180,7 @@ def generate_launch_description():
         "preflight_lidar_debug_config"
     )
     joy_device_id = LaunchConfiguration("joy_device_id")
+    localiser_cmd_vel_topic = _select_localiser_cmd_vel_topic(enable_teleop)
 
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -171,7 +191,28 @@ def generate_launch_description():
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
+            "cmd_vel_topic": localiser_cmd_vel_topic,
         }.items(),
+    )
+
+    navigate_to_pose_gate = Node(
+        package="lunabot_bringup",
+        executable="navigate_to_pose_gate",
+        name="navigate_to_pose_gate",
+        output="screen",
+        parameters=[
+            {"use_sim_time": use_sim_time},
+            {
+                "gate_enabled": PythonExpression(
+                    [
+                        "(",
+                        _is_falsey(lidar_costmap_phase),
+                        ")",
+                    ]
+                ),
+                "readiness_timeout_s": 5.0,
+            },
+        ],
     )
 
     teleop_launch = IncludeLaunchDescription(
@@ -396,6 +437,7 @@ def generate_launch_description():
             map_server,
             map_lifecycle_manager,
             localisation_launch,
+            navigate_to_pose_gate,
             teleop_launch,
             twist_mux,
             preflight_gate,
