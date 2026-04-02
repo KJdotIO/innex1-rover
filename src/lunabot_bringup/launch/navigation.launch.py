@@ -139,9 +139,13 @@ def generate_launch_description():
     # Locate the configuration files
     pkg_bringup = get_package_share_directory("lunabot_bringup")
     pkg_nav = get_package_share_directory("lunabot_navigation")
+    pkg_perception = get_package_share_directory("lunabot_perception")
     pkg_teleop = get_package_share_directory("lunabot_teleop")
 
     nav_params_path = os.path.join(pkg_nav, "config", "nav2_params.yaml")
+    terrain_hazard_params_path = os.path.join(
+        pkg_perception, "config", "terrain_hazard.yaml"
+    )
     blank_map_path = os.path.join(pkg_nav, "maps", "moon_yard_blank.yaml")
     rviz_config_path = os.path.join(pkg_bringup, "rviz", "navigation.rviz")
     twist_mux_params_path = os.path.join(
@@ -188,6 +192,17 @@ def generate_launch_description():
             "enable_apriltag_debug": enable_apriltag_debug,
             "cmd_vel_topic": localiser_cmd_vel_topic,
         }.items(),
+    )
+
+    terrain_hazard_node = Node(
+        package="lunabot_perception",
+        executable="terrain_hazard_detector",
+        name="terrain_hazard_detector",
+        output="screen",
+        parameters=[
+            terrain_hazard_params_path,
+            {"use_sim_time": use_sim_time},
+        ],
     )
 
     navigate_to_pose_gate = Node(
@@ -432,6 +447,7 @@ def generate_launch_description():
             map_server,
             map_lifecycle_manager,
             localisation_launch,
+            terrain_hazard_node,
             navigate_to_pose_gate,
             teleop_launch,
             twist_mux,

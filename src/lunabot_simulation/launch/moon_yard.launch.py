@@ -5,8 +5,10 @@ import tempfile
 import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -42,17 +44,18 @@ def generate_launch_description():
         os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
     )
 
-    # Spawn position - surface mesh is at z=0, rover spawns above and drops
-    spawn_x = "0.0"
-    spawn_y = "0.0"
-    spawn_z = "0.5"  # Start above surface, gravity will settle it
+    world = LaunchConfiguration("world")
+    spawn_x = LaunchConfiguration("spawn_x")
+    spawn_y = LaunchConfiguration("spawn_y")
+    spawn_z = LaunchConfiguration("spawn_z")
+    spawn_yaw = LaunchConfiguration("spawn_yaw")
 
     # we'll run the sim without gazebo gui to save resources for now
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
         ),
-        launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
+        launch_arguments={"gz_args": ["-r -s '", world, "'"]}.items(),
     )
 
     robot_state_publisher = Node(
@@ -82,6 +85,8 @@ def generate_launch_description():
             spawn_y,
             "-z",
             spawn_z,
+            "-Y",
+            spawn_yaw,
         ],
     )
 
@@ -135,6 +140,31 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument(
+                "world",
+                default_value=world_path,
+                description="Absolute path to the Gazebo world file.",
+            ),
+            DeclareLaunchArgument(
+                "spawn_x",
+                default_value="0.0",
+                description="Robot spawn x position in world coordinates.",
+            ),
+            DeclareLaunchArgument(
+                "spawn_y",
+                default_value="0.0",
+                description="Robot spawn y position in world coordinates.",
+            ),
+            DeclareLaunchArgument(
+                "spawn_z",
+                default_value="0.5",
+                description="Robot spawn z position in world coordinates.",
+            ),
+            DeclareLaunchArgument(
+                "spawn_yaw",
+                default_value="0.0",
+                description="Robot spawn yaw in radians.",
+            ),
             gz_sim,
             robot_state_publisher,
             spawn_robot,

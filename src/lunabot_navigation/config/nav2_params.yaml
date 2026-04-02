@@ -39,7 +39,7 @@ planner_server:
     GridBased:
       plugin: "nav2_smac_planner/SmacPlannerHybrid"
       tolerance: 0.5
-      allow_unknown: true
+      allow_unknown: false
       motion_model_for_search: "REEDS_SHEPP"
       minimum_turning_radius: 0.40
       reverse_penalty: 2.1
@@ -61,7 +61,7 @@ global_costmap:
       robot_base_frame: base_footprint
       robot_radius: 0.25 # tuned to robot radius of 0.25m
       resolution: 0.05 # spec resolution
-      track_unknown_space: false
+      track_unknown_space: true
       rolling_window: false
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
 
@@ -73,7 +73,7 @@ global_costmap:
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
-        observation_sources: ouster_points
+        observation_sources: ouster_points terrain_hazards
         ouster_points:
           topic: /ouster/points
           data_type: "PointCloud2"
@@ -90,11 +90,27 @@ global_costmap:
           raytrace_min_range: 0.0
           raytrace_max_range: 10.0
           inf_is_valid: false
+        terrain_hazards:
+          topic: /terrain_hazard/points
+          data_type: "PointCloud2"
+          marking: true
+          clearing: false
+          expected_update_rate: 0.0
+          observation_persistence: 0.8
+          footprint_clearing_enabled: false
+          tf_filter_tolerance: 0.2
+          min_obstacle_height: 0.05
+          max_obstacle_height: 0.50
+          obstacle_min_range: 0.0
+          obstacle_max_range: 3.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 0.0
+          inf_is_valid: false
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.30
+        inflation_radius: 0.40
 
       always_send_full_costmap: true
 
@@ -108,6 +124,7 @@ local_costmap:
       robot_radius: 0.25
       update_frequency: 6.0
       publish_frequency: 3.0
+      track_unknown_space: true
       plugins: ["voxel_layer", "inflation_layer"]
 
       # rolling window
@@ -117,7 +134,7 @@ local_costmap:
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
-        observation_sources: ouster_points
+        observation_sources: ouster_points terrain_hazards
         ouster_points:
           topic: /ouster/points
           data_type: "PointCloud2"
@@ -140,11 +157,28 @@ local_costmap:
           raytrace_max_range: 8.0
           raytrace_min_range: 0.0
           mark_threshold: 0
+        terrain_hazards:
+          topic: /terrain_hazard/points
+          data_type: "PointCloud2"
+          transport_type: "raw"
+          marking: true
+          clearing: false
+          expected_update_rate: 0.0
+          observation_persistence: 0.8
+          footprint_clearing_enabled: false
+          tf_filter_tolerance: 0.2
+          min_obstacle_height: 0.05
+          max_obstacle_height: 0.50
+          obstacle_max_range: 3.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 0.0
+          raytrace_min_range: 0.0
+          mark_threshold: 0
 
       # config for inflation
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.30
+        inflation_radius: 0.40
         cost_scaling_factor: 4.0
 
       always_send_full_costmap: true

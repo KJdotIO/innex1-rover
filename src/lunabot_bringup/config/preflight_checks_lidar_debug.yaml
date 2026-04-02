@@ -36,6 +36,10 @@ preflight:
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: false
+    - name: /terrain_hazard/grid
+      type: nav_msgs/msg/OccupancyGrid
+      min_messages: 1
+      critical: false
     - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
@@ -84,6 +88,8 @@ preflight:
       phases: [runtime]
     - name: map_server
       critical: true
+    - name: terrain_hazard_detector
+      critical: false
     - name: planner_server
       critical: true
       phases: [runtime]

@@ -8,13 +8,14 @@ This package contains perception nodes that convert sensor streams into navigati
 
 ## Core responsibilities
 
-- Process depth point clouds into hazard outputs.
-- Publish obstacle observations with stable topics and frames.
-- Support tuning of hazard extraction behaviour for competition terrain.
+- Process depth point clouds into terrain hazard outputs.
+- Publish a local hazard grid and hazard marker points with stable topics and frames.
+- Support tuning of crater and drop-off extraction for competition terrain.
 
 ## Key files
 
-- `lunabot_perception/hazard_detection.py`: hazard extraction node.
+- `lunabot_perception/terrain_hazard_detector.py`: local crater hazard detector.
+- `lunabot_perception/terrain_hazard_core.py`: pure helper logic for the detector.
 
 ## Common failure modes
 

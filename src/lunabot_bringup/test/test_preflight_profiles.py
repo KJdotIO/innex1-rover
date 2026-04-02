@@ -1,8 +1,10 @@
 """Unit tests for phase-scoped preflight filtering and CLI helpers."""
 
 import sys
+from pathlib import Path
 
 import pytest
+import yaml
 
 from lunabot_bringup.preflight_check import _parse_bool_text
 from lunabot_bringup.preflight_check import _strip_ros_cli_args
@@ -174,3 +176,45 @@ def test_parse_bool_text_accepts_common_launch_values(text, expected):
 def test_parse_bool_text_rejects_invalid_value():
     with pytest.raises(Exception):
         _parse_bool_text("maybe")
+
+
+def test_full_preflight_profile_requires_terrain_hazard_pipeline():
+    config_path = (
+        Path(__file__).resolve().parents[1] / "config" / "preflight_checks.yaml"
+    )
+
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = yaml.safe_load(handle)
+
+    required_topics = {
+        topic["name"]: topic for topic in config["preflight"]["required_topics"]
+    }
+    required_nodes = {
+        node["name"]: node for node in config["preflight"]["required_nodes"]
+    }
+
+    assert required_topics["/camera_front/points"]["critical"] is True
+    assert required_topics["/terrain_hazard/grid"]["critical"] is True
+    assert required_nodes["terrain_hazard_detector"]["critical"] is True
+
+
+def test_lidar_debug_profile_keeps_terrain_hazard_optional():
+    config_path = (
+        Path(__file__).resolve().parents[1]
+        / "config"
+        / "preflight_checks_lidar_debug.yaml"
+    )
+
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = yaml.safe_load(handle)
+
+    required_topics = {
+        topic["name"]: topic for topic in config["preflight"]["required_topics"]
+    }
+    required_nodes = {
+        node["name"]: node for node in config["preflight"]["required_nodes"]
+    }
+
+    assert required_topics["/camera_front/points"]["critical"] is False
+    assert required_topics["/terrain_hazard/grid"]["critical"] is False
+    assert required_nodes["terrain_hazard_detector"]["critical"] is False

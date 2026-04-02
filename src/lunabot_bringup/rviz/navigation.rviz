@@ -54,6 +54,16 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /local_costmap/costmap
+    - Alpha: 0.8
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Enabled: false
+      Name: Terrain Hazard Grid
+      Topic:
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /terrain_hazard/grid
     - Class: rviz_default_plugins/PointCloud2
       Enabled: true
       Name: Ouster Points
@@ -65,6 +75,18 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Best Effort
         Value: /ouster/points
+      Use Fixed Frame: true
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: false
+      Name: Terrain Hazard Points
+      Position Transformer: XYZ
+      Size (Pixels): 4
+      Style: Flat Squares
+      Topic:
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /terrain_hazard/points
       Use Fixed Frame: true
     - Class: rviz_default_plugins/Image
       Enabled: true

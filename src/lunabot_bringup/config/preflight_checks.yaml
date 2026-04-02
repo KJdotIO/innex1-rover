@@ -35,7 +35,11 @@ preflight:
     - name: /camera_front/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
-      critical: false
+      critical: true
+    - name: /terrain_hazard/grid
+      type: nav_msgs/msg/OccupancyGrid
+      min_messages: 1
+      critical: true
     - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
@@ -91,6 +95,8 @@ preflight:
     - name: ekf_filter_node_map
       critical: true
     - name: map_server
+      critical: true
+    - name: terrain_hazard_detector
       critical: true
     - name: start_zone_localiser
       critical: true

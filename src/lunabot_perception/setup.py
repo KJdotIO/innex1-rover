@@ -11,6 +11,7 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
+        ("share/" + package_name + "/config", ["config/terrain_hazard.yaml"]),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -23,5 +24,10 @@ setup(
             "pytest",
         ],
     },
-    entry_points={"console_scripts": []},
+    entry_points={
+        "console_scripts": [
+            "terrain_hazard_detector = "
+            "lunabot_perception.terrain_hazard_detector:main",
+        ]
+    },
 )

@@ -1,32 +1,29 @@
 <?xml version="1.0" ?>
 <sdf version="1.8">
-  <model name="lunar_surface">
+  <model name="lunar_surface_flat">
     <static>true</static>
     <link name="surface_link">
       <visual name="ground_visual">
         <pose>0 0 0 0 0 0</pose>
         <geometry>
-          <mesh>
-            <uri>model://lunar_surface/meshes/lunar_surface.dae</uri>
-          </mesh>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>7.9 4.4</size>
+          </plane>
         </geometry>
         <material>
           <ambient>0.76 0.67 0.47 1</ambient>
           <diffuse>0.76 0.67 0.47 1</diffuse>
           <specular>0.1 0.1 0.1 1</specular>
-          <pbr>
-            <metal>
-              <albedo_map>model://lunar_surface/meshes/sand_texture.png</albedo_map>
-            </metal>
-          </pbr>
         </material>
       </visual>
       <collision name="ground_collision">
         <pose>0 0 0 0 0 0</pose>
         <geometry>
-          <mesh>
-            <uri>model://lunar_surface/meshes/lunar_surface.stl</uri>
-          </mesh>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>7.9 4.4</size>
+          </plane>
         </geometry>
         <surface>
           <friction>
@@ -37,7 +34,6 @@
           </friction>
         </surface>
       </collision>
-
     </link>
   </model>
 </sdf>
