@@ -36,6 +36,7 @@ def test_detect_drop_cells_marks_supported_crater_cell():
     min_height = np.zeros((grid.height, grid.width), dtype=np.float32)
     max_height = np.zeros((grid.height, grid.width), dtype=np.float32)
     min_height[1, 1] = -0.25
+    max_height[1, 1] = -0.25
 
     hazards, unknown = detect_drop_cells(
         min_height=min_height,

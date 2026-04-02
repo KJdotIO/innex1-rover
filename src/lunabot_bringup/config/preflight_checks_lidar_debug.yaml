@@ -44,6 +44,10 @@ preflight:
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: false
+    - name: /terrain_hazard/ready
+      type: std_msgs/msg/Bool
+      min_messages: 1
+      critical: false
     - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1

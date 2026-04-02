@@ -16,6 +16,7 @@ from rclpy.time import Time
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
+from std_msgs.msg import Bool
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from lunabot_perception.terrain_hazard_core import GridSpec
@@ -77,6 +78,7 @@ class TerrainHazardDetector(Node):
         self.input_topic = str(self.get_parameter("input_topic").value)
         self.points_topic = str(self.get_parameter("hazard_points_topic").value)
         self.grid_topic = str(self.get_parameter("hazard_grid_topic").value)
+        self.ready_topic = str(self.get_parameter("hazard_ready_topic").value)
         self.marker_height = float(self.get_parameter("hazard_marker_height").value)
         self.stale_timeout = Duration(
             seconds=float(self.get_parameter("stale_timeout_s").value)
@@ -159,6 +161,11 @@ class TerrainHazardDetector(Node):
             self.grid_topic,
             10,
         )
+        self.hazard_ready_pub = self.create_publisher(
+            Bool,
+            self.ready_topic,
+            10,
+        )
         self.point_cloud_sub = self.create_subscription(
             PointCloud2,
             self.input_topic,
@@ -172,6 +179,7 @@ class TerrainHazardDetector(Node):
         self.declare_parameter("input_topic", "/camera_front/points")
         self.declare_parameter("hazard_points_topic", "/terrain_hazard/points")
         self.declare_parameter("hazard_grid_topic", "/terrain_hazard/grid")
+        self.declare_parameter("hazard_ready_topic", "/terrain_hazard/ready")
         self.declare_parameter("grid_min_x", 0.40)
         self.declare_parameter("grid_max_x", 2.40)
         self.declare_parameter("grid_min_y", -1.00)
@@ -208,17 +216,17 @@ class TerrainHazardDetector(Node):
 
         points = self.decode_points(msg)
         if points is None or points.shape[0] < self.min_input_points:
-            self.publish_unknown(msg.header, now)
+            self.publish_unknown(msg.header, now, sensor_ready=False)
             return
 
         transformed = self.transform_points(points, msg.header)
         if transformed is None or transformed.shape[0] < self.min_input_points:
-            self.publish_unknown(msg.header, now)
+            self.publish_unknown(msg.header, now, sensor_ready=False)
             return
 
         roi_points = self.crop_points(transformed)
         if roi_points.shape[0] < self.min_input_points:
-            self.publish_unknown(msg.header, now)
+            self.publish_unknown(msg.header, now, sensor_ready=False)
             return
 
         min_height, max_height, counts = build_elevation_grid(roi_points, self.grid)
@@ -251,7 +259,7 @@ class TerrainHazardDetector(Node):
         )
         unknown |= ~supported
         unknown &= ~hazards
-        self.publish_outputs(msg.header, hazards, unknown)
+        self.publish_outputs(msg.header, hazards, unknown, sensor_ready=True)
 
         if now - self.last_log_time >= self.log_period:
             self.get_logger().info(
@@ -369,9 +377,9 @@ class TerrainHazardDetector(Node):
         if now - self.last_input_time < self.stale_timeout:
             return
 
-        self.publish_unknown(self.make_header(now), now)
+        self.publish_unknown(self.make_header(now), now, sensor_ready=False)
 
-    def publish_unknown(self, header: Header, now: Time) -> None:
+    def publish_unknown(self, header: Header, now: Time, *, sensor_ready: bool) -> None:
         """Publish a conservative unknown grid when terrain support is absent."""
         scale = self.confidence_scale(now)
         self.confidence, _ = decay_confidence(
@@ -382,27 +390,28 @@ class TerrainHazardDetector(Node):
         )
         hazards = np.zeros((self.grid.height, self.grid.width), dtype=bool)
         unknown = np.ones((self.grid.height, self.grid.width), dtype=bool)
-        self.publish_outputs(header, hazards, unknown)
+        self.publish_outputs(header, hazards, unknown, sensor_ready=sensor_ready)
 
     def publish_outputs(
         self,
         input_header: Header,
         hazards: np.ndarray,
         unknown: np.ndarray,
+        *,
+        sensor_ready: bool,
     ) -> None:
         """Publish terrain hazards as points and a tri-state occupancy grid."""
         header = Header()
         header.stamp = input_header.stamp
         header.frame_id = self.base_frame
 
-        nav_hazard_mask = hazards | unknown
         hazard_points = [
             [
                 self.grid.min_x + (x_idx + 0.5) * self.grid.resolution,
                 self.grid.min_y + (y_idx + 0.5) * self.grid.resolution,
                 self.marker_height,
             ]
-            for y_idx, x_idx in np.argwhere(nav_hazard_mask)
+            for y_idx, x_idx in np.argwhere(hazards)
         ]
         self.hazard_points_pub.publish(
             point_cloud2.create_cloud_xyz32(header, hazard_points)
@@ -423,6 +432,7 @@ class TerrainHazardDetector(Node):
             unknown=unknown,
         ).reshape(-1).tolist()
         self.hazard_grid_pub.publish(grid_msg)
+        self.hazard_ready_pub.publish(Bool(data=sensor_ready))
 
     def make_header(self, now: Time) -> Header:
         """Build a base-frame header using the current ROS clock."""

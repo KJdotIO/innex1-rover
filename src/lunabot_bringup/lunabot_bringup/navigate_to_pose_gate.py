@@ -15,6 +15,7 @@ from rclpy.action import ActionServer
 from rclpy.action import CancelResponse
 from rclpy.action import GoalResponse
 from rclpy.node import Node
+from std_msgs.msg import Bool
 
 
 def _parse_bool(value) -> bool:
@@ -24,6 +25,29 @@ def _parse_bool(value) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return bool(value)
+
+
+def _hazard_readiness_is_fresh(
+    *,
+    ready_value: bool | None,
+    ready_received_ns: int | None,
+    grid_stamp_ns: int | None,
+    now_ns: int,
+    timeout_ns: int,
+) -> bool:
+    """Return whether crater sensing is both ready and fresh enough to trust."""
+    if not ready_value:
+        return False
+    if ready_received_ns is None or grid_stamp_ns is None:
+        return False
+    if ready_received_ns <= 0 or grid_stamp_ns <= 0 or now_ns <= 0:
+        return False
+    if now_ns < ready_received_ns or now_ns < grid_stamp_ns:
+        return False
+    return (
+        (now_ns - ready_received_ns) <= timeout_ns
+        and (now_ns - grid_stamp_ns) <= timeout_ns
+    )
 
 
 class NavigateToPoseGate(Node):
@@ -37,6 +61,7 @@ class NavigateToPoseGate(Node):
         self.declare_parameter("internal_action_name", "/navigate_to_pose")
         self.declare_parameter("readiness_timeout_s", 5.0)
         self.declare_parameter("hazard_topic", "/terrain_hazard/grid")
+        self.declare_parameter("hazard_ready_topic", "/terrain_hazard/ready")
         self.declare_parameter("hazard_timeout_s", 2.0)
         self.declare_parameter("gate_enabled", True)
 
@@ -44,6 +69,7 @@ class NavigateToPoseGate(Node):
         self.public_action_name = self.get_parameter("public_action_name").value
         self.internal_action_name = self.get_parameter("internal_action_name").value
         self.hazard_topic = self.get_parameter("hazard_topic").value
+        self.hazard_ready_topic = self.get_parameter("hazard_ready_topic").value
         self.readiness_timeout_ns = int(
             float(self.get_parameter("readiness_timeout_s").value) * 1e9
         )
@@ -54,6 +80,8 @@ class NavigateToPoseGate(Node):
 
         self._latest_status = None
         self._latest_hazard = None
+        self._latest_hazard_ready = None
+        self._latest_hazard_ready_time_ns = None
 
         self.create_subscription(
             LocalisationStartZoneStatus,
@@ -65,6 +93,12 @@ class NavigateToPoseGate(Node):
             OccupancyGrid,
             self.hazard_topic,
             self._on_hazard,
+            10,
+        )
+        self.create_subscription(
+            Bool,
+            self.hazard_ready_topic,
+            self._on_hazard_ready,
             10,
         )
 
@@ -99,6 +133,11 @@ class NavigateToPoseGate(Node):
         """Cache the latest terrain hazard grid."""
         self._latest_hazard = msg
 
+    def _on_hazard_ready(self, msg: Bool) -> None:
+        """Cache whether the detector considers crater sensing healthy."""
+        self._latest_hazard_ready = bool(msg.data)
+        self._latest_hazard_ready_time_ns = self.get_clock().now().nanoseconds
+
     def _hazard_ready_for_travel(self) -> bool:
         """Return whether the latest terrain hazard grid is still fresh."""
         if self._latest_hazard is None:
@@ -107,9 +146,13 @@ class NavigateToPoseGate(Node):
         stamp = self._latest_hazard.header.stamp
         hazard_ns = int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
         now_ns = self.get_clock().now().nanoseconds
-        if hazard_ns <= 0 or now_ns <= 0 or now_ns < hazard_ns:
-            return False
-        return (now_ns - hazard_ns) <= self.hazard_timeout_ns
+        return _hazard_readiness_is_fresh(
+            ready_value=self._latest_hazard_ready,
+            ready_received_ns=self._latest_hazard_ready_time_ns,
+            grid_stamp_ns=hazard_ns,
+            now_ns=now_ns,
+            timeout_ns=self.hazard_timeout_ns,
+        )
 
     def _ready_for_travel(self) -> bool:
         """Return whether the latest localisation status permits travel goals."""
