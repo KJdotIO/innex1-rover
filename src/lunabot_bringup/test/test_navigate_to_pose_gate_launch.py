@@ -17,6 +17,9 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node as RclpyNode
 
+PUBLIC_ACTION_NAME = "/test_navigate_to_pose_gate"
+INTERNAL_ACTION_NAME = "/test_navigate_to_pose"
+
 
 @pytest.mark.launch_test
 def generate_test_description():
@@ -36,8 +39,8 @@ def generate_test_description():
         parameters=[
             {
                 "gate_enabled": False,
-                "public_action_name": "/navigate_to_pose_gate",
-                "internal_action_name": "/navigate_to_pose",
+                "public_action_name": PUBLIC_ACTION_NAME,
+                "internal_action_name": INTERNAL_ACTION_NAME,
             }
         ],
     )
@@ -65,12 +68,12 @@ class _GateTestClient(RclpyNode):
         self.client = ActionClient(
             self,
             NavigateToPose,
-            "/navigate_to_pose_gate",
+            PUBLIC_ACTION_NAME,
         )
         self.downstream_client = ActionClient(
             self,
             NavigateToPose,
-            "/navigate_to_pose",
+            INTERNAL_ACTION_NAME,
         )
 
 

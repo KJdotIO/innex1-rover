@@ -13,6 +13,8 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
+ACTION_NAME = "/test_navigate_to_pose"
+
 
 class FakeNavigateToPoseServer(Node):
     """Serve minimal NavigateToPose goals for gate integration tests."""
@@ -23,7 +25,7 @@ class FakeNavigateToPoseServer(Node):
         self._server = ActionServer(
             self,
             NavigateToPose,
-            "/navigate_to_pose",
+            ACTION_NAME,
             execute_callback=self._execute_goal,
             goal_callback=self._on_goal,
             cancel_callback=self._on_cancel,
