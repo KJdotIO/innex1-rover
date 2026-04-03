@@ -3,7 +3,7 @@
 <package format="3">
   <name>lunabot_perception</name>
   <version>0.1.0</version>
-  <description>Computer vision and sensor processing</description>
+  <description>Reserved package shell for future perception nodes</description>
   <maintainer email="lunabotics@le.ac.uk">Leicester Lunabotics Team</maintainer>
   <license>Apache-2.0</license>
 
