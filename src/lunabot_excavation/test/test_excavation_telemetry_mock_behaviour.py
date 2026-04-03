@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+from builtin_interfaces.msg import Time
+
 from lunabot_excavation import excavation_telemetry_mock as mock_module
 from lunabot_excavation.excavation_telemetry_mock import ExcavationTelemetryMock
 from lunabot_interfaces.msg import ExcavationCommand, ExcavationTelemetry
@@ -30,7 +32,7 @@ def _mock_node():
         }[name]
     )
     node.get_clock = lambda: SimpleNamespace(
-        now=lambda: SimpleNamespace(to_msg=lambda: SimpleNamespace())
+        now=lambda: SimpleNamespace(to_msg=lambda: Time())
     )
     node._telemetry_pub = SimpleNamespace(publish=node._published.append)
     return node
