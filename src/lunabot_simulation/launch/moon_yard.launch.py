@@ -104,13 +104,31 @@ def generate_launch_description():
             "/imu/data_raw@sensor_msgs/msg/Imu[ignition.msgs.IMU",
             "/joint_states@sensor_msgs/msg/JointState[ignition.msgs.Model",
             "/ouster/points/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
-            "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
-            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
-            "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
-            "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
         ],
         remappings=[
             ("/ouster/points/points", "/ouster/points"),
+        ],
+        output="screen",
+    )
+
+    camera_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_bridge",
+        arguments=[
+            "/camera_front/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
+            "/camera_front/image@sensor_msgs/msg/Image[ignition.msgs.Image",
+            "/camera_front/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
+        ],
+        output="screen",
+    )
+
+    camera_points_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_points_bridge",
+        arguments=[
+            "/camera_front/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
         ],
         output="screen",
     )
@@ -122,5 +140,7 @@ def generate_launch_description():
             spawn_robot,
             clock_bridge,
             robot_bridge,
+            camera_bridge,
+            camera_points_bridge,
         ]
     )

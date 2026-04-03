@@ -1,7 +1,8 @@
 import os
 from launch.actions import DeclareLaunchArgument
+from launch.actions import OpaqueFunction
 from launch import LaunchDescription
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.substitutions import PathJoinSubstitution
@@ -9,6 +10,77 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import IncludeLaunchDescription
 from ament_index_python.packages import get_package_share_directory
+
+
+TRUTHY_VALUES = ("1", "true", "yes", "on")
+FALSEY_VALUES = ("0", "false", "no", "off")
+
+
+def _normalise_bool_text(value, argument_name=None):
+    """Return a normalised launch boolean string or raise on invalid input."""
+    normalised = str(value).strip().lower()
+    if normalised in TRUTHY_VALUES or normalised in FALSEY_VALUES:
+        return normalised
+    if argument_name is not None:
+        raise ValueError(
+            f"Expected a boolean-style launch value for '{argument_name}', "
+            f"got '{value}'."
+        )
+    raise ValueError(
+        f"Expected a boolean-style launch value, got '{value}'."
+    )
+
+
+def _is_truthy(value):
+    """Return a launch expression that accepts common truthy strings."""
+    return PythonExpression(
+        [
+            "'",
+            value,
+            f"'.strip().lower() in {list(TRUTHY_VALUES)}",
+        ]
+    )
+
+
+def _is_falsey(value):
+    """Return a launch expression that accepts common falsey strings."""
+    return PythonExpression(
+        [
+            "'",
+            value,
+            f"'.strip().lower() in {list(FALSEY_VALUES)}",
+        ]
+    )
+
+
+def _tag_pose_bridge_config(use_sim_time, sim_config, hardware_config):
+    """Return the correct tag-pose bridge config for the selected clock mode."""
+    return PythonExpression(
+        [
+            "'",
+            sim_config,
+            "' if ",
+            _is_truthy(use_sim_time),
+            " else '",
+            hardware_config,
+            "'",
+        ]
+    )
+
+
+def _validate_boolean_launch_arguments(context):
+    """Reject invalid boolean-style launch argument values early."""
+    for argument_name in (
+        "lidar_costmap_phase",
+        "enable_visual_slam",
+        "use_sim_time",
+        "enable_apriltag_debug",
+    ):
+        _normalise_bool_text(
+            LaunchConfiguration(argument_name).perform(context),
+            argument_name=argument_name,
+        )
+    return []
 
 
 def generate_launch_description():
@@ -27,30 +99,40 @@ def generate_launch_description():
         pkg_localisation, "config", "ekf_lidar_phase.yaml"
     )
     apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
+    tag_pose_bridge_yaml = os.path.join(
+        pkg_localisation, "config", "tag_pose_bridge.yaml"
+    )
+    tag_pose_bridge_sim_yaml = os.path.join(
+        pkg_localisation, "config", "tag_pose_bridge_sim.yaml"
+    )
+    start_zone_localisation_yaml = os.path.join(
+        pkg_localisation, "config", "start_zone_localisation.yaml"
+    )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
+    tag_map_x = LaunchConfiguration("tag_map_x")
+    tag_map_y = LaunchConfiguration("tag_map_y")
+    tag_map_z = LaunchConfiguration("tag_map_z")
+    tag_map_yaw = LaunchConfiguration("tag_map_yaw")
 
     visual_slam_condition = IfCondition(
         PythonExpression(
             [
-                "'",
-                lidar_costmap_phase,
-                "' == 'false' and '",
-                enable_visual_slam,
-                "' == 'true'",
+                _is_falsey(lidar_costmap_phase),
+                " and ",
+                _is_truthy(enable_visual_slam),
             ]
         )
     )
     apriltag_debug_condition = IfCondition(
         PythonExpression(
             [
-                "'",
-                lidar_costmap_phase,
-                "' == 'false' and '",
-                enable_apriltag_debug,
-                "' == 'true'",
+                _is_falsey(lidar_costmap_phase),
+                " and ",
+                _is_truthy(enable_apriltag_debug),
             ]
         )
     )
@@ -89,6 +171,32 @@ def generate_launch_description():
                     "debugging."
                 ),
             ),
+            DeclareLaunchArgument(
+                "cmd_vel_topic",
+                default_value="cmd_vel",
+                description="Velocity command topic used by the start-zone localiser.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_x",
+                default_value="0.0",
+                description="Configured map-frame x position of the start-zone tag.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_y",
+                default_value="1.08",
+                description="Configured map-frame y position of the start-zone tag.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_z",
+                default_value="0.25",
+                description="Configured map-frame z position of the start-zone tag.",
+            ),
+            DeclareLaunchArgument(
+                "tag_map_yaw",
+                default_value="0.0",
+                description="Configured map-frame yaw of the start-zone tag.",
+            ),
+            OpaqueFunction(function=_validate_boolean_launch_arguments),
             # Visual odometry
             Node(
                 package="rtabmap_odom",
@@ -106,7 +214,10 @@ def generate_launch_description():
                 name="ekf_filter_node_odom",
                 output="screen",
                 parameters=[ekf_lidar_phase_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[("odometry/filtered", "/odometry/local")],
+                remappings=[
+                    ("odometry/filtered", "/odometry/local"),
+                    ("set_pose", "/ekf_filter_node_odom/set_pose"),
+                ],
             ),
             # During the lidar debug phase there is no global localisation source,
             # so publish an identity map->odom transform to keep Nav2 / RViz happy.
@@ -123,7 +234,7 @@ def generate_launch_description():
                     "--frame-id", "map",
                     "--child-frame-id", "odom",
                 ],
-                condition=IfCondition(lidar_costmap_phase),
+                condition=IfCondition(_is_truthy(lidar_costmap_phase)),
             ),
             # Global EKF: map -> odom (corrects drift when tag seen)
             Node(
@@ -132,8 +243,11 @@ def generate_launch_description():
                 name="ekf_filter_node_map",
                 output="screen",
                 parameters=[ekf_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[("odometry/filtered", "/odometry/global")],
-                condition=UnlessCondition(lidar_costmap_phase),
+                remappings=[
+                    ("odometry/filtered", "/odometry/global"),
+                    ("set_pose", "/ekf_filter_node_map/set_pose"),
+                ],
+                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
             # RTAB-Map SLAM (optional, map building only, no TF publishing)
             Node(
@@ -158,7 +272,7 @@ def generate_launch_description():
                     ("camera_info", "/camera_front/camera_info"),
                     ("detections", "/camera_front/tags"),
                 ],
-                condition=UnlessCondition(lidar_costmap_phase),
+                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -179,16 +293,16 @@ def generate_launch_description():
                 package="tf2_ros",
                 executable="static_transform_publisher",
                 arguments=[
-                    "--x", "0",
-                    "--y", "1.08",
-                    "--z", "0.25",
+                    "--x", tag_map_x,
+                    "--y", tag_map_y,
+                    "--z", tag_map_z,
                     "--roll", "0",
                     "--pitch", "0",
-                    "--yaw", "0",
+                    "--yaw", tag_map_yaw,
                     "--frame-id", "map",
                     "--child-frame-id", "tag36h11:0",
                 ],
-                condition=UnlessCondition(lidar_costmap_phase),
+                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
             # Converts apriltag TF into PoseWithCovarianceStamped for global EKF
             Node(
@@ -197,12 +311,31 @@ def generate_launch_description():
                 name="tag_pose_publisher",
                 output="screen",
                 parameters=[
+                    _tag_pose_bridge_config(
+                        use_sim_time,
+                        tag_pose_bridge_sim_yaml,
+                        tag_pose_bridge_yaml,
+                    ),
                     {
                         "use_sim_time": use_sim_time,
                         "detections_topic": "/camera_front/tags",
                     }
                 ],
-                condition=UnlessCondition(lidar_costmap_phase),
+                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
+            ),
+            Node(
+                package="lunabot_localisation",
+                executable="start_zone_localiser",
+                name="start_zone_localiser",
+                output="screen",
+                parameters=[
+                    start_zone_localisation_yaml,
+                    {
+                        "use_sim_time": use_sim_time,
+                        "cmd_vel_topic": cmd_vel_topic,
+                    },
+                ],
+                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
         ]
     )

@@ -43,6 +43,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
+            "navigate_to_pose_gate = lunabot_bringup.navigate_to_pose_gate:main",
             "preflight_check = lunabot_bringup.preflight_check:main",
         ],
     },
