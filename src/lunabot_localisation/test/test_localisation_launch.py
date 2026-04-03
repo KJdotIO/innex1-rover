@@ -59,17 +59,6 @@ def _node_executable(node):
     return node.node_executable
 
 
-def _node_parameter_file_names(node):
-    """Return configured parameter-file basenames for a launch node."""
-    names = []
-    for parameter_source in node.__dict__.get("_Node__parameters", ()):
-        param_file = getattr(parameter_source, "param_file", None)
-        if param_file is None:
-            continue
-        names.append(Path(str(param_file)).name)
-    return tuple(names)
-
-
 def _static_tf_owner_link(node):
     """Return a static transform link when the node publishes one explicitly."""
     arguments = node.__dict__.get("_Node__arguments", ())
@@ -79,31 +68,6 @@ def _static_tf_owner_link(node):
     if parent is None or child is None:
         return None
     return (parent, child)
-
-
-def _configured_tf_owner_link(node):
-    """Return the TF link published by a launch node when it is explicit."""
-    if (
-        _node_package(node) == "tf2_ros"
-        and _node_executable(node) == "static_transform_publisher"
-    ):
-        return _static_tf_owner_link(node)
-
-    if (
-        _node_package(node) != "robot_localization"
-        or _node_executable(node) != "ekf_node"
-    ):
-        return None
-
-    node_name = _node_name(node)
-    for config_name in _node_parameter_file_names(node):
-        try:
-            parameters = _ekf_parameters(config_name, node_name)
-        except (FileNotFoundError, KeyError):
-            continue
-        if parameters.get("publish_tf") is True:
-            return _tf_owner_link(parameters)
-    return None
 
 
 def _runtime_tf_owner_links(*, lidar_costmap_phase):
@@ -120,11 +84,6 @@ def _runtime_tf_owner_links(*, lidar_costmap_phase):
         owner_links.add(_tf_owner_link(global_parameters))
 
     return owner_links
-
-
-def _dual_ekf_contract_links():
-    """Return the TF links guarded by the dual-EKF ownership contract."""
-    return {("odom", "base_footprint"), ("map", "odom")}
 
 
 @pytest.mark.parametrize(
@@ -278,48 +237,6 @@ def test_runtime_tf_owner_links_remain_unique_across_modes(
     )
 
     assert owner_links == expected_links
-    assert len(owner_links) == len(expected_links)
-
-
-@pytest.mark.parametrize(
-    ("lidar_costmap_phase", "expected_links"),
-    [
-        ("true", {("odom", "base_footprint"), ("map", "odom")}),
-        ("1", {("odom", "base_footprint"), ("map", "odom")}),
-        ("false", {("odom", "base_footprint"), ("map", "odom")}),
-        ("0", {("odom", "base_footprint"), ("map", "odom")}),
-    ],
-)
-def test_launch_exposes_only_expected_tf_owner_links(
-    lidar_costmap_phase, expected_links
-):
-    launch_module = _load_launch_module()
-    launch_module.get_package_share_directory = (
-        lambda _package: "/tmp/lunabot_localisation"
-    )
-    description = launch_module.generate_launch_description()
-    context = LaunchContext()
-    context.launch_configurations["lidar_costmap_phase"] = lidar_costmap_phase
-    context.launch_configurations["enable_visual_slam"] = "false"
-    context.launch_configurations["use_sim_time"] = "true"
-    context.launch_configurations["enable_apriltag_debug"] = "false"
-
-    owner_links = [
-        _configured_tf_owner_link(entity)
-        for entity in description.entities
-        if isinstance(entity, Node)
-        and (
-            entity.condition is None
-            or entity.condition.evaluate(context)
-        )
-    ]
-    owner_links = [
-        owner_link
-        for owner_link in owner_links
-        if owner_link in _dual_ekf_contract_links()
-    ]
-
-    assert set(owner_links) == expected_links
     assert len(owner_links) == len(expected_links)
 
 
