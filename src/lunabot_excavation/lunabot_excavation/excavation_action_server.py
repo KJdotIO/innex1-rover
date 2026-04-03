@@ -164,10 +164,12 @@ class ExcavationActionServer(Node):
         if not client.wait_for_service(timeout_sec=timeout_s):
             return None
         future = client.call_async(Trigger.Request())
-        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_s)
-        if not future.done():
-            return None
-        return future.result()
+        deadline = monotonic() + timeout_s
+        while rclpy.ok() and monotonic() < deadline:
+            if future.done():
+                return future.result()
+            sleep(min(self.loop_period_s, 0.05))
+        return future.result() if future.done() else None
 
     def _publish_feedback(self, goal_handle, elapsed: float):
         """Publish action feedback from controller status and telemetry."""
