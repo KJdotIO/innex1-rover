@@ -228,19 +228,25 @@ class ExcavationActionServer(Node):
     ):
         """Apply a terminal goal state, log it once, and build the result."""
         if terminal_state == "succeed":
-            if goal_handle.is_active:
+            try:
                 goal_handle.succeed()
+            except RuntimeError:
+                pass
             self.get_logger().info("Excavation action succeeded")
             return self._result(True, reason_code, reason, duration_s)
 
         if terminal_state == "cancel":
-            if goal_handle.is_active:
+            try:
                 goal_handle.canceled()
+            except RuntimeError:
+                pass
             self.get_logger().info(reason)
             return self._result(success, reason_code, reason, duration_s)
 
-        if goal_handle.is_active:
+        try:
             goal_handle.abort()
+        except RuntimeError:
+            pass
         self.get_logger().warn(reason)
         return self._result(success, reason_code, reason, duration_s)
 
