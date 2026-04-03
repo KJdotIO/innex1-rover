@@ -4,14 +4,17 @@ This package contains Nav2 configuration and mission navigation behaviour tree a
 
 ## What this package is responsible for
 
-`lunabot_navigation` defines how Nav2 plans and follows paths in this project. It does not estimate localisation and it does not detect hazards directly. It consumes those outputs from localisation and perception.
+`lunabot_navigation` defines how Nav2 plans and follows paths in this project.
+It does not estimate localisation and it does not detect hazards directly. In
+the June baseline it consumes localisation outputs plus direct sensor
+observation topics used by the costmaps.
 
 ## Inputs this package depends on
 
 At runtime, navigation expects:
 - fused odometry from localisation (`/odometry/filtered`),
 - TF chain including `map`, `odom`, `base_footprint`,
-- hazard/depth observation sources used by costmaps,
+- direct sensor observation sources used by costmaps,
 - configured mission or operator navigation goals.
 
 ## Key files

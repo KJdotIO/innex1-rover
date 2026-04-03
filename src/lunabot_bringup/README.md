@@ -4,7 +4,10 @@ This package contains launch entrypoints that start integrated stack configurati
 
 ## What this package is responsible for
 
-`lunabot_bringup` is the operational entrypoint package. It composes localisation, perception, planning, and control-related nodes into runnable launch flows for testing and operation.
+`lunabot_bringup` is the operational entrypoint package. It composes
+localisation, navigation, safety, teleop, and control-related nodes into
+runnable launch flows for testing and operation. The June baseline does not
+launch a standalone perception package.
 
 ## Typical usage
 
