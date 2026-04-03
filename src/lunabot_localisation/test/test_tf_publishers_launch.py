@@ -101,7 +101,7 @@ def _publisher_count(topic_info_output):
             True,
             {"/ekf_filter_node_odom"},
             {"/ekf_filter_node_map"},
-            2,
+            1,
         ),
     ],
 )
