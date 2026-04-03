@@ -37,6 +37,7 @@ class NavigateToPoseGate(Node):
         self.declare_parameter("public_action_name", "/navigate_to_pose_gate")
         self.declare_parameter("internal_action_name", "/navigate_to_pose")
         self.declare_parameter("readiness_timeout_s", 5.0)
+        self.declare_parameter("internal_action_wait_timeout_s", 1.0)
         self.declare_parameter("gate_enabled", True)
 
         self.status_topic = self.get_parameter("status_topic").value
@@ -44,6 +45,9 @@ class NavigateToPoseGate(Node):
         self.internal_action_name = self.get_parameter("internal_action_name").value
         self.readiness_timeout_ns = int(
             float(self.get_parameter("readiness_timeout_s").value) * 1e9
+        )
+        self.internal_action_wait_timeout_s = float(
+            self.get_parameter("internal_action_wait_timeout_s").value
         )
         self.gate_enabled = _parse_bool(self.get_parameter("gate_enabled").value)
 
@@ -107,7 +111,9 @@ class NavigateToPoseGate(Node):
             )
             return GoalResponse.REJECT
 
-        if not self._action_client.wait_for_server(timeout_sec=0.0):
+        if not self._action_client.wait_for_server(
+            timeout_sec=self.internal_action_wait_timeout_s
+        ):
             self.get_logger().warn(
                 "Rejecting NavigateToPose goal because the internal Nav2 action "
                 "server is unavailable."
