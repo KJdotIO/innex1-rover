@@ -123,7 +123,8 @@ def test_generate_launch_description_has_validation_and_one_tag_pose_node():
     tag_pose_publishers = [
         entity
         for entity in description.entities
-        if isinstance(entity, Node) and entity.node_name == "tag_pose_publisher"
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__node_name") == "tag_pose_publisher"
     ]
 
     assert len(validators) == 1
