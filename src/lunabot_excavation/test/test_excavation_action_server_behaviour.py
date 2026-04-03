@@ -29,6 +29,10 @@ def _excavation_server():
             "stop_timeout_s": 2.0,
         }[name]
     )
+    server.get_logger = lambda: SimpleNamespace(
+        info=lambda _msg: None,
+        warn=lambda _msg: None,
+    )
     server._publish_feedback = lambda _goal_handle, _elapsed: None
     return server
 
@@ -99,7 +103,7 @@ def test_execute_excavate_returns_timeout_result(monkeypatch):
     server._call_trigger = lambda client, timeout_s: (
         trigger_calls.append((client, timeout_s)) or SimpleNamespace(success=True)
     )
-    server._wait_for_stop_settle = lambda _timeout_s: True
+    server._wait_for_stop_settle = lambda _timeout_s: "settled"
 
     result = server.execute_excavate(goal_handle)
 
@@ -127,7 +131,7 @@ def test_execute_excavate_returns_canceled_result(monkeypatch):
     server._call_trigger = lambda client, timeout_s: (
         trigger_calls.append((client, timeout_s)) or SimpleNamespace(success=True)
     )
-    server._wait_for_stop_settle = lambda _timeout_s: True
+    server._wait_for_stop_settle = lambda _timeout_s: "settled"
 
     result = server.execute_excavate(goal_handle)
 
@@ -138,5 +142,116 @@ def test_execute_excavate_returns_canceled_result(monkeypatch):
     assert result.failure_reason == "Excavation goal canceled by client"
     assert trigger_calls == [
         (server._start_client, 2.0),
+        (server._stop_client, 2.0),
+    ]
+
+
+def test_execute_excavate_fault_beats_cancel_during_stop_settle(monkeypatch):
+    server = _excavation_server()
+    goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=5.0), cancel_requested=True)
+    trigger_calls = []
+    monotonic_values = iter([30.0, 30.1])
+
+    monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
+    monkeypatch.setattr(excavation_module, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
+
+    def _call_trigger(client, timeout_s):
+        trigger_calls.append((client, timeout_s))
+        if client is server._stop_client:
+            server._status = SimpleNamespace(
+                state=ExcavationStatus.STATE_FAULT,
+                fault_code=ExcavationStatus.FAULT_OVERCURRENT,
+                estop_active=False,
+                motor_current_a=0.0,
+            )
+        return SimpleNamespace(success=True)
+
+    server._call_trigger = _call_trigger
+    server._wait_for_stop_settle = lambda _timeout_s: "fault"
+
+    result = server.execute_excavate(goal_handle)
+
+    assert goal_handle.abort_count == 1
+    assert goal_handle.canceled_count == 0
+    assert result.reason_code == Excavate.Result.REASON_JAM_OR_OVERCURRENT
+    assert result.failure_reason == "Excavation jam or overcurrent detected"
+    assert trigger_calls == [
+        (server._start_client, 2.0),
+        (server._stop_client, 2.0),
+    ]
+
+
+def test_execute_excavate_fault_beats_timeout_during_stop_settle(monkeypatch):
+    server = _excavation_server()
+    goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=1.0))
+    trigger_calls = []
+    monotonic_values = iter([40.0, 41.5])
+
+    monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
+    monkeypatch.setattr(excavation_module, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
+
+    def _call_trigger(client, timeout_s):
+        trigger_calls.append((client, timeout_s))
+        if client is server._stop_client:
+            server._status = SimpleNamespace(
+                state=ExcavationStatus.STATE_FAULT,
+                fault_code=ExcavationStatus.FAULT_DRIVER,
+                estop_active=False,
+                motor_current_a=0.0,
+            )
+        return SimpleNamespace(success=True)
+
+    server._call_trigger = _call_trigger
+    server._wait_for_stop_settle = lambda _timeout_s: "fault"
+
+    result = server.execute_excavate(goal_handle)
+
+    assert goal_handle.abort_count == 1
+    assert goal_handle.canceled_count == 0
+    assert result.reason_code == Excavate.Result.REASON_DRIVER_FAULT
+    assert result.failure_reason == "Excavation driver fault active"
+    assert trigger_calls == [
+        (server._start_client, 2.0),
+        (server._stop_client, 2.0),
+    ]
+
+
+def test_execute_excavate_estop_beats_cancel_during_homing_stop_settle():
+    server = _excavation_server()
+    goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=5.0), cancel_requested=True)
+    trigger_calls = []
+
+    server._status = SimpleNamespace(
+        state=ExcavationStatus.STATE_IDLE,
+        fault_code=ExcavationStatus.FAULT_NONE,
+        estop_active=False,
+        motor_current_a=0.0,
+    )
+
+    def _call_trigger(client, timeout_s):
+        trigger_calls.append((client, timeout_s))
+        if client is server._stop_client:
+            server._status = SimpleNamespace(
+                state=ExcavationStatus.STATE_FAULT,
+                fault_code=ExcavationStatus.FAULT_ESTOP,
+                estop_active=True,
+                motor_current_a=0.0,
+            )
+        return SimpleNamespace(success=True)
+
+    server._call_trigger = _call_trigger
+    server._wait_for_ready_or_fault = lambda *_args: ("cancel", 0.8)
+    server._wait_for_stop_settle = lambda _timeout_s: "fault"
+
+    result = server.execute_excavate(goal_handle)
+
+    assert goal_handle.abort_count == 1
+    assert goal_handle.canceled_count == 0
+    assert result.reason_code == Excavate.Result.REASON_ESTOP
+    assert result.failure_reason == "Excavation estop active"
+    assert trigger_calls == [
+        (server._home_client, 2.0),
         (server._stop_client, 2.0),
     ]
