@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 
+from launch.actions import DeclareLaunchArgument
+
 
 def _load_launch_module():
     launch_path = Path(__file__).resolve().parents[1] / "launch" / "material_actions.launch.py"
@@ -27,3 +29,22 @@ def test_material_actions_launch_includes_bench_mock_and_servers():
         "material_action_server",
     }
 
+    mock_node = next(
+        entity for entity in entities if entity.node_name == "excavation_telemetry_mock"
+    )
+    mock_parameters = mock_node._Node__parameters[0]
+    assert str(mock_parameters["fault_on_start_code"][0]) == "fault_on_start_code"
+    assert str(mock_parameters["fault_on_stop_code"][0]) == "fault_on_stop_code"
+    assert type(mock_node.condition).__name__ == "IfCondition"
+    assert str(mock_node.condition._predicate_expression[0]) == "use_mock_telemetry"
+
+    declared_arguments = [
+        entity.name
+        for entity in description.entities
+        if isinstance(entity, DeclareLaunchArgument)
+    ]
+    assert declared_arguments == [
+        "fault_on_start_code",
+        "use_mock_telemetry",
+        "fault_on_stop_code",
+    ]

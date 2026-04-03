@@ -82,3 +82,39 @@ def test_stop_fault_is_published_after_delay(monkeypatch):
     assert node._fault_code == ExcavationTelemetry.FAULT_DRIVER
     assert node._published[-1].driver_fault is True
 
+
+def test_home_command_clears_switch_then_restores_it(monkeypatch):
+    node = _mock_node()
+    times = iter([30.0, 30.3])
+    node._home_switch = True
+
+    monkeypatch.setattr(mock_module, "monotonic", lambda: next(times))
+
+    command = ExcavationCommand()
+    command.command = ExcavationCommand.COMMAND_HOME
+    node._handle_command(command)
+
+    assert node._home_switch is False
+
+    node._tick()
+
+    assert node._home_switch is True
+    assert node._published[-1].home_switch is True
+
+
+def test_clear_fault_command_clears_latched_fault_immediately(monkeypatch):
+    node = _mock_node()
+    times = iter([40.0])
+    node._driver_fault = True
+    node._fault_code = ExcavationTelemetry.FAULT_DRIVER
+
+    monkeypatch.setattr(mock_module, "monotonic", lambda: next(times))
+
+    command = ExcavationCommand()
+    command.command = ExcavationCommand.COMMAND_CLEAR_FAULT
+    node._handle_command(command)
+    node._tick()
+
+    assert node._driver_fault is False
+    assert node._fault_code == ExcavationTelemetry.FAULT_NONE
+    assert node._published[-1].fault_code == ExcavationTelemetry.FAULT_NONE

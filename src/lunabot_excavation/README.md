@@ -19,9 +19,10 @@ If you want the mission-facing action adapter as well, use:
 ros2 launch lunabot_control material_actions.launch.py
 ```
 
-That launch now includes an explicit `excavation_telemetry_mock` node. It is a bench mock, not
-real hardware IO, and it is there so the controller and action adapter can complete a clean
-cycle on their own.
+That launch now includes an explicit `excavation_telemetry_mock` node by default. It is a bench
+mock, not real hardware IO, and it is there so the controller and action adapter can complete a
+clean cycle on their own. If you already have a real telemetry source, pass
+`use_mock_telemetry:=false`.
 
 ## Bench Commands
 
@@ -109,6 +110,13 @@ If you want to force a stop-side fault for readability checks, override the mock
 ```bash
 ros2 launch lunabot_control material_actions.launch.py \
   fault_on_stop_code:=2
+```
+
+If you are wiring in a real `/excavation/telemetry` source, disable the mock explicitly:
+
+```bash
+ros2 launch lunabot_control material_actions.launch.py \
+  use_mock_telemetry:=false
 ```
 
 ## Notes
