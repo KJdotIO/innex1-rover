@@ -66,21 +66,24 @@ def _test_environment(domain_id):
 
 def _run_ros_command(env, *args):
     """Run a ROS CLI command and return combined output."""
-    completed = subprocess.run(
-        args,
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+            timeout=5.0,
+        )
+    except subprocess.TimeoutExpired:
+        return ""
     return completed.stdout + completed.stderr
 
 
 def _publisher_count(topic_info_output):
     """Count publisher entries in `ros2 topic info -v` output."""
     match = re.search(r"Publisher count:\s+(\d+)", topic_info_output)
-    assert match is not None, topic_info_output
-    return int(match.group(1))
+    return None if match is None else int(match.group(1))
 
 
 @pytest.mark.parametrize(
@@ -124,11 +127,10 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
             "enable_apriltag_debug:=false",
             "use_sim_time:=true",
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         env=env,
-        preexec_fn=os.setsid,
+        start_new_session=True,
     )
 
     try:
@@ -177,10 +179,11 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
             _publisher_count(tf_static_info_output) == expected_tf_static_publishers
         ), tf_static_info_output
     finally:
-        os.killpg(launch_process.pid, signal.SIGTERM)
-        try:
-            launch_process.wait(timeout=5.0)
-        except subprocess.TimeoutExpired:
-            os.killpg(launch_process.pid, signal.SIGKILL)
-            launch_process.wait(timeout=5.0)
+        if launch_process.poll() is None:
+            os.killpg(launch_process.pid, signal.SIGTERM)
+            try:
+                launch_process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                os.killpg(launch_process.pid, signal.SIGKILL)
+                launch_process.wait(timeout=5.0)
         _release_test_domain_reservation()
