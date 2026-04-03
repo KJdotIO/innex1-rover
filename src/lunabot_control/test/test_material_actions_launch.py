@@ -39,7 +39,7 @@ def test_material_actions_launch_includes_bench_mock_and_servers():
         if entity.__dict__.get("_Node__node_name") == "excavation_telemetry_mock"
     )
     assert type(mock_node.condition).__name__ == "IfCondition"
-    assert str(mock_node.condition._predicate_expression[0]) == "use_mock_telemetry"
+    assert 'condition=IfCondition(LaunchConfiguration("use_mock_telemetry"))' in launch_source
     assert '"fault_on_start_code": LaunchConfiguration("fault_on_start_code")' in launch_source
     assert '"fault_on_stop_code": LaunchConfiguration("fault_on_stop_code")' in launch_source
 
