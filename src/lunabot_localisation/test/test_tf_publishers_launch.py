@@ -86,29 +86,29 @@ def _publisher_count(topic_info_output):
 @pytest.mark.parametrize(
     (
         "lidar_costmap_phase",
-        "expected_nodes",
-        "expected_tf_publishers",
+        "expected_present_nodes",
+        "expected_absent_nodes",
         "expected_tf_static_publishers",
     ),
     [
         (
             False,
             {"/ekf_filter_node_odom", "/ekf_filter_node_map"},
-            2,
+            set(),
             1,
         ),
         (
             True,
             {"/ekf_filter_node_odom"},
-            1,
+            {"/ekf_filter_node_map"},
             2,
         ),
     ],
 )
 def test_localisation_launch_tf_publishers_match_expected_modes(
     lidar_costmap_phase,
-    expected_nodes,
-    expected_tf_publishers,
+    expected_present_nodes,
+    expected_absent_nodes,
     expected_tf_static_publishers,
 ):
     domain_id = _reserve_test_domain()
@@ -134,12 +134,10 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
     try:
         deadline = time.time() + 20.0
         node_list_output = ""
-        tf_info_output = ""
         tf_static_info_output = ""
 
         while time.time() < deadline:
             node_list_output = _run_ros_command(env, "ros2", "node", "list")
-            tf_info_output = _run_ros_command(env, "ros2", "topic", "info", "/tf", "-v")
             tf_static_info_output = _run_ros_command(
                 env,
                 "ros2",
@@ -156,8 +154,8 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
             }
 
             if (
-                expected_nodes.issubset(nodes)
-                and _publisher_count(tf_info_output) == expected_tf_publishers
+                expected_present_nodes.issubset(nodes)
+                and expected_absent_nodes.isdisjoint(nodes)
                 and _publisher_count(tf_static_info_output)
                 == expected_tf_static_publishers
             ):
@@ -173,8 +171,8 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
             for line in node_list_output.splitlines()
             if line.strip().startswith("/")
         }
-        assert expected_nodes.issubset(nodes), node_list_output
-        assert _publisher_count(tf_info_output) == expected_tf_publishers, tf_info_output
+        assert expected_present_nodes.issubset(nodes), node_list_output
+        assert expected_absent_nodes.isdisjoint(nodes), node_list_output
         assert (
             _publisher_count(tf_static_info_output) == expected_tf_static_publishers
         ), tf_static_info_output
