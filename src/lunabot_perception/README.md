@@ -1,26 +1,30 @@
 # lunabot_perception
 
-This package contains perception nodes that convert sensor streams into navigation-relevant observations.
+This package is a reserved shell for future perception nodes.
 
 ## What this package is responsible for
 
-`lunabot_perception` turns front depth inputs into hazard observations that Nav2 costmaps can consume. It does not perform global planning and it does not own mission sequencing.
+`lunabot_perception` is not part of the June runtime baseline. The current
+stack uses direct sensor observation topics in Nav2 costmaps rather than a
+standalone perception node in this package.
 
-## Core responsibilities
+## Current status
 
-- Process depth point clouds into hazard outputs.
-- Publish obstacle observations with stable topics and frames.
-- Support tuning of hazard extraction behaviour for competition terrain.
+- No runnable node is installed from this package today.
+- No launch file depends on a baseline perception node here.
+- The package stays in the repo as the future home for camera or depth-derived
+  perception work once that runtime path is defined properly.
 
 ## Key files
 
-- `lunabot_perception/hazard_detection.py`: hazard extraction node.
+- `package.xml`: package metadata.
+- `setup.py`: installation metadata for the package shell.
 
 ## Common failure modes
 
-- Missing runtime dependencies (for example `open3d` in environments still using the older implementation path).
-- QoS mismatch with upstream camera topics.
-- Frame mismatch causing hazards to appear in incorrect locations.
+- Assuming this package already contains a runnable hazard pipeline.
+- Updating navigation or bring-up docs without checking whether a real
+  perception node exists yet.
 
 ## Where to read next
 

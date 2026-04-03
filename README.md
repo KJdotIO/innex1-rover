@@ -142,8 +142,6 @@ If Gazebo is already running in a bad state, kill old instances and relaunch:
 pkill -9 -f "gz sim"
 ```
 
-If `hazard_detection` dies with `open3d` import errors, install it in your active Python environment.
-
 ## Repository layout
 
 ```text
@@ -155,7 +153,7 @@ src/
 ├── lunabot_interfaces/      # Shared ROS action/message contracts
 ├── lunabot_localisation/    # EKF + global correction path
 ├── lunabot_navigation/      # Nav2 config + mission BT assets
-├── lunabot_perception/      # Hazard detection pipeline
+├── lunabot_perception/      # Reserved shell for future perception nodes
 ├── lunabot_simulation/      # Gazebo world/bridge launch
 └── lunabot_teleop/          # Manual control
 ```

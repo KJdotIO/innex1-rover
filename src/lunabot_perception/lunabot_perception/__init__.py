@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Perception package for hazard detection and obstacle processing."""
+"""Reserved package shell for future perception nodes."""
