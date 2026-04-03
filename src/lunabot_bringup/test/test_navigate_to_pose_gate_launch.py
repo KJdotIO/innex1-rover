@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import sys
+import time
 import unittest
 
 from action_msgs.msg import GoalStatus
@@ -22,11 +23,28 @@ from rclpy.node import Node as RclpyNode
 
 PUBLIC_ACTION_NAME = "/test_navigate_to_pose_gate"
 INTERNAL_ACTION_NAME = "/test_navigate_to_pose"
-TEST_ROS_DOMAIN_ID = str(100 + (os.getpid() % 100))
 
-os.environ["ROS_DOMAIN_ID"] = TEST_ROS_DOMAIN_ID
-os.environ.pop("FASTRTPS_DEFAULT_PROFILES_FILE", None)
-os.environ.pop("RMW_FASTRTPS_USE_QOS_FROM_XML", None)
+
+def _reserve_test_domain():
+    """Reserve a ROS domain id for this test run on the current machine."""
+    domain_ids = list(range(100, 231))
+    start_index = (os.getpid() + time.time_ns()) % len(domain_ids)
+
+    for offset in range(len(domain_ids)):
+        domain_id = domain_ids[(start_index + offset) % len(domain_ids)]
+        lock_path = Path(f"/tmp/lunabot_ros_domain_{domain_id}.lock")
+        try:
+            lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+        except FileExistsError:
+            continue
+        return str(domain_id), lock_fd, lock_path
+
+    raise RuntimeError("No free ROS domain id available for launch test")
+
+
+TEST_ROS_DOMAIN_ID, TEST_ROS_DOMAIN_LOCK_FD, TEST_ROS_DOMAIN_LOCK_PATH = (
+    _reserve_test_domain()
+)
 
 
 @pytest.mark.launch_test
@@ -93,12 +111,32 @@ class TestNavigateToPoseGate(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls._original_env = {
+            "ROS_DOMAIN_ID": os.environ.get("ROS_DOMAIN_ID"),
+            "FASTRTPS_DEFAULT_PROFILES_FILE": os.environ.get(
+                "FASTRTPS_DEFAULT_PROFILES_FILE"
+            ),
+            "RMW_FASTRTPS_USE_QOS_FROM_XML": os.environ.get(
+                "RMW_FASTRTPS_USE_QOS_FROM_XML"
+            ),
+        }
+        os.environ["ROS_DOMAIN_ID"] = TEST_ROS_DOMAIN_ID
+        os.environ.pop("FASTRTPS_DEFAULT_PROFILES_FILE", None)
+        os.environ.pop("RMW_FASTRTPS_USE_QOS_FROM_XML", None)
         rclpy.init()
 
     @classmethod
     def tearDownClass(cls):
         if rclpy.ok():
             rclpy.shutdown()
+        for name, value in cls._original_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+        os.close(TEST_ROS_DOMAIN_LOCK_FD)
+        TEST_ROS_DOMAIN_LOCK_PATH.unlink(missing_ok=True)
 
     def setUp(self):
         self.node = _GateTestClient()
