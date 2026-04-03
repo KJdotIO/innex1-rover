@@ -59,17 +59,31 @@ class ExcavationActionServer(Node):
             "/excavation/status",
             self._handle_status,
             qos,
+            callback_group=self._callback_group,
         )
         self.create_subscription(
             ExcavationTelemetry,
             "/excavation/telemetry",
             self._handle_telemetry,
             qos,
+            callback_group=self._callback_group,
         )
 
-        self._home_client = self.create_client(Trigger, "/excavation/home")
-        self._start_client = self.create_client(Trigger, "/excavation/start")
-        self._stop_client = self.create_client(Trigger, "/excavation/stop")
+        self._home_client = self.create_client(
+            Trigger,
+            "/excavation/home",
+            callback_group=self._callback_group,
+        )
+        self._start_client = self.create_client(
+            Trigger,
+            "/excavation/start",
+            callback_group=self._callback_group,
+        )
+        self._stop_client = self.create_client(
+            Trigger,
+            "/excavation/stop",
+            callback_group=self._callback_group,
+        )
 
         self._server = ActionServer(
             self,
