@@ -13,7 +13,16 @@ Start the controller for bench work:
 ros2 launch lunabot_excavation excavation_bench.launch.py
 ```
 
-If you want the mission-facing action adapter as well, use:
+Start the excavation sim proxy, controller, and action adapter together:
+
+```bash
+ros2 launch lunabot_excavation excavation_sim.launch.py
+```
+
+`excavation_sim.launch.py` already includes the excavation action adapter. The broader
+`material_actions.launch.py` path does not start `excavation_sim_proxy`, so it is not a
+drop-in replacement for excavation simulation by itself. Use it only when you want the broader
+action path and are providing excavation telemetry separately:
 
 ```bash
 ros2 launch lunabot_control material_actions.launch.py
@@ -79,6 +88,21 @@ Expected state flow for a healthy bounded jog is:
 - `excavating`
 - `stopping`
 - `ready` or `idle`
+
+## Sim Proxy Fault Injection
+
+The excavation sim launch exposes three simple fault knobs:
+
+```bash
+ros2 launch lunabot_excavation excavation_sim.launch.py force_overcurrent:=true
+ros2 launch lunabot_excavation excavation_sim.launch.py force_driver_fault:=true
+ros2 launch lunabot_excavation excavation_sim.launch.py hold_home_switch_false:=true
+```
+
+- `force_overcurrent` faults once the fake motor starts, which lets the controller/action path
+  exercise the jam or overcurrent branch.
+- `force_driver_fault` publishes a persistent driver fault from the fake hardware.
+- `hold_home_switch_false` prevents homing completion, which gives a deterministic timeout path.
 
 For a simple fault-path check, stop the controller or block the service path and confirm the
 bench CLI exits cleanly with an `error:` message rather than a traceback.
