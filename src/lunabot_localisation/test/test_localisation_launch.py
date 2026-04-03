@@ -132,8 +132,9 @@ def test_generate_launch_description_has_validation_and_one_tag_pose_node():
     assert len(tag_pose_publishers) == 1
 
 
-def test_june_baseline_ekf_does_not_fuse_visual_odometry():
-    ekf_path = Path(__file__).resolve().parents[1] / "config" / "ekf.yaml"
+@pytest.mark.parametrize("config_name", ["ekf.yaml", "ekf_lidar_phase.yaml"])
+def test_june_baseline_ekf_does_not_fuse_visual_odometry(config_name):
+    ekf_path = Path(__file__).resolve().parents[1] / "config" / config_name
     config = yaml.safe_load(ekf_path.read_text())
     odom_parameters = config["ekf_filter_node_odom"]["ros__parameters"]
 
