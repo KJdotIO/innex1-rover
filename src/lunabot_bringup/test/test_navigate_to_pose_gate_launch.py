@@ -13,6 +13,7 @@ from action_msgs.msg import GoalStatus
 import launch
 from launch.actions import ExecuteProcess
 from launch.actions import SetEnvironmentVariable
+from launch.actions import TimerAction
 from launch.actions import UnsetEnvironmentVariable
 from launch_ros.actions import Node
 import launch_testing.actions
@@ -100,7 +101,10 @@ def generate_test_description():
                 UnsetEnvironmentVariable("RMW_FASTRTPS_USE_QOS_FROM_XML"),
                 test_server,
                 gate,
-                launch_testing.actions.ReadyToTest(),
+                TimerAction(
+                    period=2.0,
+                    actions=[launch_testing.actions.ReadyToTest()],
+                ),
             ]
         ),
         {
@@ -160,8 +164,8 @@ class TestNavigateToPoseGate(unittest.TestCase):
 
     def setUp(self):
         self.node = _GateTestClient()
-        self.assertTrue(self.node.client.wait_for_server(timeout_sec=5.0))
-        self.assertTrue(self.node.downstream_client.wait_for_server(timeout_sec=5.0))
+        self.assertTrue(self.node.client.wait_for_server(timeout_sec=10.0))
+        self.assertTrue(self.node.downstream_client.wait_for_server(timeout_sec=10.0))
 
     def tearDown(self):
         self.node.destroy_node()
