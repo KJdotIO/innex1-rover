@@ -294,13 +294,24 @@ class ExcavationActionServer(Node):
                 return "settled"
             if (
                 self._latest_telemetry is not None
-                and not self._latest_telemetry.motor_enabled
+                and self._is_stopped_without_fault()
             ):
                 return "settled"
             if monotonic() - settle_start >= timeout_s:
                 return "timeout"
             sleep(self.loop_period_s)
         return "shutdown"
+
+    def _is_stopped_without_fault(self):
+        """Return True when telemetry shows the mechanism has stopped cleanly."""
+        telemetry = self._latest_telemetry
+        return (
+            telemetry is not None
+            and not telemetry.estop_active
+            and not telemetry.driver_fault
+            and telemetry.fault_code == ExcavationTelemetry.FAULT_NONE
+            and not telemetry.motor_enabled
+        )
 
     def _resolve_stop_settle(
         self,
@@ -523,6 +534,16 @@ class ExcavationActionServer(Node):
                 ExcavationStatus.STATE_READY,
                 ExcavationStatus.STATE_IDLE,
             ):
+                return self._finish_goal(
+                    goal_handle,
+                    terminal_state="succeed",
+                    success=True,
+                    reason_code=Excavate.Result.REASON_SUCCESS,
+                    reason="",
+                    duration_s=elapsed,
+                )
+
+            if saw_excavating and self._is_stopped_without_fault():
                 return self._finish_goal(
                     goal_handle,
                     terminal_state="succeed",

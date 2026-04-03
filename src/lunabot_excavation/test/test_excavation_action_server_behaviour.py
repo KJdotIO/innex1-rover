@@ -297,3 +297,43 @@ def test_wait_for_stop_settle_reports_telemetry_fault(monkeypatch):
     monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
 
     assert server._wait_for_stop_settle(2.0) == "fault"
+
+
+def test_execute_excavate_succeeds_when_telemetry_shows_stopped(monkeypatch):
+    server = _excavation_server()
+    goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=10.0))
+    trigger_calls = []
+    monotonic_values = iter([50.0, 51.0, 51.1])
+
+    server._status = SimpleNamespace(
+        state=ExcavationStatus.STATE_EXCAVATING,
+        fault_code=ExcavationStatus.FAULT_NONE,
+        estop_active=False,
+        motor_current_a=12.0,
+    )
+    server._latest_telemetry = SimpleNamespace(
+        estop_active=False,
+        driver_fault=False,
+        fault_code=ExcavationTelemetry.FAULT_NONE,
+        motor_enabled=False,
+    )
+
+    monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
+    monkeypatch.setattr(excavation_module, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
+
+    def _call_trigger(client, timeout_s):
+        trigger_calls.append((client, timeout_s))
+        return SimpleNamespace(success=True)
+
+    server._call_trigger = _call_trigger
+
+    result = server.execute_excavate(goal_handle)
+
+    assert goal_handle.succeed_count == 1
+    assert result.success is True
+    assert result.reason_code == Excavate.Result.REASON_SUCCESS
+    assert trigger_calls == [
+        (server._start_client, 2.0),
+        (server._stop_client, 2.0),
+    ]
