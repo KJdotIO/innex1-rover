@@ -6,7 +6,12 @@ from time import monotonic
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 from std_srvs.srv import Trigger
 
 from lunabot_interfaces.msg import (
@@ -63,6 +68,12 @@ class ExcavationController(Node):
             depth=10,
             reliability=ReliabilityPolicy.RELIABLE,
         )
+        command_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
 
         self._state = ExcavationState.IDLE
         self._last_fault_code = ExcavationStatus.FAULT_NONE
@@ -74,7 +85,7 @@ class ExcavationController(Node):
         self._command_pub = self.create_publisher(
             ExcavationCommand,
             "/excavation/command",
-            qos,
+            command_qos,
         )
         self._status_pub = self.create_publisher(
             ExcavationStatus,
@@ -182,7 +193,6 @@ class ExcavationController(Node):
                 f"Excavation start requires READY state, got '{self._state.value}'",
             )
         self._active_run = ActiveRun.MISSION
-        self._jog_deadline = None
         self._publish_command(ExcavationCommand.COMMAND_START)
         self._set_state(ExcavationState.STARTING)
         return self._trigger_response(True, "Excavation start accepted")

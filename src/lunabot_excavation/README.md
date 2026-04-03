@@ -19,9 +19,10 @@ Start the excavation sim proxy, controller, and action adapter together:
 ros2 launch lunabot_excavation excavation_sim.launch.py
 ```
 
-`excavation_sim.launch.py` already includes the excavation action adapter. Use the broader
-material stack launch only when you want the full excavation-plus-deposition action path instead
-of the dedicated sim stack:
+`excavation_sim.launch.py` already includes the excavation action adapter. The broader
+`material_actions.launch.py` path does not start `excavation_sim_proxy`, so it is not a
+drop-in replacement for excavation simulation by itself. Use it only when you want the broader
+action path and are providing excavation telemetry separately:
 
 ```bash
 ros2 launch lunabot_control material_actions.launch.py

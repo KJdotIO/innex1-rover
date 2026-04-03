@@ -4,7 +4,12 @@ from time import monotonic
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 
 from lunabot_interfaces.msg import ExcavationCommand, ExcavationTelemetry
 
@@ -31,6 +36,12 @@ class ExcavationSimProxy(Node):
             depth=10,
             reliability=ReliabilityPolicy.RELIABLE,
         )
+        command_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
 
         self._last_command = ExcavationCommand.COMMAND_STOP
         self._home_switch = False
@@ -45,7 +56,7 @@ class ExcavationSimProxy(Node):
             ExcavationCommand,
             "/excavation/command",
             self._handle_command,
-            qos,
+            command_qos,
         )
         self._telemetry_pub = self.create_publisher(
             ExcavationTelemetry,

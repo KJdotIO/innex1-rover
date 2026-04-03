@@ -2,7 +2,6 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.actions import TimerAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.actions import Node
@@ -13,18 +12,6 @@ def generate_launch_description():
     force_overcurrent = LaunchConfiguration("force_overcurrent")
     force_driver_fault = LaunchConfiguration("force_driver_fault")
     hold_home_switch_false = LaunchConfiguration("hold_home_switch_false")
-    controller_node = Node(
-        package="lunabot_excavation",
-        executable="excavation_controller",
-        name="excavation_controller",
-        output="screen",
-    )
-    action_server_node = Node(
-        package="lunabot_excavation",
-        executable="excavation_action_server",
-        name="excavation_action_server",
-        output="screen",
-    )
 
     return LaunchDescription(
         [
@@ -53,16 +40,17 @@ def generate_launch_description():
                     }
                 ],
             ),
-            # Bring the proxy up slightly ahead of the controller path so the
-            # first home/start command is not published before the sim hardware
-            # has its subscription ready.
-            TimerAction(
-                period=0.5,
-                actions=[controller_node],
+            Node(
+                package="lunabot_excavation",
+                executable="excavation_controller",
+                name="excavation_controller",
+                output="screen",
             ),
-            TimerAction(
-                period=1.0,
-                actions=[action_server_node],
+            Node(
+                package="lunabot_excavation",
+                executable="excavation_action_server",
+                name="excavation_action_server",
+                output="screen",
             ),
         ]
     )

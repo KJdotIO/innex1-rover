@@ -146,6 +146,55 @@ def test_execute_excavate_returns_canceled_result(monkeypatch):
     ]
 
 
+def test_execute_excavate_returns_success_after_nominal_run(monkeypatch):
+    server = _excavation_server()
+    goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=12.0))
+    trigger_calls = []
+    monotonic_values = iter([50.0, 50.1, 58.2])
+    sleep_calls = {"count": 0}
+
+    monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
+    monkeypatch.setattr(excavation_module, "monotonic", lambda: next(monotonic_values))
+
+    def _sleep(_seconds):
+        sleep_calls["count"] += 1
+        if sleep_calls["count"] == 1:
+            server._status = SimpleNamespace(
+                state=ExcavationStatus.STATE_EXCAVATING,
+                fault_code=ExcavationStatus.FAULT_NONE,
+                estop_active=False,
+                motor_current_a=12.0,
+            )
+
+    monkeypatch.setattr(excavation_module, "sleep", _sleep)
+
+    def _call_trigger(client, timeout_s):
+        trigger_calls.append((client, timeout_s))
+        if client is server._stop_client:
+            server._status = SimpleNamespace(
+                state=ExcavationStatus.STATE_READY,
+                fault_code=ExcavationStatus.FAULT_NONE,
+                estop_active=False,
+                motor_current_a=0.0,
+            )
+        return SimpleNamespace(success=True)
+
+    server._call_trigger = _call_trigger
+
+    result = server.execute_excavate(goal_handle)
+
+    assert goal_handle.succeed_count == 1
+    assert goal_handle.abort_count == 0
+    assert goal_handle.canceled_count == 0
+    assert result.success is True
+    assert result.reason_code == Excavate.Result.REASON_SUCCESS
+    assert result.failure_reason == ""
+    assert trigger_calls == [
+        (server._start_client, 2.0),
+        (server._stop_client, 2.0),
+    ]
+
+
 def test_execute_excavate_returns_timeout_result_during_homing():
     server = _excavation_server()
     goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=1.0))
