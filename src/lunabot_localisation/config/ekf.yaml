@@ -60,26 +60,9 @@ ekf_filter_node_odom:
         false,
       ]
 
-    # Visual odometry: position only
-    odom1: /visual_odometry
-    odom1_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-      ]
+    # June baseline: local EKF only fuses wheel odom + IMU.
+    # Visual odometry stays out of the baseline until the gate is launched,
+    # tested, and explicitly chosen as part of the runtime story.
 
 ekf_filter_node_map:
   ros__parameters:

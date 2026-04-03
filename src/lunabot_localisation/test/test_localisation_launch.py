@@ -5,6 +5,7 @@ from importlib.util import spec_from_file_location
 from pathlib import Path
 
 import pytest
+import yaml
 from launch import LaunchContext
 from launch.actions import OpaqueFunction
 from launch_ros.actions import Node
@@ -129,3 +130,13 @@ def test_generate_launch_description_has_validation_and_one_tag_pose_node():
 
     assert len(validators) == 1
     assert len(tag_pose_publishers) == 1
+
+
+@pytest.mark.parametrize("config_name", ["ekf.yaml", "ekf_lidar_phase.yaml"])
+def test_june_baseline_ekf_does_not_fuse_visual_odometry(config_name):
+    ekf_path = Path(__file__).resolve().parents[1] / "config" / config_name
+    config = yaml.safe_load(ekf_path.read_text())
+    odom_parameters = config["ekf_filter_node_odom"]["ros__parameters"]
+
+    assert "odom1" not in odom_parameters
+    assert "/visual_odometry" not in odom_parameters.values()

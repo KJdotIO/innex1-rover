@@ -89,7 +89,9 @@ def generate_launch_description():
 
     Start the local EKF in all modes, optionally publish the debug identity
     map->odom transform, and enable AprilTag/global EKF nodes by default.
-    Visual SLAM remains available behind an explicit launch argument.
+    RTAB-Map remains available behind an explicit launch argument for
+    experimentation, but raw visual odometry is not fused into the June
+    baseline EKFs.
     """
     pkg_localisation = get_package_share_directory("lunabot_localisation")
 
@@ -154,8 +156,8 @@ def generate_launch_description():
                 "enable_visual_slam",
                 default_value="false",
                 description=(
-                    "Optionally enable RTAB-Map visual odometry "
-                    "alongside AprilTag global localisation."
+                    "Optionally enable RTAB-Map odometry and mapping for "
+                    "experimentation; the June EKF baseline does not fuse VO."
                 ),
             ),
             DeclareLaunchArgument(
@@ -197,7 +199,8 @@ def generate_launch_description():
                 description="Configured map-frame yaw of the start-zone tag.",
             ),
             OpaqueFunction(function=_validate_boolean_launch_arguments),
-            # Visual odometry
+            # Optional RTAB-Map odometry for experimentation only.
+            # The June baseline does not fuse this topic into either EKF.
             Node(
                 package="rtabmap_odom",
                 executable="rgbd_odometry",

@@ -12,6 +12,12 @@ This package contains localisation launch/config and localisation helper nodes f
 - Global correction path through tag-derived pose updates.
 - TF relationships required by planning components.
 
+## June baseline
+
+The current baseline is deliberately simple: wheel odom, IMU, and start-zone
+AprilTag correction. RTAB-Map can still be launched for experimentation, but
+raw visual odometry is not fused into the EKFs as part of the June baseline.
+
 ## Key files
 
 - `config/ekf.yaml`: EKF fusion and frame configuration.
