@@ -7,7 +7,7 @@ from rclpy.action import GoalResponse
 from lunabot_excavation import excavation_action_server as excavation_module
 from lunabot_excavation.excavation_action_server import ExcavationActionServer
 from lunabot_interfaces.action import Excavate
-from lunabot_interfaces.msg import ExcavationStatus
+from lunabot_interfaces.msg import ExcavationStatus, ExcavationTelemetry
 
 
 def _excavation_server():
@@ -255,3 +255,45 @@ def test_execute_excavate_estop_beats_cancel_during_homing_stop_settle():
         (server._home_client, 2.0),
         (server._stop_client, 2.0),
     ]
+
+
+def test_wait_for_stop_settle_accepts_motor_disabled_telemetry(monkeypatch):
+    server = _excavation_server()
+    server._status = SimpleNamespace(
+        state=ExcavationStatus.STATE_STOPPING,
+        fault_code=ExcavationStatus.FAULT_NONE,
+        estop_active=False,
+        motor_current_a=0.0,
+    )
+    server._latest_telemetry = SimpleNamespace(
+        estop_active=False,
+        driver_fault=False,
+        fault_code=ExcavationTelemetry.FAULT_NONE,
+        motor_enabled=False,
+    )
+
+    monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
+    monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
+
+    assert server._wait_for_stop_settle(2.0) == "settled"
+
+
+def test_wait_for_stop_settle_reports_telemetry_fault(monkeypatch):
+    server = _excavation_server()
+    server._status = SimpleNamespace(
+        state=ExcavationStatus.STATE_STOPPING,
+        fault_code=ExcavationStatus.FAULT_NONE,
+        estop_active=False,
+        motor_current_a=0.0,
+    )
+    server._latest_telemetry = SimpleNamespace(
+        estop_active=False,
+        driver_fault=True,
+        fault_code=ExcavationTelemetry.FAULT_NONE,
+        motor_enabled=True,
+    )
+
+    monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
+    monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
+
+    assert server._wait_for_stop_settle(2.0) == "fault"

@@ -280,7 +280,22 @@ class ExcavationActionServer(Node):
                 and self._status.state == ExcavationStatus.STATE_FAULT
             ):
                 return "fault"
+            if (
+                self._latest_telemetry is not None
+                and (
+                    self._latest_telemetry.estop_active
+                    or self._latest_telemetry.driver_fault
+                    or self._latest_telemetry.fault_code
+                    != ExcavationTelemetry.FAULT_NONE
+                )
+            ):
+                return "fault"
             if self._status is not None and self._status.state not in ACTIVE_STATES:
+                return "settled"
+            if (
+                self._latest_telemetry is not None
+                and not self._latest_telemetry.motor_enabled
+            ):
                 return "settled"
             if monotonic() - settle_start >= timeout_s:
                 return "timeout"
