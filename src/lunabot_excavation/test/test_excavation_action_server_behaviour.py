@@ -305,25 +305,32 @@ def test_execute_excavate_succeeds_when_telemetry_shows_stopped(monkeypatch):
     trigger_calls = []
     monotonic_values = iter([50.0, 51.0, 51.1])
 
-    server._status = SimpleNamespace(
-        state=ExcavationStatus.STATE_EXCAVATING,
-        fault_code=ExcavationStatus.FAULT_NONE,
-        estop_active=False,
-        motor_current_a=12.0,
-    )
-    server._latest_telemetry = SimpleNamespace(
-        estop_active=False,
-        driver_fault=False,
-        fault_code=ExcavationTelemetry.FAULT_NONE,
-        motor_enabled=False,
-    )
-
     monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
     monkeypatch.setattr(excavation_module, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(excavation_module, "sleep", lambda _seconds: None)
 
     def _call_trigger(client, timeout_s):
         trigger_calls.append((client, timeout_s))
+        if client is server._start_client:
+            server._status = SimpleNamespace(
+                state=ExcavationStatus.STATE_EXCAVATING,
+                fault_code=ExcavationStatus.FAULT_NONE,
+                estop_active=False,
+                motor_current_a=12.0,
+            )
+            server._latest_telemetry = SimpleNamespace(
+                estop_active=False,
+                driver_fault=False,
+                fault_code=ExcavationTelemetry.FAULT_NONE,
+                motor_enabled=True,
+            )
+        elif client is server._stop_client:
+            server._latest_telemetry = SimpleNamespace(
+                estop_active=False,
+                driver_fault=False,
+                fault_code=ExcavationTelemetry.FAULT_NONE,
+                motor_enabled=False,
+            )
         return SimpleNamespace(success=True)
 
     server._call_trigger = _call_trigger
