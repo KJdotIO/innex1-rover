@@ -18,6 +18,9 @@ def _load_launch_module():
 
 def test_material_actions_launch_includes_bench_mock_and_servers():
     module = _load_launch_module()
+    launch_source = (
+        Path(__file__).resolve().parents[1] / "launch" / "material_actions.launch.py"
+    ).read_text()
 
     description = module.generate_launch_description()
     entities = [entity for entity in description.entities if isinstance(entity, Node)]
@@ -35,11 +38,10 @@ def test_material_actions_launch_includes_bench_mock_and_servers():
         for entity in entities
         if entity.__dict__.get("_Node__node_name") == "excavation_telemetry_mock"
     )
-    mock_parameters = mock_node._Node__parameters[0]
-    assert str(mock_parameters["fault_on_start_code"][0]) == "fault_on_start_code"
-    assert str(mock_parameters["fault_on_stop_code"][0]) == "fault_on_stop_code"
     assert type(mock_node.condition).__name__ == "IfCondition"
     assert str(mock_node.condition._predicate_expression[0]) == "use_mock_telemetry"
+    assert '"fault_on_start_code": LaunchConfiguration("fault_on_start_code")' in launch_source
+    assert '"fault_on_stop_code": LaunchConfiguration("fault_on_stop_code")' in launch_source
 
     declared_arguments = [
         entity.name
