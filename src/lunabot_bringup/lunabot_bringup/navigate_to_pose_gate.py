@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+import threading
 
 from action_msgs.msg import GoalStatus
 from lunabot_bringup.localisation_readiness import is_localisation_ready
@@ -13,6 +13,8 @@ from rclpy.action import ActionClient
 from rclpy.action import ActionServer
 from rclpy.action import CancelResponse
 from rclpy.action import GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
 
@@ -46,6 +48,7 @@ class NavigateToPoseGate(Node):
         self.gate_enabled = _parse_bool(self.get_parameter("gate_enabled").value)
 
         self._latest_status = None
+        self._callback_group = ReentrantCallbackGroup()
 
         self.create_subscription(
             LocalisationStartZoneStatus,
@@ -58,6 +61,7 @@ class NavigateToPoseGate(Node):
             self,
             NavigateToPose,
             self.internal_action_name,
+            callback_group=self._callback_group,
         )
         # Humble cannot reliably hide or rename Nav2's own action server via
         # remapping, so this node exposes a separate action surface that the
@@ -69,6 +73,7 @@ class NavigateToPoseGate(Node):
             execute_callback=self._execute_goal,
             goal_callback=self._on_goal,
             cancel_callback=self._on_cancel,
+            callback_group=self._callback_group,
         )
 
         self.get_logger().info(
@@ -115,6 +120,41 @@ class NavigateToPoseGate(Node):
         """Accept cancellation requests and mirror them to Nav2."""
         return CancelResponse.ACCEPT
 
+    def _wait_for_future(self, future, *, goal_handle=None, on_cancel=None):
+        """
+        Wait for a future without busy-spinning the executor thread.
+
+        The gate uses a re-entrant callback group and a multi-threaded executor
+        so downstream action callbacks can still complete while this execute
+        path waits for the forwarded goal lifecycle.
+        """
+        done = threading.Event()
+
+        def _mark_done(_future):
+            done.set()
+
+        future.add_done_callback(_mark_done)
+        cancel_sent = False
+
+        while rclpy.ok():
+            if done.wait(timeout=0.05):
+                try:
+                    return future.result()
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    self.get_logger().error(f"NavigateToPose gate future failed: {exc}")
+                    return None
+
+            if (
+                goal_handle is not None
+                and goal_handle.is_cancel_requested
+                and on_cancel is not None
+                and not cancel_sent
+            ):
+                on_cancel()
+                cancel_sent = True
+
+        return None
+
     def _execute_goal(self, goal_handle) -> None:
         """Forward the accepted goal to Nav2 and mirror the result."""
         send_goal_future = self._action_client.send_goal_async(
@@ -124,10 +164,10 @@ class NavigateToPoseGate(Node):
             ),
         )
 
-        while rclpy.ok() and not send_goal_future.done():
-            time.sleep(0.05)
-
-        client_goal_handle = send_goal_future.result()
+        client_goal_handle = self._wait_for_future(
+            send_goal_future,
+            goal_handle=goal_handle,
+        )
         if client_goal_handle is None or not client_goal_handle.accepted:
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
@@ -138,12 +178,23 @@ class NavigateToPoseGate(Node):
         result_future = client_goal_handle.get_result_async()
         cancel_future = None
 
-        while rclpy.ok() and not result_future.done():
-            if goal_handle.is_cancel_requested and cancel_future is None:
+        def _forward_cancel():
+            nonlocal cancel_future
+            if cancel_future is None:
                 cancel_future = client_goal_handle.cancel_goal_async()
-            time.sleep(0.05)
 
-        wrapped_result = result_future.result()
+        wrapped_result = self._wait_for_future(
+            result_future,
+            goal_handle=goal_handle,
+            on_cancel=_forward_cancel,
+        )
+        if wrapped_result is None:
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+            else:
+                goal_handle.abort()
+            return NavigateToPose.Result()
+
         result = wrapped_result.result
         status = wrapped_result.status
 
@@ -161,11 +212,14 @@ def main(args=None) -> None:
     """Run the NavigateToPose gate node."""
     rclpy.init(args=args)
     node = NavigateToPoseGate()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         try:
             if rclpy.ok():
