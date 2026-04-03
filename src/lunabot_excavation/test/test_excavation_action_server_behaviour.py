@@ -303,7 +303,7 @@ def test_execute_excavate_succeeds_when_telemetry_shows_stopped(monkeypatch):
     server = _excavation_server()
     goal_handle = _FakeGoalHandle(_excavate_goal(timeout_s=10.0))
     trigger_calls = []
-    monotonic_values = iter([50.0, 51.0, 51.1])
+    monotonic_values = iter([50.0, 51.0, 51.1, 51.2])
 
     monkeypatch.setattr(excavation_module.rclpy, "ok", lambda: True)
     monkeypatch.setattr(excavation_module, "monotonic", lambda: next(monotonic_values))
