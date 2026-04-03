@@ -111,15 +111,6 @@ class NavigateToPoseGate(Node):
             )
             return GoalResponse.REJECT
 
-        if not self._action_client.wait_for_server(
-            timeout_sec=self.internal_action_wait_timeout_s
-        ):
-            self.get_logger().warn(
-                "Rejecting NavigateToPose goal because the internal Nav2 action "
-                "server is unavailable."
-            )
-            return GoalResponse.REJECT
-
         return GoalResponse.ACCEPT
 
     def _on_cancel(self, _goal_handle) -> CancelResponse:
@@ -163,6 +154,19 @@ class NavigateToPoseGate(Node):
 
     def _execute_goal(self, goal_handle) -> None:
         """Forward the accepted goal to Nav2 and mirror the result."""
+        if not self._action_client.wait_for_server(
+            timeout_sec=self.internal_action_wait_timeout_s
+        ):
+            self.get_logger().warn(
+                "Ending NavigateToPose goal because the internal Nav2 action "
+                "server is unavailable."
+            )
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+            else:
+                goal_handle.abort()
+            return NavigateToPose.Result()
+
         send_goal_future = self._action_client.send_goal_async(
             goal_handle.request,
             feedback_callback=lambda feedback: goal_handle.publish_feedback(
