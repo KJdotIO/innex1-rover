@@ -1,4 +1,9 @@
 <root BTCPP_format="4" main_tree_to_execute="MissionNavigateToPoseShell">
+  <!--
+    Scaffold only: the June baseline still runs the stock Nav2 navigate-to-pose
+    tree from nav2_bt_navigator. Keep this file for future mission orchestration
+    work under issue #107, but do not treat it as the active runtime BT.
+  -->
   <BehaviorTree ID="MissionNavigateToPoseShell">
     <Sequence name="MissionShellSequence">
       <!-- TODO(issue#107): Replace this placeholder with a real readiness condition node/service check. -->
