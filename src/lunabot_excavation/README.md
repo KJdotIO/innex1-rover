@@ -28,6 +28,11 @@ action path and are providing excavation telemetry separately:
 ros2 launch lunabot_control material_actions.launch.py
 ```
 
+That launch now includes an explicit `excavation_telemetry_mock` node by default. It is a bench
+mock, not real hardware IO, and it is there so the controller and action adapter can complete a
+clean cycle on their own. If you already have a real telemetry source, pass
+`use_mock_telemetry:=false`.
+
 ## Bench Commands
 
 Print one excavation status snapshot:
@@ -106,6 +111,37 @@ ros2 launch lunabot_excavation excavation_sim.launch.py hold_home_switch_false:=
 
 For a simple fault-path check, stop the controller or block the service path and confirm the
 bench CLI exits cleanly with an `error:` message rather than a traceback.
+
+## Material Bench Path
+
+`material_actions.launch.py` is the standalone bench path for excavation plus the deposition
+stub. It launches:
+
+- the excavation telemetry mock
+- the excavation controller
+- the excavation action server
+- the material action server
+
+That means you can run a full material smoke check without embedded hardware:
+
+```bash
+ros2 launch lunabot_control material_actions.launch.py
+ros2 run lunabot_control material_action_client
+```
+
+If you want to force a stop-side fault for readability checks, override the mock parameter:
+
+```bash
+ros2 launch lunabot_control material_actions.launch.py \
+  fault_on_stop_code:=2
+```
+
+If you are wiring in a real `/excavation/telemetry` source, disable the mock explicitly:
+
+```bash
+ros2 launch lunabot_control material_actions.launch.py \
+  use_mock_telemetry:=false
+```
 
 ## Notes
 
