@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import sys
 import unittest
@@ -9,6 +10,8 @@ import unittest
 from action_msgs.msg import GoalStatus
 import launch
 from launch.actions import ExecuteProcess
+from launch.actions import SetEnvironmentVariable
+from launch.actions import UnsetEnvironmentVariable
 from launch_ros.actions import Node
 import launch_testing.actions
 from nav2_msgs.action import NavigateToPose
@@ -19,6 +22,11 @@ from rclpy.node import Node as RclpyNode
 
 PUBLIC_ACTION_NAME = "/test_navigate_to_pose_gate"
 INTERNAL_ACTION_NAME = "/test_navigate_to_pose"
+TEST_ROS_DOMAIN_ID = str(100 + (os.getpid() % 100))
+
+os.environ["ROS_DOMAIN_ID"] = TEST_ROS_DOMAIN_ID
+os.environ.pop("FASTRTPS_DEFAULT_PROFILES_FILE", None)
+os.environ.pop("RMW_FASTRTPS_USE_QOS_FROM_XML", None)
 
 
 @pytest.mark.launch_test
@@ -48,6 +56,9 @@ def generate_test_description():
     return (
         launch.LaunchDescription(
             [
+                SetEnvironmentVariable("ROS_DOMAIN_ID", TEST_ROS_DOMAIN_ID),
+                UnsetEnvironmentVariable("FASTRTPS_DEFAULT_PROFILES_FILE"),
+                UnsetEnvironmentVariable("RMW_FASTRTPS_USE_QOS_FROM_XML"),
                 test_server,
                 gate,
                 launch_testing.actions.ReadyToTest(),
