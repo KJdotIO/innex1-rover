@@ -20,6 +20,7 @@ setup(
                 "launch/excavation_bench.launch.py",
                 "launch/excavation_controller.launch.py",
                 "launch/excavation_action_server.launch.py",
+                "launch/excavation_sim.launch.py",
             ],
         ),
         ("share/" + package_name, ["README.md"]),
@@ -38,6 +39,7 @@ setup(
             "excavation_action_server = lunabot_excavation.excavation_action_server:main",
             "excavation_telemetry_mock = "
             "lunabot_excavation.excavation_telemetry_mock:main",
+            "excavation_sim_proxy = lunabot_excavation.excavation_sim_proxy:main",
         ],
     },
 )
