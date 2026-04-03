@@ -1,6 +1,7 @@
 # lunabot_navigation
 
-This package contains Nav2 configuration and mission navigation behaviour tree assets used by the rover navigation stack.
+This package contains Nav2 configuration and behaviour tree assets used by the
+rover navigation stack.
 
 ## What this package is responsible for
 
@@ -17,11 +18,15 @@ At runtime, navigation expects:
 ## Key files
 
 - `config/nav2_params.yaml`: Nav2 planners, controller, costmaps, and BT navigator config.
-- `behavior_trees/mission_navigate_to_pose_bt.xml`: current mission BT shell used for scaffolded orchestration.
+- `behavior_trees/mission_navigate_to_pose_bt.xml`: scaffold for future
+  mission-level orchestration work; it is not the active June runtime tree.
 
 ## Current status
 
-The BT configuration in this package is a shell intended for incremental development. It is designed to be safe, readable, and easy to extend in follow-up PRs.
+The June baseline still uses the stock Nav2 `navigate_to_pose` tree from
+`nav2_bt_navigator`. The custom mission BT in this package is only a scaffold
+for future work under issue `#107`, so it should not shape the current runtime
+story.
 
 ## Common failure modes
 

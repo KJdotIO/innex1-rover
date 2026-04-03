@@ -1,7 +1,6 @@
-# **ADDITIONAL NOTES:
-# add use_sim_time: true, soon...
-
-# config bt_nav to have default BT
+# June baseline: keep the stock Nav2 navigate-to-pose tree in runtime.
+# The custom mission BT shipped in this package is still a scaffold for
+# issue #107 and is not loaded by default.
 bt_navigator:
   ros__parameters:
     use_sim_time: true
