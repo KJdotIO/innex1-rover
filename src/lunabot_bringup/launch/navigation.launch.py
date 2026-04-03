@@ -367,8 +367,8 @@ def generate_launch_description():
                 "enable_visual_slam",
                 default_value="false",
                 description=(
-                    "Optionally enable RTAB-Map visual odometry "
-                    "alongside AprilTag global localisation."
+                    "Optionally enable RTAB-Map odometry and mapping for "
+                    "experimentation; the June EKF baseline does not fuse VO."
                 ),
             ),
             DeclareLaunchArgument(
