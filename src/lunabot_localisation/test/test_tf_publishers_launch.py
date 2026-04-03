@@ -5,6 +5,8 @@ from __future__ import annotations
 import atexit
 import os
 from pathlib import Path
+import re
+import signal
 import subprocess
 import time
 
@@ -50,14 +52,13 @@ def _release_test_domain_reservation():
         TEST_ROS_DOMAIN_LOCK_PATH = None
 
 
-TEST_ROS_DOMAIN_ID = _reserve_test_domain()
 atexit.register(_release_test_domain_reservation)
 
 
-def _test_environment():
+def _test_environment(domain_id):
     """Return a clean ROS environment for launch and graph probes."""
     env = os.environ.copy()
-    env["ROS_DOMAIN_ID"] = TEST_ROS_DOMAIN_ID
+    env["ROS_DOMAIN_ID"] = domain_id
     env.pop("FASTRTPS_DEFAULT_PROFILES_FILE", None)
     env.pop("RMW_FASTRTPS_USE_QOS_FROM_XML", None)
     return env
@@ -77,7 +78,9 @@ def _run_ros_command(env, *args):
 
 def _publisher_count(topic_info_output):
     """Count publisher entries in `ros2 topic info -v` output."""
-    return topic_info_output.count("Node name:")
+    match = re.search(r"Publisher count:\s+(\d+)", topic_info_output)
+    assert match is not None, topic_info_output
+    return int(match.group(1))
 
 
 @pytest.mark.parametrize(
@@ -108,7 +111,8 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
     expected_tf_publishers,
     expected_tf_static_publishers,
 ):
-    env = _test_environment()
+    domain_id = _reserve_test_domain()
+    env = _test_environment(domain_id)
     launch_process = subprocess.Popen(
         [
             "ros2",
@@ -124,6 +128,7 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
         stderr=subprocess.STDOUT,
         text=True,
         env=env,
+        preexec_fn=os.setsid,
     )
 
     try:
@@ -174,10 +179,10 @@ def test_localisation_launch_tf_publishers_match_expected_modes(
             _publisher_count(tf_static_info_output) == expected_tf_static_publishers
         ), tf_static_info_output
     finally:
-        launch_process.terminate()
+        os.killpg(launch_process.pid, signal.SIGTERM)
         try:
             launch_process.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
-            launch_process.kill()
+            os.killpg(launch_process.pid, signal.SIGKILL)
             launch_process.wait(timeout=5.0)
-
+        _release_test_domain_reservation()
