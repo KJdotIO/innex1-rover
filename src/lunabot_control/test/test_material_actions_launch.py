@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 
 from launch.actions import DeclareLaunchArgument
+from launch_ros.actions import Node
 
 
 def _load_launch_module():
@@ -19,8 +20,8 @@ def test_material_actions_launch_includes_bench_mock_and_servers():
     module = _load_launch_module()
 
     description = module.generate_launch_description()
-    entities = [entity for entity in description.entities if hasattr(entity, "node_package")]
-    node_names = {entity.node_name for entity in entities}
+    entities = [entity for entity in description.entities if isinstance(entity, Node)]
+    node_names = {entity.__dict__.get("_Node__node_name") for entity in entities}
 
     assert node_names == {
         "excavation_telemetry_mock",
@@ -30,7 +31,9 @@ def test_material_actions_launch_includes_bench_mock_and_servers():
     }
 
     mock_node = next(
-        entity for entity in entities if entity.node_name == "excavation_telemetry_mock"
+        entity
+        for entity in entities
+        if entity.__dict__.get("_Node__node_name") == "excavation_telemetry_mock"
     )
     mock_parameters = mock_node._Node__parameters[0]
     assert str(mock_parameters["fault_on_start_code"][0]) == "fault_on_start_code"
