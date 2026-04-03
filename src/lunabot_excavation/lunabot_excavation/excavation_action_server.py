@@ -59,17 +59,31 @@ class ExcavationActionServer(Node):
             "/excavation/status",
             self._handle_status,
             qos,
+            callback_group=self._callback_group,
         )
         self.create_subscription(
             ExcavationTelemetry,
             "/excavation/telemetry",
             self._handle_telemetry,
             qos,
+            callback_group=self._callback_group,
         )
 
-        self._home_client = self.create_client(Trigger, "/excavation/home")
-        self._start_client = self.create_client(Trigger, "/excavation/start")
-        self._stop_client = self.create_client(Trigger, "/excavation/stop")
+        self._home_client = self.create_client(
+            Trigger,
+            "/excavation/home",
+            callback_group=self._callback_group,
+        )
+        self._start_client = self.create_client(
+            Trigger,
+            "/excavation/start",
+            callback_group=self._callback_group,
+        )
+        self._stop_client = self.create_client(
+            Trigger,
+            "/excavation/stop",
+            callback_group=self._callback_group,
+        )
 
         self._server = ActionServer(
             self,
@@ -150,10 +164,12 @@ class ExcavationActionServer(Node):
         if not client.wait_for_service(timeout_sec=timeout_s):
             return None
         future = client.call_async(Trigger.Request())
-        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_s)
-        if not future.done():
-            return None
-        return future.result()
+        deadline = monotonic() + timeout_s
+        while rclpy.ok() and monotonic() < deadline:
+            if future.done():
+                return future.result()
+            sleep(min(self.loop_period_s, 0.05))
+        return future.result() if future.done() else None
 
     def _publish_feedback(self, goal_handle, elapsed: float):
         """Publish action feedback from controller status and telemetry."""
@@ -212,19 +228,25 @@ class ExcavationActionServer(Node):
     ):
         """Apply a terminal goal state, log it once, and build the result."""
         if terminal_state == "succeed":
-            if goal_handle.is_active:
+            try:
                 goal_handle.succeed()
+            except RuntimeError:
+                pass
             self.get_logger().info("Excavation action succeeded")
             return self._result(True, reason_code, reason, duration_s)
 
         if terminal_state == "cancel":
-            if goal_handle.is_active:
+            try:
                 goal_handle.canceled()
+            except RuntimeError:
+                pass
             self.get_logger().info(reason)
             return self._result(success, reason_code, reason, duration_s)
 
-        if goal_handle.is_active:
+        try:
             goal_handle.abort()
+        except RuntimeError:
+            pass
         self.get_logger().warn(reason)
         return self._result(success, reason_code, reason, duration_s)
 
@@ -264,12 +286,38 @@ class ExcavationActionServer(Node):
                 and self._status.state == ExcavationStatus.STATE_FAULT
             ):
                 return "fault"
+            if (
+                self._latest_telemetry is not None
+                and (
+                    self._latest_telemetry.estop_active
+                    or self._latest_telemetry.driver_fault
+                    or self._latest_telemetry.fault_code
+                    != ExcavationTelemetry.FAULT_NONE
+                )
+            ):
+                return "fault"
             if self._status is not None and self._status.state not in ACTIVE_STATES:
+                return "settled"
+            if (
+                self._latest_telemetry is not None
+                and self._is_stopped_without_fault()
+            ):
                 return "settled"
             if monotonic() - settle_start >= timeout_s:
                 return "timeout"
             sleep(self.loop_period_s)
         return "shutdown"
+
+    def _is_stopped_without_fault(self):
+        """Return True when telemetry shows the mechanism has stopped cleanly."""
+        telemetry = self._latest_telemetry
+        return (
+            telemetry is not None
+            and not telemetry.estop_active
+            and not telemetry.driver_fault
+            and telemetry.fault_code == ExcavationTelemetry.FAULT_NONE
+            and not telemetry.motor_enabled
+        )
 
     def _resolve_stop_settle(
         self,
@@ -492,6 +540,16 @@ class ExcavationActionServer(Node):
                 ExcavationStatus.STATE_READY,
                 ExcavationStatus.STATE_IDLE,
             ):
+                return self._finish_goal(
+                    goal_handle,
+                    terminal_state="succeed",
+                    success=True,
+                    reason_code=Excavate.Result.REASON_SUCCESS,
+                    reason="",
+                    duration_s=elapsed,
+                )
+
+            if saw_excavating and self._is_stopped_without_fault():
                 return self._finish_goal(
                     goal_handle,
                     terminal_state="succeed",
