@@ -14,6 +14,7 @@ class MaterialActionClient(Node):
         """Initialise action clients and configurable goal parameters."""
         super().__init__("material_action_client")
 
+        self.declare_parameter("action_server_wait_timeout_s", 15.0)
         self.declare_parameter("excavate_timeout_s", 12.0)
         self.declare_parameter("deposit_timeout_s", 10.0)
         self.declare_parameter("dump_duration_s", 3.0)
@@ -34,11 +35,19 @@ class MaterialActionClient(Node):
 
     def run_sequence(self):
         """Run one excavation request followed by one deposition request."""
-        if not self._excavate_client.wait_for_server(timeout_sec=5.0):
+        action_server_wait_timeout_s = float(
+            self.get_parameter("action_server_wait_timeout_s").value
+        )
+
+        if not self._excavate_client.wait_for_server(
+            timeout_sec=action_server_wait_timeout_s
+        ):
             self.get_logger().error("Excavate action server not available")
             return 1
 
-        if not self._deposit_client.wait_for_server(timeout_sec=5.0):
+        if not self._deposit_client.wait_for_server(
+            timeout_sec=action_server_wait_timeout_s
+        ):
             self.get_logger().error("Deposit action server not available")
             return 1
 
