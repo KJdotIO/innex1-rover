@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 from pathlib import Path
 import sys
@@ -23,11 +24,16 @@ from rclpy.node import Node as RclpyNode
 
 PUBLIC_ACTION_NAME = "/test_navigate_to_pose_gate"
 INTERNAL_ACTION_NAME = "/test_navigate_to_pose"
+TEST_ROS_DOMAIN_LOCK_FD = None
+TEST_ROS_DOMAIN_LOCK_PATH = None
 
 
 def _reserve_test_domain():
     """Reserve a ROS domain id for this test run on the current machine."""
-    domain_ids = list(range(100, 231))
+    global TEST_ROS_DOMAIN_LOCK_FD
+    global TEST_ROS_DOMAIN_LOCK_PATH
+
+    domain_ids = list(range(1, 102)) + list(range(215, 233))
     start_index = (os.getpid() + time.time_ns()) % len(domain_ids)
 
     for offset in range(len(domain_ids)):
@@ -37,14 +43,29 @@ def _reserve_test_domain():
             lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
         except FileExistsError:
             continue
-        return str(domain_id), lock_fd, lock_path
+        TEST_ROS_DOMAIN_LOCK_FD = lock_fd
+        TEST_ROS_DOMAIN_LOCK_PATH = lock_path
+        return str(domain_id)
 
     raise RuntimeError("No free ROS domain id available for launch test")
 
 
-TEST_ROS_DOMAIN_ID, TEST_ROS_DOMAIN_LOCK_FD, TEST_ROS_DOMAIN_LOCK_PATH = (
-    _reserve_test_domain()
-)
+def _release_test_domain_reservation():
+    """Release any reserved ROS domain id lock for this test run."""
+    global TEST_ROS_DOMAIN_LOCK_FD
+    global TEST_ROS_DOMAIN_LOCK_PATH
+
+    if TEST_ROS_DOMAIN_LOCK_FD is not None:
+        os.close(TEST_ROS_DOMAIN_LOCK_FD)
+        TEST_ROS_DOMAIN_LOCK_FD = None
+
+    if TEST_ROS_DOMAIN_LOCK_PATH is not None:
+        TEST_ROS_DOMAIN_LOCK_PATH.unlink(missing_ok=True)
+        TEST_ROS_DOMAIN_LOCK_PATH = None
+
+
+TEST_ROS_DOMAIN_ID = _reserve_test_domain()
+atexit.register(_release_test_domain_reservation)
 
 
 @pytest.mark.launch_test
@@ -135,8 +156,7 @@ class TestNavigateToPoseGate(unittest.TestCase):
             else:
                 os.environ[name] = value
 
-        os.close(TEST_ROS_DOMAIN_LOCK_FD)
-        TEST_ROS_DOMAIN_LOCK_PATH.unlink(missing_ok=True)
+        _release_test_domain_reservation()
 
     def setUp(self):
         self.node = _GateTestClient()
