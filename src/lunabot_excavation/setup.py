@@ -36,6 +36,8 @@ setup(
             "excavation_bench = lunabot_excavation.excavation_bench:main",
             "excavation_controller = lunabot_excavation.excavation_controller:main",
             "excavation_action_server = lunabot_excavation.excavation_action_server:main",
+            "excavation_telemetry_mock = "
+            "lunabot_excavation.excavation_telemetry_mock:main",
         ],
     },
 )
