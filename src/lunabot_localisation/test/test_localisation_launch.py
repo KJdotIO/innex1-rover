@@ -295,6 +295,9 @@ def test_launch_exposes_only_expected_tf_owner_links(
     description = launch_module.generate_launch_description()
     context = LaunchContext()
     context.launch_configurations["lidar_costmap_phase"] = lidar_costmap_phase
+    context.launch_configurations["enable_visual_slam"] = "false"
+    context.launch_configurations["use_sim_time"] = "true"
+    context.launch_configurations["enable_apriltag_debug"] = "false"
 
     owner_links = [
         _configured_tf_owner_link(entity)
@@ -330,6 +333,9 @@ def test_launch_switches_between_global_ekf_and_debug_map_to_odom(
     description = launch_module.generate_launch_description()
     context = LaunchContext()
     context.launch_configurations["lidar_costmap_phase"] = lidar_costmap_phase
+    context.launch_configurations["enable_visual_slam"] = "false"
+    context.launch_configurations["use_sim_time"] = "true"
+    context.launch_configurations["enable_apriltag_debug"] = "false"
 
     static_map_to_odom_publishers = [
         entity
@@ -337,6 +343,7 @@ def test_launch_switches_between_global_ekf_and_debug_map_to_odom(
         if isinstance(entity, Node)
         and _node_package(entity) == "tf2_ros"
         and _node_executable(entity) == "static_transform_publisher"
+        and _static_tf_owner_link(entity) == ("map", "odom")
     ]
     global_ekf_nodes = [
         entity

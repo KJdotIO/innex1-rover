@@ -1,21 +1,14 @@
-"""Launch tests for dual-EKF TF publisher ownership."""
+"""Subprocess launch tests for localisation TF publishers."""
 
 from __future__ import annotations
 
 import atexit
 import os
 from pathlib import Path
-import threading
+import subprocess
 import time
 
-import launch
-from launch.actions import IncludeLaunchDescription
-from launch.actions import SetEnvironmentVariable
-from launch.actions import UnsetEnvironmentVariable
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 import pytest
-import rclpy
-from rclpy.node import Node as RclpyNode
 
 TEST_ROS_DOMAIN_LOCK_FD = None
 TEST_ROS_DOMAIN_LOCK_PATH = None
@@ -61,109 +54,130 @@ TEST_ROS_DOMAIN_ID = _reserve_test_domain()
 atexit.register(_release_test_domain_reservation)
 
 
-class _GraphProbe(RclpyNode):
-    """Minimal node for checking active graph publishers."""
-
-    def __init__(self) -> None:
-        super().__init__("localisation_tf_graph_probe")
-
-    def publisher_names(self, topic_name):
-        """Return publisher node names for a topic."""
-        return {
-            publisher.node_name
-            for publisher in self.get_publishers_info_by_topic(topic_name)
-        }
+def _test_environment():
+    """Return a clean ROS environment for launch and graph probes."""
+    env = os.environ.copy()
+    env["ROS_DOMAIN_ID"] = TEST_ROS_DOMAIN_ID
+    env.pop("FASTRTPS_DEFAULT_PROFILES_FILE", None)
+    env.pop("RMW_FASTRTPS_USE_QOS_FROM_XML", None)
+    return env
 
 
-def _launch_localisation(*, lidar_costmap_phase):
-    """Start the localisation launch file for the selected mode."""
-    launch_path = (
-        Path(__file__).resolve().parents[1] / "launch" / "localisation.launch.py"
+def _run_ros_command(env, *args):
+    """Run a ROS CLI command and return combined output."""
+    completed = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
     )
-    description = launch.LaunchDescription(
-        [
-            SetEnvironmentVariable("ROS_DOMAIN_ID", TEST_ROS_DOMAIN_ID),
-            UnsetEnvironmentVariable("FASTRTPS_DEFAULT_PROFILES_FILE"),
-            UnsetEnvironmentVariable("RMW_FASTRTPS_USE_QOS_FROM_XML"),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(str(launch_path)),
-                launch_arguments={
-                    "lidar_costmap_phase": "true" if lidar_costmap_phase else "false",
-                    "enable_visual_slam": "false",
-                    "use_sim_time": "true",
-                    "enable_apriltag_debug": "false",
-                }.items(),
-            ),
-        ]
-    )
+    return completed.stdout + completed.stderr
 
-    launch_service = launch.LaunchService()
-    launch_service.include_launch_description(description)
-    thread = threading.Thread(target=launch_service.run, daemon=True)
-    thread.start()
-    return launch_service, thread
+
+def _publisher_count(topic_info_output):
+    """Count publisher entries in `ros2 topic info -v` output."""
+    return topic_info_output.count("Node name:")
 
 
 @pytest.mark.parametrize(
     (
         "lidar_costmap_phase",
+        "expected_nodes",
         "expected_tf_publishers",
-        "expected_tf_static_count",
+        "expected_tf_static_publishers",
     ),
     [
-        (False, {"ekf_filter_node_odom", "ekf_filter_node_map"}, 0),
-        (True, {"ekf_filter_node_odom"}, 1),
+        (
+            False,
+            {"/ekf_filter_node_odom", "/ekf_filter_node_map"},
+            2,
+            1,
+        ),
+        (
+            True,
+            {"/ekf_filter_node_odom"},
+            1,
+            2,
+        ),
     ],
 )
 def test_localisation_launch_tf_publishers_match_expected_modes(
-    lidar_costmap_phase, expected_tf_publishers, expected_tf_static_count
+    lidar_costmap_phase,
+    expected_nodes,
+    expected_tf_publishers,
+    expected_tf_static_publishers,
 ):
-    original_env = {
-        "ROS_DOMAIN_ID": os.environ.get("ROS_DOMAIN_ID"),
-        "FASTRTPS_DEFAULT_PROFILES_FILE": os.environ.get(
-            "FASTRTPS_DEFAULT_PROFILES_FILE"
-        ),
-        "RMW_FASTRTPS_USE_QOS_FROM_XML": os.environ.get(
-            "RMW_FASTRTPS_USE_QOS_FROM_XML"
-        ),
-    }
-    os.environ["ROS_DOMAIN_ID"] = TEST_ROS_DOMAIN_ID
-    os.environ.pop("FASTRTPS_DEFAULT_PROFILES_FILE", None)
-    os.environ.pop("RMW_FASTRTPS_USE_QOS_FROM_XML", None)
-
-    launch_service, thread = _launch_localisation(
-        lidar_costmap_phase=lidar_costmap_phase
+    env = _test_environment()
+    launch_process = subprocess.Popen(
+        [
+            "ros2",
+            "launch",
+            "lunabot_localisation",
+            "localisation.launch.py",
+            f"lidar_costmap_phase:={'true' if lidar_costmap_phase else 'false'}",
+            "enable_visual_slam:=false",
+            "enable_apriltag_debug:=false",
+            "use_sim_time:=true",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
     )
-    rclpy.init()
-    node = _GraphProbe()
 
     try:
-        deadline = time.time() + 15.0
-        tf_publishers = set()
-        tf_static_publishers = set()
+        deadline = time.time() + 20.0
+        node_list_output = ""
+        tf_info_output = ""
+        tf_static_info_output = ""
 
         while time.time() < deadline:
-            tf_publishers = node.publisher_names("/tf")
-            tf_static_publishers = node.publisher_names("/tf_static")
+            node_list_output = _run_ros_command(env, "ros2", "node", "list")
+            tf_info_output = _run_ros_command(env, "ros2", "topic", "info", "/tf", "-v")
+            tf_static_info_output = _run_ros_command(
+                env,
+                "ros2",
+                "topic",
+                "info",
+                "/tf_static",
+                "-v",
+            )
+
+            nodes = {
+                line.strip()
+                for line in node_list_output.splitlines()
+                if line.strip().startswith("/")
+            }
+
             if (
-                tf_publishers == expected_tf_publishers
-                and len(tf_static_publishers) == expected_tf_static_count
+                expected_nodes.issubset(nodes)
+                and _publisher_count(tf_info_output) == expected_tf_publishers
+                and _publisher_count(tf_static_info_output)
+                == expected_tf_static_publishers
             ):
                 break
-            rclpy.spin_once(node, timeout_sec=0.1)
-            time.sleep(0.1)
 
-        assert tf_publishers == expected_tf_publishers
-        assert len(tf_static_publishers) == expected_tf_static_count
+            if launch_process.poll() is not None:
+                break
+
+            time.sleep(0.5)
+
+        nodes = {
+            line.strip()
+            for line in node_list_output.splitlines()
+            if line.strip().startswith("/")
+        }
+        assert expected_nodes.issubset(nodes), node_list_output
+        assert _publisher_count(tf_info_output) == expected_tf_publishers, tf_info_output
+        assert (
+            _publisher_count(tf_static_info_output) == expected_tf_static_publishers
+        ), tf_static_info_output
     finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
-        launch_service.shutdown()
-        thread.join(timeout=5.0)
-        for name, value in original_env.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+        launch_process.terminate()
+        try:
+            launch_process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            launch_process.kill()
+            launch_process.wait(timeout=5.0)
 
