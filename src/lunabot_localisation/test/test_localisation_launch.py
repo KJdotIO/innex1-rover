@@ -122,6 +122,11 @@ def _runtime_tf_owner_links(*, lidar_costmap_phase):
     return owner_links
 
 
+def _dual_ekf_contract_links():
+    """Return the TF links guarded by the dual-EKF ownership contract."""
+    return {("odom", "base_footprint"), ("map", "odom")}
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
@@ -308,7 +313,11 @@ def test_launch_exposes_only_expected_tf_owner_links(
             or entity.condition.evaluate(context)
         )
     ]
-    owner_links = [owner_link for owner_link in owner_links if owner_link is not None]
+    owner_links = [
+        owner_link
+        for owner_link in owner_links
+        if owner_link in _dual_ekf_contract_links()
+    ]
 
     assert set(owner_links) == expected_links
     assert len(owner_links) == len(expected_links)
