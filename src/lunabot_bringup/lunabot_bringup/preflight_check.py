@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
+from lunabot_interfaces.action import Deposit
+from lunabot_interfaces.action import Excavate
 from nav2_msgs.action import NavigateToPose
 import rclpy
 from rclpy.action import ActionClient
@@ -38,6 +40,8 @@ EXIT_CRITICAL_FAILURE = 2
 EXIT_INTERNAL_ERROR = 3
 
 ACTION_TYPE_MAP: dict[str, type] = {
+    "lunabot_interfaces/action/Deposit": Deposit,
+    "lunabot_interfaces/action/Excavate": Excavate,
     "nav2_msgs/action/NavigateToPose": NavigateToPose,
 }
 

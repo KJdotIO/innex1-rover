@@ -1,0 +1,135 @@
+preflight:
+  use_interface_contracts: true
+
+  sim_time:
+    critical: true
+    timeout_s: 10.0
+    min_delta_s: 0.2
+
+  topic_message_timeout_s: 10.0
+  topic_discovery_timeout_s: 30.0
+  tf_timeout_s: 10.0
+  action_timeout_s: 30.0
+  node_timeout_s: 30.0
+
+  required_topics:
+    - name: /imu/data_raw
+      type: sensor_msgs/msg/Imu
+      min_messages: 1
+      critical: true
+    - name: /odom
+      type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: true
+    - name: /camera_front/image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: true
+    - name: /camera_front/depth_image
+      type: sensor_msgs/msg/Image
+      min_messages: 1
+      critical: false
+    - name: /camera_front/camera_info
+      type: sensor_msgs/msg/CameraInfo
+      min_messages: 1
+      critical: true
+    - name: /camera_front/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: false
+    - name: /ouster/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: true
+    - name: /map
+      type: nav_msgs/msg/OccupancyGrid
+      min_messages: 1
+      critical: true
+      reliability: reliable
+      durability: transient_local
+    - name: /odometry/local
+      type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: true
+    - name: /localisation/start_zone_status
+      type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+      min_messages: 1
+      critical: false
+    - name: /excavation/status
+      type: lunabot_interfaces/msg/ExcavationStatus
+      min_messages: 1
+      critical: true
+      phases: [runtime]
+    - name: /excavation/telemetry
+      type: lunabot_interfaces/msg/ExcavationTelemetry
+      min_messages: 1
+      critical: true
+      phases: [runtime]
+
+  required_tf_links:
+    - parent: map
+      child: odom
+      critical: true
+    - parent: odom
+      child: base_footprint
+      critical: true
+    - parent: base_footprint
+      child: base_link
+      critical: true
+    - parent: base_link
+      child: ouster_link
+      critical: true
+
+  required_actions:
+    - name: /navigate_to_pose
+      type: nav2_msgs/action/NavigateToPose
+      critical: true
+      phases: [runtime]
+    - name: /navigate_to_pose_gate
+      type: nav2_msgs/action/NavigateToPose
+      critical: true
+      phases: [runtime]
+    - name: /mission/excavate
+      type: lunabot_interfaces/action/Excavate
+      critical: true
+      phases: [runtime]
+    - name: /mission/deposit
+      type: lunabot_interfaces/action/Deposit
+      critical: true
+      phases: [runtime]
+
+  required_nodes:
+    - name: apriltag
+      critical: true
+    - name: bt_navigator
+      critical: true
+      phases: [runtime]
+    - name: controller_server
+      critical: true
+      phases: [runtime]
+    - name: ekf_filter_node_map
+      critical: true
+    - name: map_server
+      critical: true
+    - name: start_zone_localiser
+      critical: true
+    - name: planner_server
+      critical: true
+      phases: [runtime]
+    - name: navigate_to_pose_gate
+      critical: true
+      phases: [runtime]
+    - name: tag_pose_publisher
+      critical: true
+    - name: excavation_controller
+      critical: true
+      phases: [runtime]
+    - name: excavation_action_server
+      critical: true
+      phases: [runtime]
+    - name: excavation_sim_proxy
+      critical: true
+      phases: [runtime]
+    - name: material_action_server
+      critical: true
+      phases: [runtime]
