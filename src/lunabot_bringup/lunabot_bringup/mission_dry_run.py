@@ -178,7 +178,6 @@ class MissionDryRunHarness(Node):
             preflight_runner=self._run_runtime_preflight,
         )
 
-        print("\n=== Mission Dry Run Summary ===")
         for line in summary_lines(results):
             print(line)
 

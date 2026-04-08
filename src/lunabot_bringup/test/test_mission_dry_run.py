@@ -1,8 +1,20 @@
 """Unit tests for mission dry-run orchestration helpers."""
 
+from types import SimpleNamespace
+
+from lunabot_bringup import mission_dry_run as dry_run_module
 from lunabot_bringup.mission_dry_run import dry_run_exit_code
 from lunabot_bringup.mission_dry_run import execute_dry_run
+from lunabot_bringup.mission_dry_run import MissionDryRunHarness
 from lunabot_bringup.mission_dry_run import summary_lines
+
+
+def _fake_logger():
+    return SimpleNamespace(
+        info=lambda _msg: None,
+        error=lambda _msg: None,
+        warn=lambda _msg: None,
+    )
 
 
 def test_execute_dry_run_runs_each_step_once_on_success():
@@ -86,3 +98,56 @@ def test_dry_run_exit_code_is_non_zero_on_failure():
     )
 
     assert dry_run_exit_code(results) == 1
+
+
+def test_execute_dry_run_marks_all_steps_failed_when_preflight_fails():
+    results = execute_dry_run(
+        [
+            ("travel", lambda: (True, "travel ok")),
+            ("excavate", lambda: (True, "excavate ok")),
+            ("deposit", lambda: (True, "deposit ok")),
+        ],
+        preflight_runner=lambda: (False, "runtime preflight failed"),
+    )
+
+    assert [(result.name, result.passed) for result in results] == [
+        ("travel", False),
+        ("excavate", False),
+        ("deposit", False),
+    ]
+
+
+def test_run_returns_non_zero_when_runtime_preflight_fails(monkeypatch):
+    harness = object.__new__(MissionDryRunHarness)
+    harness.get_logger = _fake_logger
+    monkeypatch.setattr(
+        dry_run_module.MissionDryRunHarness,
+        "_run_runtime_preflight",
+        lambda self: (False, "runtime preflight failed"),
+    )
+
+    status = MissionDryRunHarness.run(harness)
+
+    assert status == 1
+
+
+def test_run_prints_flat_summary_when_runtime_preflight_fails(
+    monkeypatch, capsys
+):
+    harness = object.__new__(MissionDryRunHarness)
+    harness.get_logger = _fake_logger
+    monkeypatch.setattr(
+        dry_run_module.MissionDryRunHarness,
+        "_run_runtime_preflight",
+        lambda self: (False, "runtime preflight failed"),
+    )
+
+    status = MissionDryRunHarness.run(harness)
+
+    assert status == 1
+    assert capsys.readouterr().out.splitlines() == [
+        "travel: fail",
+        "excavate: fail",
+        "deposit: fail",
+        "overall: fail",
+    ]
