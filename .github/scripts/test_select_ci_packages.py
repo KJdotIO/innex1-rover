@@ -40,7 +40,10 @@ def main() -> int:
         ),
         "excavation_safe_leaf": (
             ["src/lunabot_excavation/lunabot_excavation/excavation_controller.py"],
-            ("packages", ("lunabot_control", "lunabot_excavation")),
+            (
+                "packages",
+                ("lunabot_bringup", "lunabot_control", "lunabot_excavation"),
+            ),
         ),
         "leaf_package": (
             ["src/lunabot_teleop/config/xbox_teleop.yaml"],
