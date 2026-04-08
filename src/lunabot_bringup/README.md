@@ -16,6 +16,30 @@ Use bring-up launches when validating end-to-end behaviour. Avoid debugging subs
 ## Key files
 
 - `launch/`: stack launch entrypoints (navigation and related orchestration paths).
+- `launch/mission_dry_run.launch.py`: one-command sim dry run for travel, excavate, and deposit.
+
+## Mission Dry Run
+
+Use the dry-run launch when you want one bounded operator-facing regression pass in sim:
+
+```bash
+ros2 launch lunabot_bringup mission_dry_run.launch.py
+```
+
+The harness runs runtime preflight, then one travel attempt through `/navigate_to_pose_gate`,
+one bounded excavation attempt through `/mission/excavate`, and one bounded deposit attempt
+through `/mission/deposit`. It prints flat summary lines:
+
+- `travel: pass/fail`
+- `excavate: pass/fail`
+- `deposit: pass/fail`
+- `overall: pass/fail`
+
+For a direct shell exit code without the composed sim launch, run the harness entrypoint:
+
+```bash
+ros2 run lunabot_bringup mission_dry_run
+```
 
 ## Common failure modes
 
