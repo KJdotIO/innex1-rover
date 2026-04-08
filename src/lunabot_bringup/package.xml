@@ -29,6 +29,10 @@
   <exec_depend>rviz2</exec_depend>
   <exec_depend>lunabot_navigation</exec_depend>
   <exec_depend>lunabot_teleop</exec_depend>
+  <exec_depend>lunabot_perception</exec_depend>
+  <exec_depend>lunabot_control</exec_depend>
+  <exec_depend>lunabot_excavation</exec_depend>
+  <exec_depend>lunabot_simulation</exec_depend>
   <exec_depend>twist_mux</exec_depend>
 
   <export>

@@ -1,9 +1,12 @@
 """Unit tests for phase-scoped preflight filtering and CLI helpers."""
 
 import sys
+from pathlib import Path
 
 import pytest
+import yaml
 
+from lunabot_bringup.preflight_check import ACTION_TYPE_MAP
 from lunabot_bringup.preflight_check import _parse_bool_text
 from lunabot_bringup.preflight_check import _strip_ros_cli_args
 from lunabot_bringup.preflight_profiles import filter_preflight_config
@@ -95,6 +98,29 @@ def test_filter_preflight_config_keeps_runtime_actions_in_runtime_phase():
     assert filtered["preflight"]["required_actions"] == config["preflight"][
         "required_actions"
     ]
+
+
+def test_dry_run_preflight_config_keeps_mission_actions_in_runtime_phase():
+    config_path = (
+        Path(__file__).resolve().parents[1]
+        / "config"
+        / "preflight_checks_dry_run.yaml"
+    )
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+
+    filtered = filter_preflight_config(config, "runtime")
+    action_names = {
+        entry["name"] for entry in filtered["preflight"]["required_actions"]
+    }
+
+    assert "/navigate_to_pose_gate" in action_names
+    assert "/mission/excavate" in action_names
+    assert "/mission/deposit" in action_names
+
+
+def test_action_type_map_supports_mission_dry_run_actions():
+    assert "lunabot_interfaces/action/Excavate" in ACTION_TYPE_MAP
+    assert "lunabot_interfaces/action/Deposit" in ACTION_TYPE_MAP
 
 
 def test_filter_preflight_config_rejects_invalid_phase_shape():
