@@ -60,7 +60,7 @@ def execute_dry_run(
         if passed:
             continue
 
-        for remaining_name, _remaining_runner in step_runners[index + 1 :]:
+        for remaining_name, _remaining_runner in step_runners[index + 1:]:
             results.append(
                 StepStatus(
                     name=remaining_name,
