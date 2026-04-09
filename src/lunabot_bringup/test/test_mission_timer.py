@@ -22,7 +22,7 @@ def test_fresh_timer_has_expected_initial_state():
 
 
 def test_begin_cycle_resets_cycle_start_time():
-    """beginCycle() updates cycleStartTime to a value at least as large as before."""
+    """Verify beginCycle() resets cycleStartTime to a value at or after the previous one."""
     timer = MissionTimer()
     old_start = timer.cycleStartTime
     timer.beginCycle()
@@ -30,7 +30,7 @@ def test_begin_cycle_resets_cycle_start_time():
 
 
 def test_record_cycle_time_returns_positive_float_and_increments_counter():
-    """recordCycleTime() returns a positive duration and increments completedCycles."""
+    """Verify recordCycleTime() returns a non-negative duration and increments completedCycles."""
     timer = MissionTimer()
     timer.beginCycle()
     duration = timer.recordCycleTime()
@@ -41,7 +41,7 @@ def test_record_cycle_time_returns_positive_float_and_increments_counter():
 
 
 def test_record_cycle_time_updates_worst_cycle_time_for_slower_cycle(monkeypatch):
-    """worstCycleTime is updated when a slower cycle is recorded."""
+    """Verify worstCycleTime is updated when a slower cycle is recorded."""
     timer = MissionTimer()
 
     # First cycle: fake a duration of 10 seconds
@@ -62,7 +62,7 @@ def test_record_cycle_time_updates_worst_cycle_time_for_slower_cycle(monkeypatch
 
 
 def test_record_cycle_time_does_not_update_worst_cycle_time_for_faster_cycle(monkeypatch):
-    """worstCycleTime is NOT updated when a faster cycle is recorded."""
+    """Verify worstCycleTime is not updated when a faster cycle is recorded."""
     timer = MissionTimer()
 
     fake_now = [1000.0]
@@ -84,13 +84,13 @@ def test_record_cycle_time_does_not_update_worst_cycle_time_for_faster_cycle(mon
 
 
 def test_can_start_cycle_returns_true_when_no_cycles_completed():
-    """canStartCycle() always returns True before any cycle has been recorded."""
+    """Verify canStartCycle() always returns True before any cycle has been recorded."""
     timer = MissionTimer()
     assert timer.canStartCycle() is True
 
 
 def test_can_start_cycle_returns_false_when_budget_would_be_exceeded(monkeypatch):
-    """canStartCycle() returns False when elapsed + worstCycleTime >= 1200."""
+    """Verify canStartCycle() returns False when elapsed + worstCycleTime >= 1200."""
     timer = MissionTimer()
 
     # Simulate missionStartTime at t=0
@@ -106,7 +106,7 @@ def test_can_start_cycle_returns_false_when_budget_would_be_exceeded(monkeypatch
 
 
 def test_can_start_cycle_returns_true_when_budget_is_sufficient(monkeypatch):
-    """canStartCycle() returns True when elapsed + worstCycleTime < 1200."""
+    """Verify canStartCycle() returns True when elapsed + worstCycleTime < 1200."""
     timer = MissionTimer()
 
     timer.missionStartTime = 0.0
