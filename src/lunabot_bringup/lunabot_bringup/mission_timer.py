@@ -6,7 +6,8 @@ import time
 
 
 class MissionTimer:
-    """Track mission elapsed time and per-cycle durations.
+    """
+    Track mission elapsed time and per-cycle durations.
 
     All timing uses ``time.monotonic()`` to avoid wall-clock jumps.
     The 1200-second budget guard in ``canStartCycle`` prevents starting a new
@@ -25,7 +26,8 @@ class MissionTimer:
         self.cycleStartTime = time.monotonic()
 
     def recordCycleTime(self) -> float:
-        """Record the current cycle duration and return it.
+        """
+        Record the current cycle duration and return it.
 
         Computes elapsed time since the last ``beginCycle`` call, updates
         ``worstCycleTime`` if this cycle is the slowest seen so far, increments
@@ -38,7 +40,8 @@ class MissionTimer:
         return duration
 
     def canStartCycle(self) -> bool:
-        """Return whether there is enough time budget to start another cycle.
+        """
+        Return whether there is enough time budget to start another cycle.
 
         The first cycle (``completedCycles == 0``) is always allowed.
         Subsequent cycles are allowed only when the elapsed mission time plus
