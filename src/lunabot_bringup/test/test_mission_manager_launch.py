@@ -1,5 +1,3 @@
-"""Tests for the standalone mission manager launch entrypoint."""
-
 import importlib.util
 from pathlib import Path
 
@@ -10,7 +8,6 @@ from launch_ros.actions import Node
 
 
 def _load_launch_module():
-    """Import the mission manager launch file as a Python module."""
     launch_path = (
         Path(__file__).resolve().parents[1]
         / "launch"
@@ -26,8 +23,6 @@ def _load_launch_module():
 
 
 def test_mission_manager_launch_starts_one_supervisor_node(monkeypatch):
-    """Mission manager launch shape.
-    Verify the entrypoint declares `use_sim_time` and starts one mission_manager node."""
     module = _load_launch_module()
     description = module.generate_launch_description()
 

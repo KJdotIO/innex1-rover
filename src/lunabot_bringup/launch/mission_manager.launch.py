@@ -1,5 +1,3 @@
-"""Launch file for the mission manager."""
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
@@ -8,7 +6,6 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    """Generate a launch description for the mission manager."""
     use_sim_time = LaunchConfiguration("use_sim_time")
 
     # Start only the standalone mission manager; dependent action servers stay separate.
