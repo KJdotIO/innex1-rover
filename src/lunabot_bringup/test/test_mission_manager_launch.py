@@ -42,5 +42,5 @@ def test_mission_manager_launch_starts_one_supervisor_node():
 
     assert declared_arguments == ["use_sim_time"]
     assert len(nodes) == 1
-    assert nodes[0].__dict__.get("_Node__node_name") == "mission_manager"
+    assert nodes[0].node_name == "mission_manager"
     assert 'executable="mission_manager"' in launch_source

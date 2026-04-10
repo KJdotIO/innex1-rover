@@ -8,7 +8,11 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    """Start the mission manager with an overridable sim-time setting."""
+    """
+    Generate a launch description for the mission manager.
+
+    Start the standalone mission manager node with an overridable sim-time setting.
+    """
     use_sim_time = LaunchConfiguration("use_sim_time")
 
     mission_manager = Node(
