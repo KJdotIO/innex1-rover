@@ -7,6 +7,8 @@
   <maintainer email="ko129@student.le.ac.uk">Leicester Lunabotics Team</maintainer>
   <license>Apache-2.0</license>
 
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

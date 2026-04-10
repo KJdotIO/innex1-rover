@@ -16,7 +16,26 @@ Use bring-up launches when validating end-to-end behaviour. Avoid debugging subs
 ## Key files
 
 - `launch/`: stack launch entrypoints (navigation and related orchestration paths).
+- `launch/mission_manager.launch.py`: starts the standalone mission supervisor node.
 - `launch/mission_dry_run.launch.py`: one-command sim dry run for travel, excavate, and deposit.
+
+## Mission Manager
+
+Start just the mission supervisor node with:
+
+```bash
+ros2 launch lunabot_bringup mission_manager.launch.py
+```
+
+For direct executable discovery without the launch wrapper, run:
+
+```bash
+ros2 run lunabot_bringup mission_manager
+```
+
+This launch path only starts the supervisor node itself. Navigation, excavation,
+and deposition servers remain in their existing bringup paths and are not
+implicitly started here.
 
 ## Mission Dry Run
 
