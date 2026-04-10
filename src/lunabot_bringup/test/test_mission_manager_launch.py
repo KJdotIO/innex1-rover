@@ -26,7 +26,7 @@ def _load_launch_module():
 
 
 def test_mission_manager_launch_starts_one_supervisor_node(monkeypatch):
-    """The launch entrypoint should expose a single mission_manager node."""
+    """Mission manager launch shape. Verify the entrypoint declares `use_sim_time` and starts one mission_manager node."""
     module = _load_launch_module()
     description = module.generate_launch_description()
 
