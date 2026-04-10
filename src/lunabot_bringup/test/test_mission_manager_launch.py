@@ -46,4 +46,4 @@ def test_mission_manager_launch_starts_one_supervisor_node(monkeypatch):
     monkeypatch.setattr(ExecuteProcess, "execute", lambda self, context: None)
     nodes[0].execute(context)
 
-    assert nodes[0].node_name == "mission_manager"
+    assert nodes[0].node_name.rsplit("/", 1)[-1] == "mission_manager"
