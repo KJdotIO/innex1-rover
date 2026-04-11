@@ -1,0 +1,16 @@
+extends: default
+
+ignore: |
+  build/
+  install/
+  log/
+  logs/
+  cache/
+  research/
+  src/external/
+
+rules:
+  document-start: disable
+  line-length: disable
+  comments-indentation: disable
+  truthy: disable

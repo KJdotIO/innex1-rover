@@ -28,7 +28,10 @@ def main() -> int:
 
     ros_ci_scenarios = {
         "docs_only_skips_ros_ci": (["README.md"], False),
-        "src_change_needs_ros_ci": (["src/lunabot_teleop/config/xbox_teleop.yaml"], True),
+        "src_change_needs_ros_ci": (
+            ["src/lunabot_teleop/config/xbox_teleop.yaml"],
+            True,
+        ),
         "workflow_change_needs_ros_ci": ([".github/workflows/ci.yml"], True),
         "empty_diff_forces_ros_ci": ([], True),
     }
@@ -138,7 +141,9 @@ def main() -> int:
             "packages=",
             "reason=ROS build/test not needed for this change set",
         ]
-        missing = [fragment for fragment in expected_fragments if fragment not in output]
+        missing = [
+            fragment for fragment in expected_fragments if fragment not in output
+        ]
         if missing:
             print("CI package selector regression checks failed:")
             for fragment in missing:

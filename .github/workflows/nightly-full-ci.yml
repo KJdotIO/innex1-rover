@@ -173,6 +173,23 @@ jobs:
           python3 .github/scripts/check_interface_contracts.py
         shell: bash
 
+      - name: Install repository quality tools
+        run: |
+          python3 -m pip install --disable-pip-version-check -r .github/requirements-preflight.txt
+        shell: bash
+
+      - name: Run blocking repository quality checks
+        run: python3 .github/scripts/run_quality_checks.py --mode blocking
+        shell: bash
+
+      - name: Lint GitHub Actions workflows
+        uses: rhysd/actionlint@v1
+
+      - name: Run advisory repository quality checks
+        continue-on-error: true
+        run: python3 .github/scripts/run_quality_checks.py --mode advisory
+        shell: bash
+
       - name: Build
         run: |
           source /opt/ros/humble/setup.bash

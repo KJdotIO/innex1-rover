@@ -53,6 +53,18 @@ jobs:
           python .github/scripts/test_select_ci_packages.py
         shell: bash
 
+      - name: Run blocking repository quality checks
+        run: python .github/scripts/run_quality_checks.py --mode blocking
+        shell: bash
+
+      - name: Lint GitHub Actions workflows
+        uses: rhysd/actionlint@v1
+
+      - name: Run advisory repository quality checks
+        continue-on-error: true
+        run: python .github/scripts/run_quality_checks.py --mode advisory
+        shell: bash
+
       - name: Determine comparison range
         id: range
         run: |
