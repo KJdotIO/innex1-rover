@@ -165,7 +165,9 @@ def _select(
             return Selection("full", (), f"Broad package changed: {package}")
 
         if package not in SAFE_SELECT_PACKAGES:
-            return Selection("full", (), f"Package not whitelisted for selective CI: {package}")
+            return Selection(
+                "full", (), f"Package not whitelisted for selective CI: {package}"
+            )
 
         changed_packages.add(package)
 
@@ -194,10 +196,14 @@ def main() -> int:
     package_roots, dependencies = _discover_packages()
     changed_files = _git_changed_files(args.base_sha, args.head_sha)
     ros_ci = requires_ros_ci(changed_files)
-    selection = _select(changed_files, package_roots, dependencies) if ros_ci else Selection(
-        "skip",
-        (),
-        "ROS build/test not needed for this change set",
+    selection = (
+        _select(changed_files, package_roots, dependencies)
+        if ros_ci
+        else Selection(
+            "skip",
+            (),
+            "ROS build/test not needed for this change set",
+        )
     )
 
     summary = {

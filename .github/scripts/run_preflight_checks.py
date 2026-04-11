@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import py_compile
-import sys
 from pathlib import Path
 
 import yaml
@@ -43,7 +42,9 @@ def _check_python(files: list[Path]) -> list[str]:
         try:
             py_compile.compile(str(path), doraise=True)
         except py_compile.PyCompileError as exc:
-            errors.append(f"Python syntax error in {path.relative_to(REPO_ROOT)}: {exc.msg}")
+            errors.append(
+                f"Python syntax error in {path.relative_to(REPO_ROOT)}: {exc.msg}"
+            )
     return errors
 
 
