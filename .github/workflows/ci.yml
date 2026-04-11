@@ -58,7 +58,7 @@ jobs:
         shell: bash
 
       - name: Lint GitHub Actions workflows
-        uses: rhysd/actionlint@v1
+        uses: devops-actions/actionlint@v0.1.10
 
       - name: Run advisory repository quality checks
         continue-on-error: true
