@@ -7,9 +7,8 @@ import ast
 import json
 import re
 import sys
-from typing import Any
 from pathlib import Path
-
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = REPO_ROOT / ".github/contracts/interface_contracts.json"

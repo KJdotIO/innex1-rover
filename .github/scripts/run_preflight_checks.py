@@ -8,7 +8,6 @@ from pathlib import Path
 
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCAN_ROOTS = (REPO_ROOT / ".github", REPO_ROOT / "src")
 PYTHON_SUFFIXES = {".py"}

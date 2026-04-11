@@ -16,9 +16,10 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List
+
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,7 +82,7 @@ def _validate_preflight_config(config: dict) -> None:
             raise ValueError(f"missing preflight.{section}")
         section_items = config[section]
         if not isinstance(section_items, list):
-             raise ValueError(f"preflight.{section} must be a list")
+            raise ValueError(f"preflight.{section} must be a list")
         for index, item in enumerate(section_items):
             if not isinstance(item, dict):
                 raise ValueError(f"preflight.{section}[{index}] must be a mapping")
@@ -105,7 +106,7 @@ def _preflight_error_result(name: str) -> CheckResult:
 
 def _configured_required_names(section: str, field: str = "name") -> set[str] | None:
     config, error = _load_preflight_config()
-    if error is not None:
+    if error is not None or config is None:
         return None
 
     section_items = config.get(section, [])
@@ -126,7 +127,7 @@ def _configured_required_names(section: str, field: str = "name") -> set[str] | 
 
 def _configured_required_tf_links() -> list[tuple[str, str]] | None:
     config, error = _load_preflight_config()
-    if error is not None:
+    if error is not None or config is None:
         return None
 
     section_items = config.get("required_tf_links", [])
@@ -151,7 +152,7 @@ def _normalize_ros_name(name: str) -> str:
     return name.strip().lstrip("/")
 
 
-def run_cmd(cmd: List[str], timeout: int = 8) -> subprocess.CompletedProcess:
+def run_cmd(cmd: list[str], timeout: int = 8) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as exc:
@@ -262,7 +263,7 @@ def check_required_topics() -> CheckResult:
         return _preflight_error_result("Required topics")
     required_topics = {_normalize_ros_name(name) for name in required_topics}
 
-    seen = set(_normalize_ros_name(t) for t in proc.stdout.splitlines() if t.strip())
+    seen = {_normalize_ros_name(t) for t in proc.stdout.splitlines() if t.strip()}
     missing = sorted(required_topics - seen)
     if not missing:
         return CheckResult("PASS", "Required topics", "All required topics found")
@@ -333,7 +334,7 @@ def check_required_nodes() -> CheckResult:
         return _preflight_error_result("Required nodes")
     required_nodes = {_normalize_ros_name(name) for name in required_nodes}
 
-    seen = set(_normalize_ros_name(n) for n in proc.stdout.splitlines() if n.strip())
+    seen = {_normalize_ros_name(n) for n in proc.stdout.splitlines() if n.strip()}
     missing = sorted(required_nodes - seen)
     if not missing:
         return CheckResult("PASS", "Required nodes", "All required nodes found")
@@ -364,7 +365,7 @@ def check_required_actions() -> CheckResult:
         return _preflight_error_result("Required actions")
     required_actions = {_normalize_ros_name(name) for name in required_actions}
 
-    seen = set(_normalize_ros_name(a) for a in proc.stdout.splitlines() if a.strip())
+    seen = {_normalize_ros_name(a) for a in proc.stdout.splitlines() if a.strip()}
     missing = sorted(required_actions - seen)
     if not missing:
         return CheckResult("PASS", "Required actions", "All required actions found")
@@ -402,8 +403,8 @@ def check_required_tf_links() -> CheckResult:
     )
 
 
-def run_checks(checks: List[Callable[[], CheckResult]]) -> List[CheckResult]:
-    results: List[CheckResult] = []
+def run_checks(checks: list[Callable[[], CheckResult]]) -> list[CheckResult]:
+    results: list[CheckResult] = []
     for check in checks:
         try:
             results.append(check())
@@ -419,7 +420,7 @@ def run_checks(checks: List[Callable[[], CheckResult]]) -> List[CheckResult]:
     return results
 
 
-def print_results(results: List[CheckResult], heading: str) -> None:
+def print_results(results: list[CheckResult], heading: str) -> None:
     print(f"\n== {heading} ==")
     for r in results:
         print(f"[{r.status}] {r.name}: {r.detail}")
@@ -427,7 +428,7 @@ def print_results(results: List[CheckResult], heading: str) -> None:
             print(f"  -> {r.suggestion}")
 
 
-def final_exit_code(results: List[CheckResult]) -> int:
+def final_exit_code(results: list[CheckResult]) -> int:
     if any(r.status == "FAIL" for r in results):
         return 2
     if any(r.status == "WARN" for r in results):
@@ -450,7 +451,7 @@ def should_run_runtime_checks() -> tuple[bool, CheckResult | None]:
         return False, _preflight_error_result("Runtime checks")
     runtime_markers = {_normalize_ros_name(name) for name in runtime_markers}
 
-    nodes = set(_normalize_ros_name(n) for n in proc.stdout.splitlines() if n.strip())
+    nodes = {_normalize_ros_name(n) for n in proc.stdout.splitlines() if n.strip()}
     return any(marker in nodes for marker in runtime_markers), None
 
 
@@ -464,7 +465,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    setup_checks: List[Callable[[], CheckResult]] = [
+    setup_checks: list[Callable[[], CheckResult]] = [
         check_python_version,
         lambda: check_command_exists("ros2", "ROS CLI"),
         lambda: check_command_exists("colcon", "Colcon"),
@@ -490,7 +491,7 @@ def main() -> int:
         check_open3d_available,
     ]
 
-    runtime_checks: List[Callable[[], CheckResult]] = [
+    runtime_checks: list[Callable[[], CheckResult]] = [
         check_preflight_config_load,
         check_ros_graph_available,
         check_required_topics,
@@ -500,7 +501,7 @@ def main() -> int:
         check_nav2_lifecycle,
     ]
 
-    all_results: List[CheckResult] = []
+    all_results: list[CheckResult] = []
 
     if args.mode in {"setup", "all"}:
         setup_results = run_checks(setup_checks)

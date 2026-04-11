@@ -108,18 +108,22 @@ jobs:
           if docker buildx imagetools inspect "$CI_IMAGE" >/tmp/ci-image-inspect.txt 2>/tmp/ci-image-inspect.err; then
             digest=$(awk '/^Digest:/ {print $2}' /tmp/ci-image-inspect.txt)
             if [ -n "$digest" ]; then
-              echo "image=${CI_IMAGE%@*}@${digest}" >> "$GITHUB_OUTPUT"
-              echo "prebuilt=true" >> "$GITHUB_OUTPUT"
-              echo "image_reason=Using published ROS CI image" >> "$GITHUB_OUTPUT"
+              {
+                echo "image=${CI_IMAGE%@*}@${digest}"
+                echo "prebuilt=true"
+                echo "image_reason=Using published ROS CI image"
+              } >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
 
           echo "Published ROS CI image lookup failed; using ros:humble-ros-base instead."
           cat /tmp/ci-image-inspect.err || true
-          echo "image=ros:humble-ros-base" >> "$GITHUB_OUTPUT"
-          echo "prebuilt=false" >> "$GITHUB_OUTPUT"
-          echo "image_reason=Falling back because the published ROS CI image is unavailable" >> "$GITHUB_OUTPUT"
+          {
+            echo "image=ros:humble-ros-base"
+            echo "prebuilt=false"
+            echo "image_reason=Falling back because the published ROS CI image is unavailable"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
 
   full-build-and-test:
@@ -183,7 +187,7 @@ jobs:
         shell: bash
 
       - name: Lint GitHub Actions workflows
-        uses: rhysd/actionlint@v1
+        uses: devops-actions/actionlint@v0.1.10
 
       - name: Run advisory repository quality checks
         continue-on-error: true

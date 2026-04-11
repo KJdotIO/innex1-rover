@@ -11,7 +11,6 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
 ROS_CI_PATH_PREFIXES = (
@@ -109,9 +108,10 @@ def _owning_package(changed_file: str, package_roots: dict[str, str]) -> str | N
     matching_root = None
     for root in package_roots:
         prefix = f"{root}/"
-        if changed_file == root or changed_file.startswith(prefix):
-            if matching_root is None or len(root) > len(matching_root):
-                matching_root = root
+        if (changed_file == root or changed_file.startswith(prefix)) and (
+            matching_root is None or len(root) > len(matching_root)
+        ):
+            matching_root = root
 
     if matching_root is None:
         return None
