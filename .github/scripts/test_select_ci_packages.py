@@ -8,18 +8,38 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
+from typing import Protocol, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SELECTOR_PATH = REPO_ROOT / ".github/scripts/select_ci_packages.py"
 
 
-def _load_selector_module():
+class SelectionLike(Protocol):
+    mode: str
+    packages: tuple[str, ...]
+
+
+class SelectorModule(Protocol):
+    def _discover_packages(self) -> tuple[dict[str, str], dict[str, set[str]]]: ...
+    def requires_ros_ci(self, changed_files: list[str]) -> bool: ...
+    def _select(
+        self,
+        changed_files: list[str],
+        package_roots: dict[str, str],
+        dependencies: dict[str, set[str]],
+    ) -> SelectionLike: ...
+    def _git_changed_files(self, base_sha: str, head_sha: str) -> list[str]: ...
+    def main(self) -> int: ...
+
+
+def _load_selector_module() -> SelectorModule:
     spec = importlib.util.spec_from_file_location("select_ci_packages", SELECTOR_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load selector module from {SELECTOR_PATH}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    return module
+    return cast(SelectorModule, module)
 
 
 def main() -> int:
@@ -113,7 +133,13 @@ def main() -> int:
     with tempfile.NamedTemporaryFile("r+", encoding="utf-8") as handle:
         old_git_changed_files = selector._git_changed_files
         old_argv = sys.argv[:]
-        selector._git_changed_files = lambda _base, _head: ["README.md"]
+        patched_module = selector
+
+        def _fake_git_changed_files(base_sha: str, head_sha: str) -> list[str]:
+            del base_sha, head_sha
+            return ["README.md"]
+
+        patched_module._git_changed_files = _fake_git_changed_files
         sys.argv = [
             "select_ci_packages.py",
             "--base-sha",
@@ -126,7 +152,7 @@ def main() -> int:
         try:
             result = selector.main()
         finally:
-            selector._git_changed_files = old_git_changed_files
+            patched_module._git_changed_files = old_git_changed_files
             sys.argv = old_argv
 
         if result != 0:
