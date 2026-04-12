@@ -3,28 +3,26 @@
 from __future__ import annotations
 
 import math
+from contextlib import suppress
 
-from geometry_msgs.msg import PoseWithCovarianceStamped
-from geometry_msgs.msg import Twist
-from lunabot_interfaces.msg import LocalisationStartZoneStatus
-from nav_msgs.msg import Odometry
 import rclpy
+import tf2_ros
+from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
+from nav_msgs.msg import Odometry
 from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy
-from rclpy.qos import HistoryPolicy
-from rclpy.qos import QoSProfile
-from rclpy.qos import ReliabilityPolicy
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from robot_localization.srv import SetPose
 from tf2_ros import Buffer, TransformListener
-import tf2_ros
 
-from lunabot_localisation.start_zone_logic import angle_delta
-from lunabot_localisation.start_zone_logic import PoseSample
-from lunabot_localisation.start_zone_logic import StableLockTracker
-
+from lunabot_interfaces.msg import LocalisationStartZoneStatus
+from lunabot_localisation.start_zone_logic import (
+    PoseSample,
+    StableLockTracker,
+    angle_delta,
+)
 
 STATE_IDLE = "idle"
 STATE_SEARCHING = "searching"
@@ -463,14 +461,113 @@ class StartZoneLocaliser(Node):
             self._stop_search_motion()
             return True
 
-        try:
+        with suppress(Exception):  # pragma: no cover - discarded result only
             self.discarded_set_pose_future.result()
-        except Exception:  # pragma: no cover - defensive path
-            pass
 
         self.discarded_set_pose_future = None
         self.discarded_set_pose_started_ns = None
         return True
+
+    def _clock_requires_reset(self, now_ns: int) -> bool:
+        """Return whether the localiser must reinitialise due to ROS time changes."""
+        return self.last_timer_now_ns is None or now_ns < self.last_timer_now_ns
+
+    def _handle_missing_tf(self, now_ns: int) -> bool:
+        """Handle the bounded wait for the required TF chain."""
+        if self._required_tf_available():
+            return False
+
+        assert self.search_started_ns is not None
+        self.set_pose_attempt_started_ns = None
+        tf_wait_elapsed_s = float(now_ns - self.search_started_ns) / 1e9
+        if (
+            self._should_fail_timeout(now_ns)
+            or tf_wait_elapsed_s >= self.tf_missing_timeout_s
+        ):
+            self._set_state(
+                STATE_FAILED,
+                REASON_TF_MISSING,
+                "Required TF for start-zone localisation never became available.",
+            )
+        else:
+            self._set_state(
+                STATE_SEARCHING,
+                REASON_TF_MISSING,
+                "Waiting for the map/tag or camera/base TF chain.",
+            )
+        self._stop_search_motion()
+        return True
+
+    def _handle_fresh_lock_window(self, now_ns: int) -> None:
+        """Track a candidate lock and start EKF seeding once it is stable."""
+        if self.state != STATE_CANDIDATE_LOCK:
+            self.candidate_entered_ns = now_ns
+        self._set_state(
+            STATE_CANDIDATE_LOCK,
+            REASON_UNSTABLE,
+            "Tag detected; waiting for a stable lock window.",
+        )
+        self._publish_search_cmd(
+            self.search_sign * self.candidate_alignment_angular_speed_rad_s
+        )
+
+        candidate_elapsed_ns = 0
+        if self.candidate_entered_ns is not None:
+            candidate_elapsed_ns = now_ns - self.candidate_entered_ns
+
+        if (
+            candidate_elapsed_ns >= int(self.candidate_settle_duration_s * 1e9)
+            and self.lock_tracker.has_stable_lock(
+                now_ns=now_ns,
+                window_ns=self.stable_window_ns,
+                min_samples=self.stable_window_min_samples,
+                max_gap_ns=self.max_sample_gap_ns,
+                max_translation_spread_m=self.max_lock_translation_spread_m,
+                max_yaw_spread_rad=self.max_lock_yaw_spread_rad,
+            )
+        ):
+            self._maybe_start_set_pose(now_ns)
+
+    def _handle_missing_lock_window(self, now_ns: int, latest_sample: PoseSample | None) -> None:
+        """Continue the bounded search when no fresh stable lock is available."""
+        self.candidate_entered_ns = None
+        self.set_pose_attempt_started_ns = None
+        if latest_sample is not None:
+            self._set_state(
+                STATE_SEARCHING,
+                REASON_STALE,
+                "Tag lock was lost before it became stable.",
+            )
+        else:
+            self._set_state(
+                STATE_SEARCHING,
+                REASON_SEARCHING,
+                "Searching for the start-zone AprilTag.",
+            )
+
+        if self._should_fail_timeout(now_ns):
+            self._set_state(
+                STATE_FAILED,
+                REASON_TIMEOUT,
+                "Timed out before a stable start-zone tag lock was achieved.",
+            )
+            self._stop_search_motion()
+            return
+
+        self._publish_search_cmd(self.search_sign * self.angular_speed_rad_s)
+
+    def _handle_lock_tracking(self, now_ns: int) -> None:
+        """Advance the candidate-lock state machine from accepted tag samples."""
+        self.lock_tracker.prune(now_ns - self.stable_window_ns)
+        self.lock_tracker.prune_future(now_ns)
+        latest_sample = self.lock_tracker.latest()
+        has_fresh_sample = self.lock_tracker.is_fresh(now_ns, self.max_sample_gap_ns)
+
+        if has_fresh_sample:
+            self._handle_fresh_lock_window(now_ns)
+            return
+
+        self._handle_missing_lock_window(now_ns, latest_sample)
 
     def _on_timer(self) -> None:
         """Run the bounded acquisition state machine and publish status."""
@@ -489,9 +586,7 @@ class StartZoneLocaliser(Node):
             self._publish_status(now_ns)
             return
 
-        if self.last_timer_now_ns is not None and now_ns < self.last_timer_now_ns:
-            self._reset_after_clock_jump(now_ns)
-        elif self.search_started_ns is None:
+        if self._clock_requires_reset(now_ns) or self.search_started_ns is None:
             self._reset_after_clock_jump(now_ns)
 
         self.last_timer_now_ns = now_ns
@@ -509,85 +604,11 @@ class StartZoneLocaliser(Node):
             self._publish_status(now_ns)
             return
 
-        if not self._required_tf_available():
-            self.set_pose_attempt_started_ns = None
-            if self._should_fail_timeout(now_ns) or (
-                float(now_ns - self.search_started_ns) / 1e9
-            ) >= self.tf_missing_timeout_s:
-                self._set_state(
-                    STATE_FAILED,
-                    REASON_TF_MISSING,
-                    "Required TF for start-zone localisation never became available.",
-                )
-            else:
-                self._set_state(
-                    STATE_SEARCHING,
-                    REASON_TF_MISSING,
-                    "Waiting for the map/tag or camera/base TF chain.",
-                )
-            self._stop_search_motion()
+        if self._handle_missing_tf(now_ns):
             self._publish_status(now_ns)
             return
 
-        self.lock_tracker.prune(now_ns - self.stable_window_ns)
-        self.lock_tracker.prune_future(now_ns)
-        latest_sample = self.lock_tracker.latest()
-        has_fresh_sample = self.lock_tracker.is_fresh(now_ns, self.max_sample_gap_ns)
-
-        if has_fresh_sample:
-            if self.state != STATE_CANDIDATE_LOCK:
-                self.candidate_entered_ns = now_ns
-            self._set_state(
-                STATE_CANDIDATE_LOCK,
-                REASON_UNSTABLE,
-                "Tag detected; waiting for a stable lock window.",
-            )
-            self._publish_search_cmd(
-                self.search_sign * self.candidate_alignment_angular_speed_rad_s
-            )
-
-            candidate_elapsed_ns = 0
-            if self.candidate_entered_ns is not None:
-                candidate_elapsed_ns = now_ns - self.candidate_entered_ns
-
-            if (
-                candidate_elapsed_ns >= int(self.candidate_settle_duration_s * 1e9)
-                and self.lock_tracker.has_stable_lock(
-                    now_ns=now_ns,
-                    window_ns=self.stable_window_ns,
-                    min_samples=self.stable_window_min_samples,
-                    max_gap_ns=self.max_sample_gap_ns,
-                    max_translation_spread_m=self.max_lock_translation_spread_m,
-                    max_yaw_spread_rad=self.max_lock_yaw_spread_rad,
-                )
-            ):
-                self._maybe_start_set_pose(now_ns)
-        else:
-            self.candidate_entered_ns = None
-            self.set_pose_attempt_started_ns = None
-            if latest_sample is not None:
-                self._set_state(
-                    STATE_SEARCHING,
-                    REASON_STALE,
-                    "Tag lock was lost before it became stable.",
-                )
-            else:
-                self._set_state(
-                    STATE_SEARCHING,
-                    REASON_SEARCHING,
-                    "Searching for the start-zone AprilTag.",
-                )
-
-            if self._should_fail_timeout(now_ns):
-                self._set_state(
-                    STATE_FAILED,
-                    REASON_TIMEOUT,
-                    "Timed out before a stable start-zone tag lock was achieved.",
-                )
-                self._stop_search_motion()
-            else:
-                self._publish_search_cmd(self.search_sign * self.angular_speed_rad_s)
-
+        self._handle_lock_tracking(now_ns)
         self._publish_status(now_ns)
 
 

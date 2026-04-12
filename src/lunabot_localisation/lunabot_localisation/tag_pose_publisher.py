@@ -2,10 +2,10 @@
 
 import math
 
-from apriltag_msgs.msg import AprilTagDetectionArray
 import rclpy
-import tf2_ros
 import tf2_geometry_msgs
+import tf2_ros
+from apriltag_msgs.msg import AprilTagDetectionArray
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, TransformStamped
 from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
@@ -90,6 +90,91 @@ class TagPosePublisher(Node):
 
         self.timer = self.create_timer(0.1, self.on_timer)
 
+    def _detection_metadata_ready(self) -> bool:
+        """Return whether the current TF sample has matching detection metadata."""
+        if self.latest_detection_stamp_ns is None:
+            self.get_logger().debug("Dropping tag detection without matching metadata")
+            return False
+        if self.latest_detection_hamming is None or self.latest_detection_margin is None:
+            self.get_logger().debug("Dropping tag detection with incomplete metadata")
+            return False
+        return True
+
+    def _metadata_allows_publication(self, detection_stamp_ns: int) -> bool:
+        """Return whether metadata and timing allow this tag sample to be used."""
+        if not self._detection_metadata_ready():
+            return False
+
+        detection_metadata_stamp_ns = self.latest_detection_stamp_ns
+        detection_hamming = self.latest_detection_hamming
+        detection_margin = self.latest_detection_margin
+        assert detection_metadata_stamp_ns is not None
+        assert detection_hamming is not None
+        assert detection_margin is not None
+
+        sync_error_sec = abs(detection_stamp_ns - detection_metadata_stamp_ns) / 1e9
+        if sync_error_sec > self.max_detection_sync_slop_sec:
+            self.get_logger().debug(
+                "Dropping unsynchronised tag detection "
+                f"(tf_vs_msg={sync_error_sec:.3f}s)"
+            )
+            return False
+
+        # Past this point the metadata and TF sample are aligned strongly enough
+        # that retries are no longer useful.
+        self.last_processed_stamp_ns = detection_stamp_ns
+
+        if detection_hamming > self.max_hamming:
+            self.get_logger().debug(
+                "Dropping low-quality tag detection "
+                f"(hamming={detection_hamming})"
+            )
+            return False
+
+        if detection_margin < self.min_decision_margin:
+            self.get_logger().debug(
+                "Dropping low-confidence tag detection "
+                f"(margin={detection_margin:.1f})"
+            )
+            return False
+
+        return True
+
+    def _age_allows_publication(self, detection_stamp_ns: int) -> bool:
+        """Return whether the tag sample is recent enough to trust."""
+        if detection_stamp_ns <= 0:
+            return True
+
+        now_ns = self.get_clock().now().nanoseconds
+        age_sec = (now_ns - detection_stamp_ns) / 1e9
+        if age_sec > self.max_detection_age_sec:
+            self.get_logger().debug(
+                f"Dropping stale tag detection (age={age_sec:.3f}s)"
+            )
+            return False
+        if age_sec < -0.05:
+            self.get_logger().debug(
+                f"Dropping future-dated tag detection (age={age_sec:.3f}s)"
+            )
+            return False
+        return True
+
+    def _should_log_correction(
+        self, pose_msg: PoseWithCovarianceStamped, yaw: float
+    ) -> bool:
+        """Return whether the current correction differs enough to report."""
+        if self.last_logged_pose is None:
+            return True
+
+        dx_log = pose_msg.pose.pose.position.x - self.last_logged_pose[0]
+        dy_log = pose_msg.pose.pose.position.y - self.last_logged_pose[1]
+        translation_delta = math.sqrt(dx_log * dx_log + dy_log * dy_log)
+        yaw_delta = abs(self._angle_delta(yaw, self.last_logged_pose[2]))
+        return (
+            translation_delta >= self.correction_log_min_translation_delta_m
+            or yaw_delta >= self.correction_log_min_yaw_delta_rad
+        )
+
     @staticmethod
     def _stamp_to_ns(stamp) -> int:
         return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
@@ -155,49 +240,11 @@ class TagPosePublisher(Node):
         if detection_stamp_ns == self.last_processed_stamp_ns:
             return
 
-        if self.latest_detection_stamp_ns is None:
-            self.get_logger().debug("Dropping tag detection without matching metadata")
+        if not self._metadata_allows_publication(detection_stamp_ns):
             return
 
-        sync_error_sec = abs(detection_stamp_ns - self.latest_detection_stamp_ns) / 1e9
-        if sync_error_sec > self.max_detection_sync_slop_sec:
-            self.get_logger().debug(
-                "Dropping unsynchronised tag detection "
-                f"(tf_vs_msg={sync_error_sec:.3f}s)"
-            )
+        if not self._age_allows_publication(detection_stamp_ns):
             return
-
-        # Past this point the metadata and TF sample are aligned strongly enough
-        # that retries are no longer useful.
-        self.last_processed_stamp_ns = detection_stamp_ns
-
-        if self.latest_detection_hamming > self.max_hamming:
-            self.get_logger().debug(
-                "Dropping low-quality tag detection "
-                f"(hamming={self.latest_detection_hamming})"
-            )
-            return
-
-        if self.latest_detection_margin < self.min_decision_margin:
-            self.get_logger().debug(
-                "Dropping low-confidence tag detection "
-                f"(margin={self.latest_detection_margin:.1f})"
-            )
-            return
-
-        if detection_stamp_ns > 0:
-            now_ns = self.get_clock().now().nanoseconds
-            age_sec = (now_ns - detection_stamp_ns) / 1e9
-            if age_sec > self.max_detection_age_sec:
-                self.get_logger().debug(
-                    f"Dropping stale tag detection (age={age_sec:.3f}s)"
-                )
-                return
-            if age_sec < -0.05:
-                self.get_logger().debug(
-                    f"Dropping future-dated tag detection (age={age_sec:.3f}s)"
-                )
-                return
 
         detected_tag_to_map = TransformStamped()
         detected_tag_to_map.header = map_to_tag.header
@@ -248,16 +295,7 @@ class TagPosePublisher(Node):
         self.pub.publish(msg)
         now_ns = self.get_clock().now().nanoseconds
         yaw = self._yaw_from_quaternion(msg.pose.pose.orientation)
-        should_log = self.last_logged_pose is None
-        if not should_log:
-            dx_log = msg.pose.pose.position.x - self.last_logged_pose[0]
-            dy_log = msg.pose.pose.position.y - self.last_logged_pose[1]
-            translation_delta = math.sqrt(dx_log * dx_log + dy_log * dy_log)
-            yaw_delta = abs(self._angle_delta(yaw, self.last_logged_pose[2]))
-            should_log = (
-                translation_delta >= self.correction_log_min_translation_delta_m
-                or yaw_delta >= self.correction_log_min_yaw_delta_rad
-            )
+        should_log = self._should_log_correction(msg, yaw)
 
         if (
             should_log
