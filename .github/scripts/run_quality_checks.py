@@ -9,8 +9,13 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BLOCKING_PYTHON_TARGETS = [
+BLOCKING_BASE_PYTHON_TARGETS = [
     ".github/scripts",
+]
+BLOCKING_STRICT_PYTHON_TARGETS = [
+    ".github/scripts",
+    "src/lunabot_control",
+    "src/lunabot_excavation",
 ]
 ADVISORY_PYTHON_TARGETS = [
     ".github/scripts",
@@ -25,7 +30,11 @@ BLOCKING_YAML_TARGETS = [
     ".pre-commit-config.yaml",
     ".yamllint.yml",
 ]
-COMPLEXITY_TARGETS = [
+BLOCKING_COMPLEXITY_TARGETS = [
+    "src/lunabot_control",
+    "src/lunabot_excavation",
+]
+ADVISORY_COMPLEXITY_TARGETS = [
     "tools",
     "src/lunabot_bringup",
     "src/lunabot_control",
@@ -46,7 +55,7 @@ def _blocking_commands() -> list[list[str]]:
             "-m",
             "ruff",
             "check",
-            *BLOCKING_PYTHON_TARGETS,
+            *BLOCKING_BASE_PYTHON_TARGETS,
             "--output-format",
             "concise",
             "--select",
@@ -54,8 +63,40 @@ def _blocking_commands() -> list[list[str]]:
             "--ignore",
             "E501",
         ],
-        [sys.executable, "-m", "ruff", "format", "--check", *BLOCKING_PYTHON_TARGETS],
+        [
+            sys.executable,
+            "-m",
+            "ruff",
+            "format",
+            "--check",
+            *BLOCKING_BASE_PYTHON_TARGETS,
+        ],
         [sys.executable, "-m", "yamllint", *BLOCKING_YAML_TARGETS],
+        [
+            sys.executable,
+            "-m",
+            "ruff",
+            "check",
+            *BLOCKING_STRICT_PYTHON_TARGETS,
+            "--output-format",
+            "concise",
+            "--select",
+            "I,B,UP,SIM,RET,ARG,PTH,RUF,C4",
+            "--ignore",
+            "B008",
+        ],
+        [
+            sys.executable,
+            "-m",
+            "xenon",
+            "--max-absolute",
+            "C",
+            "--max-modules",
+            "B",
+            "--max-average",
+            "B",
+            *BLOCKING_COMPLEXITY_TARGETS,
+        ],
     ]
 
 
@@ -85,7 +126,16 @@ def _advisory_commands() -> list[list[str]]:
             "B",
             "--max-average",
             "B",
-            *COMPLEXITY_TARGETS,
+            *ADVISORY_COMPLEXITY_TARGETS,
+        ],
+        [
+            sys.executable,
+            str(REPO_ROOT / ".github/scripts/audit_python_policies.py"),
+            "--paths",
+            "src/lunabot_bringup",
+            "src/lunabot_control",
+            "src/lunabot_excavation",
+            "src/lunabot_localisation",
         ],
     ]
 
