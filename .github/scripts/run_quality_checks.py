@@ -101,6 +101,16 @@ def _blocking_commands() -> list[list[str]]:
             "B",
             *BLOCKING_COMPLEXITY_TARGETS,
         ],
+        [sys.executable, "-m", "pyright"],
+        [
+            sys.executable,
+            str(REPO_ROOT / ".github/scripts/audit_python_policies.py"),
+            "--paths",
+            "src/lunabot_bringup",
+            "src/lunabot_control",
+            "src/lunabot_excavation",
+            "src/lunabot_localisation",
+        ],
     ]
 
 
@@ -119,7 +129,6 @@ def _advisory_commands() -> list[list[str]]:
             "--ignore",
             "B008",
         ],
-        [sys.executable, "-m", "pyright"],
         [
             sys.executable,
             "-m",
@@ -131,15 +140,6 @@ def _advisory_commands() -> list[list[str]]:
             "--max-average",
             "B",
             *ADVISORY_COMPLEXITY_TARGETS,
-        ],
-        [
-            sys.executable,
-            str(REPO_ROOT / ".github/scripts/audit_python_policies.py"),
-            "--paths",
-            "src/lunabot_bringup",
-            "src/lunabot_control",
-            "src/lunabot_excavation",
-            "src/lunabot_localisation",
         ],
     ]
 
