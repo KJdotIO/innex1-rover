@@ -292,13 +292,14 @@ class ExcavationActionServer(Node):
 
         response = self._call_trigger(self._home_client, 2.0)
         if response is None or not response.success:
+            elapsed = monotonic() - start_time
             return self._finish_goal(
                 goal_handle,
                 terminal_state="abort",
                 success=False,
                 reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
                 reason="Excavation home command was rejected",
-                duration_s=0.0,
+                duration_s=elapsed,
             )
 
         homing_result, elapsed = self._wait_for_ready_or_fault(
