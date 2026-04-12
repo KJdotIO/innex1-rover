@@ -149,9 +149,7 @@ def generate_launch_description():
     nav_params_path = _share_path("lunabot_navigation", "config", "nav2_params.yaml")
     blank_map_path = _share_path("lunabot_navigation", "maps", "moon_yard_blank.yaml")
     rviz_config_path = _share_path("lunabot_bringup", "rviz", "navigation.rviz")
-    twist_mux_params_path = _share_path(
-        "lunabot_bringup", "config", "twist_mux.yaml"
-    )
+    twist_mux_params_path = _share_path("lunabot_bringup", "config", "twist_mux.yaml")
     preflight_config_path = _share_path(
         "lunabot_bringup", "config", "preflight_checks.yaml"
     )
@@ -176,9 +174,7 @@ def generate_launch_description():
     enable_teleop = LaunchConfiguration("enable_teleop")
     enforce_preflight = LaunchConfiguration("enforce_preflight")
     preflight_config = LaunchConfiguration("preflight_config")
-    preflight_lidar_debug_config = LaunchConfiguration(
-        "preflight_lidar_debug_config"
-    )
+    preflight_lidar_debug_config = LaunchConfiguration("preflight_lidar_debug_config")
     joy_device_id = LaunchConfiguration("joy_device_id")
     localiser_cmd_vel_topic = _select_localiser_cmd_vel_topic(enable_teleop)
 
@@ -191,6 +187,28 @@ def generate_launch_description():
             "enable_apriltag_debug": enable_apriltag_debug,
             "cmd_vel_topic": localiser_cmd_vel_topic,
         }.items(),
+    )
+
+    depthimage_to_laserscan = Node(
+        package="depthimage_to_laserscan",
+        executable="depthimage_to_laserscan_node",
+        name="depthimage_to_laserscan",
+        output="screen",
+        parameters=[
+            {
+                "scan_height": 60,
+                "range_min": 0.3,
+                "range_max": 4.0,
+                "output_frame_id": "camera_front_link",
+                "scan_time": 0.067,
+                "use_sim_time": use_sim_time,
+            },
+        ],
+        remappings=[
+            ("depth", "/camera_front/depth_image"),
+            ("depth_camera_info", "/camera_front/camera_info"),
+            ("scan", "/depth_scan"),
+        ],
     )
 
     navigate_to_pose_gate = Node(
@@ -360,8 +378,7 @@ def generate_launch_description():
                 "lidar_costmap_phase",
                 default_value="false",
                 description=(
-                    "Use odom-only debug localisation with an identity "
-                    "map->odom TF."
+                    "Use odom-only debug localisation with an identity map->odom TF."
                 ),
             ),
             DeclareLaunchArgument(
@@ -383,9 +400,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "use_sim_time",
                 default_value="true",
-                description=(
-                    "Use /clock instead of wall time for all launched nodes."
-                ),
+                description=("Use /clock instead of wall time for all launched nodes."),
             ),
             DeclareLaunchArgument(
                 "enable_apriltag_debug",
@@ -398,9 +413,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "enable_teleop",
                 default_value="false",
-                description=(
-                    "Launch joystick teleoperation through twist_mux."
-                ),
+                description=("Launch joystick teleoperation through twist_mux."),
             ),
             DeclareLaunchArgument(
                 "enforce_preflight",
@@ -412,9 +425,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "preflight_config",
                 default_value=default_preflight_config,
-                description=(
-                    "Preflight config used for the normal launch-gate path."
-                ),
+                description=("Preflight config used for the normal launch-gate path."),
             ),
             DeclareLaunchArgument(
                 "preflight_lidar_debug_config",
@@ -426,13 +437,12 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "joy_device_id",
                 default_value="0",
-                description=(
-                    "SDL device index for the connected controller."
-                ),
+                description=("SDL device index for the connected controller."),
             ),
             map_server,
             map_lifecycle_manager,
             localisation_launch,
+            depthimage_to_laserscan,
             navigate_to_pose_gate,
             teleop_launch,
             twist_mux,

@@ -36,6 +36,7 @@
   <exec_depend>lunabot_excavation</exec_depend>
   <exec_depend>lunabot_simulation</exec_depend>
   <exec_depend>twist_mux</exec_depend>
+  <exec_depend>depthimage_to_laserscan</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
