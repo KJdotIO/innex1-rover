@@ -11,13 +11,15 @@ from lunabot_interfaces.action import Deposit
 
 def _material_server():
     server = object.__new__(MaterialActionServer)
-    server.get_parameter = lambda name: SimpleNamespace(
-        value={
+    def _parameter(name):
+        values = {
             "deposit_nominal_duration_s": 5.0,
             "loop_period_s": 0.2,
             "force_failure_action": "",
-        }[name]
-    )
+        }
+        return SimpleNamespace(value=values[name])
+
+    server.get_parameter = _parameter
     return server
 
 
