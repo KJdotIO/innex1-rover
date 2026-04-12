@@ -1,7 +1,6 @@
 """Behaviour tests for the start-zone stable-lock tracker."""
 
-from lunabot_localisation.start_zone_logic import PoseSample
-from lunabot_localisation.start_zone_logic import StableLockTracker
+from lunabot_localisation.start_zone_logic import PoseSample, StableLockTracker
 
 
 def _sample(stamp_ns: int, x: float, y: float, yaw: float) -> PoseSample:

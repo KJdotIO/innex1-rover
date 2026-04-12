@@ -1,7 +1,6 @@
 """Unit tests for localisation launch helper behaviour."""
 
-from importlib.util import module_from_spec
-from importlib.util import spec_from_file_location
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 import pytest
@@ -17,8 +16,9 @@ def _load_launch_module():
         Path(__file__).resolve().parents[1] / "launch" / "localisation.launch.py"
     )
     spec = spec_from_file_location("localisation_launch", module_path)
-    module = module_from_spec(spec)
+    assert spec is not None
     assert spec.loader is not None
+    module = module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
@@ -109,10 +109,14 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
         launch_module._validate_boolean_launch_arguments(context)
 
 
-def test_generate_launch_description_has_validation_and_one_tag_pose_node():
+def test_generate_launch_description_has_validation_and_one_tag_pose_node(
+    monkeypatch: pytest.MonkeyPatch,
+):
     launch_module = _load_launch_module()
-    launch_module.get_package_share_directory = (
-        lambda _package: "/tmp/lunabot_localisation"
+    monkeypatch.setattr(
+        launch_module,
+        "get_package_share_directory",
+        lambda _package: "/tmp/lunabot_localisation",
     )
     description = launch_module.generate_launch_description()
 
