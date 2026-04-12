@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from rclpy.action import GoalResponse
 
-from lunabot_control import material_action_server as material_module
+import lunabot_control.material_action_server as material_module
 from lunabot_control.material_action_server import MaterialActionServer
 from lunabot_interfaces.action import Deposit
 

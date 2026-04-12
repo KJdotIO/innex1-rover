@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from lunabot_bringup import mission_dry_run as dry_run_module
+import lunabot_bringup.mission_dry_run as dry_run_module
 from lunabot_bringup.mission_dry_run import (
     MissionDryRunHarness,
     dry_run_exit_code,

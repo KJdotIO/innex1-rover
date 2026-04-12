@@ -151,7 +151,10 @@ def main(args=None):
 
     try:
         if parsed.command == "status":
-            _print_status(node._wait_for_status(parsed.timeout))
+            status = node._wait_for_status(parsed.timeout)
+            if status is None:
+                raise RuntimeError("Timed out waiting for excavation status")
+            _print_status(status)
         elif parsed.command == "home":
             response = node._call_trigger(node._home_client, parsed.timeout)
             print(response.message)

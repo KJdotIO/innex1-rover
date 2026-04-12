@@ -10,8 +10,9 @@ from launch_ros.actions import Node
 def _load_launch_module():
     launch_path = Path(__file__).resolve().parents[1] / "launch" / "material_actions.launch.py"
     spec = importlib.util.spec_from_file_location("material_actions_launch", launch_path)
-    module = importlib.util.module_from_spec(spec)
+    assert spec is not None
     assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 

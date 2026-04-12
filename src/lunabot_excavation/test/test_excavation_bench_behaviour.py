@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lunabot_excavation import excavation_bench as bench_module
+import lunabot_excavation.excavation_bench as bench_module
 from lunabot_excavation.excavation_controller import (
     ActiveRun,
     ExcavationController,

@@ -2,10 +2,10 @@
   "include": [
     ".github/scripts",
     "tools",
-    "src/lunabot_bringup",
-    "src/lunabot_control",
-    "src/lunabot_excavation",
-    "src/lunabot_localisation"
+    "src/lunabot_bringup/lunabot_bringup",
+    "src/lunabot_control/lunabot_control",
+    "src/lunabot_excavation/lunabot_excavation",
+    "src/lunabot_localisation/lunabot_localisation"
   ],
   "exclude": [
     "**/__pycache__",
@@ -17,6 +17,7 @@
     "research",
     "src/external"
   ],
+  "stubPath": "typings",
   "typeCheckingMode": "basic",
   "reportMissingImports": false,
   "reportMissingModuleSource": false,
@@ -26,4 +27,3 @@
   "reportUntypedFunctionDecorator": false,
   "pythonVersion": "3.10"
 }
-
