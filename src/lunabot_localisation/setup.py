@@ -17,11 +17,17 @@ setup(
         (f"share/{package_name}", ["package.xml"]),
         (
             f"share/{package_name}/launch",
-            [str(path) for path in package_root.joinpath("launch").glob("*launch.[pxy][yma]*")],
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("launch").glob("*launch.[pxy][yma]*")
+            ],
         ),
         (
             f"share/{package_name}/config",
-            [str(path) for path in package_root.joinpath("config").glob("*.yaml")],
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("config").glob("*.yaml")
+            ],
         ),
     ],
     install_requires=["setuptools"],
