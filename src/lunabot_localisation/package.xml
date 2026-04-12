@@ -17,7 +17,6 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>rtabmap_ros</exec_depend>
   <exec_depend>rtabmap_slam</exec_depend>
-  <exec_depend>rtabmap_odom</exec_depend>
   <exec_depend>rtabmap_util</exec_depend>
   <exec_depend>apriltag_ros</exec_depend>
   <exec_depend>apriltag_msgs</exec_depend>

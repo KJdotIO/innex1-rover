@@ -1,6 +1,6 @@
-### Dual EKF Configuration ###
-# Local EKF: smooth odom -> base_footprint (continuous, never jumps)
-# Global EKF: map -> odom (jumps when AprilTag seen, corrects drift)
+### Local EKF Configuration ###
+# Smooth odom -> base_footprint from wheel odometry + IMU.
+# RTAB-Map handles the map -> odom correction; no global EKF needed.
 
 ekf_filter_node_odom:
   ros__parameters:
@@ -59,72 +59,3 @@ ekf_filter_node_odom:
         false,
         false,
       ]
-
-    # June baseline: local EKF only fuses wheel odom + IMU.
-    # Visual odometry stays out of the baseline until the gate is launched,
-    # tested, and explicitly chosen as part of the runtime story.
-
-ekf_filter_node_map:
-  ros__parameters:
-    use_sim_time: true
-    frequency: 50.0
-    sensor_timeout: 0.4
-    reset_on_time_jump: true
-    two_d_mode: true
-    smooth_lagged_data: true
-    history_length: 0.5
-    publish_acceleration: false
-    publish_tf: true
-
-    map_frame: map
-    odom_frame: odom
-    base_link_frame: base_footprint
-    world_frame: map
-
-    # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
-
-    # Continuous motion source from local EKF (odom -> base_footprint)
-    # Keep global EKF lightweight: local filtered odom + intermittent tag pose.
-    odom0: /odometry/local
-    odom0_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-      ]
-
-    # AprilTag pose correction (discontinuous, only in global EKF)
-    pose0: /tag_pose
-    pose0_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-      ]
-    pose0_differential: false
-    pose0_relative: false
-    pose0_rejection_threshold: 4.0

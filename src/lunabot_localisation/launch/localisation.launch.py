@@ -81,7 +81,6 @@ def _validate_boolean_launch_arguments(context):
     """Reject invalid boolean-style launch argument values early."""
     for argument_name in (
         "lidar_costmap_phase",
-        "enable_visual_slam",
         "use_sim_time",
         "enable_apriltag_debug",
     ):
@@ -96,14 +95,12 @@ def generate_launch_description():
     """
     Generate a launch description for the localisation stack.
 
-    Start the local EKF in all modes, optionally publish the debug identity
-    map->odom transform, and enable AprilTag/global EKF nodes by default.
-    RTAB-Map remains available behind an explicit launch argument for
-    experimentation, but raw visual odometry is not fused into the June
-    baseline EKFs.
+    Local EKF provides odom -> base_footprint from wheel odometry + IMU.
+    RTAB-Map SLAM provides map -> odom correction via RGB-D loop closure
+    and AprilTag landmarks. The global EKF has been removed; RTAB-Map
+    handles drift correction directly.
     """
     rtabmap_yaml = _config_path("config", "rtabmap.yaml")
-    ekf_yaml = _config_path("config", "ekf.yaml")
     ekf_lidar_phase_yaml = _config_path("config", "ekf_lidar_phase.yaml")
     apriltag_yaml = _config_path("config", "apriltag.yaml")
     tag_pose_bridge_yaml = _config_path("config", "tag_pose_bridge.yaml")
@@ -113,7 +110,6 @@ def generate_launch_description():
         "start_zone_localisation.yaml",
     )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
-    enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
@@ -122,15 +118,7 @@ def generate_launch_description():
     tag_map_z = LaunchConfiguration("tag_map_z")
     tag_map_yaw = LaunchConfiguration("tag_map_yaw")
 
-    visual_slam_condition = IfCondition(
-        PythonExpression(
-            [
-                _is_falsey(lidar_costmap_phase),
-                " and ",
-                _is_truthy(enable_visual_slam),
-            ]
-        )
-    )
+    normal_mode = IfCondition(_is_falsey(lidar_costmap_phase))
     apriltag_debug_condition = IfCondition(
         PythonExpression(
             [
@@ -152,75 +140,67 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "lidar_costmap_phase",
                 default_value="false",
-                description="Use odom-only debug localisation with an identity map->odom TF.",
-            ),
-            DeclareLaunchArgument(
-                "enable_visual_slam",
-                default_value="false",
                 description=(
-                    "Optionally enable RTAB-Map odometry and mapping for "
-                    "experimentation; the June EKF baseline does not fuse VO."
+                    "Use odom-only debug localisation with an identity map->odom TF."
                 ),
             ),
             DeclareLaunchArgument(
                 "use_sim_time",
                 default_value="true",
-                description="Use /clock instead of wall time for all launched nodes.",
+                description=("Use /clock instead of wall time for all launched nodes."),
             ),
             DeclareLaunchArgument(
                 "enable_apriltag_debug",
                 default_value="false",
                 description=(
-                    "Launch the apriltag_draw overlay for annotated front camera "
-                    "debugging."
+                    "Launch the apriltag_draw overlay for annotated front "
+                    "camera debugging."
                 ),
             ),
             DeclareLaunchArgument(
                 "cmd_vel_topic",
                 default_value="cmd_vel",
-                description="Velocity command topic used by the start-zone localiser.",
+                description=(
+                    "Velocity command topic used by the start-zone localiser."
+                ),
             ),
             DeclareLaunchArgument(
                 "tag_map_x",
                 default_value="0.0",
-                description="Configured map-frame x position of the start-zone tag.",
+                description=("Configured map-frame x position of the start-zone tag."),
             ),
             DeclareLaunchArgument(
                 "tag_map_y",
                 default_value="1.08",
-                description="Configured map-frame y position of the start-zone tag.",
+                description=("Configured map-frame y position of the start-zone tag."),
             ),
             DeclareLaunchArgument(
                 "tag_map_z",
                 default_value="0.25",
-                description="Configured map-frame z position of the start-zone tag.",
+                description=("Configured map-frame z position of the start-zone tag."),
             ),
             DeclareLaunchArgument(
                 "tag_map_yaw",
                 default_value="0.0",
-                description="Configured map-frame yaw of the start-zone tag.",
+                description=("Configured map-frame yaw of the start-zone tag."),
             ),
             OpaqueFunction(function=_validate_boolean_launch_arguments),
-            Node(
-                package="rtabmap_odom",
-                executable="rgbd_odometry",
-                name="rgbd_odometry",
-                output="screen",
-                parameters=[rtabmap_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[*camera_remappings, ("odom", "/visual_odometry")],
-                condition=visual_slam_condition,
-            ),
+            # --- Local EKF: odom -> base_footprint ---
             Node(
                 package="robot_localization",
                 executable="ekf_node",
                 name="ekf_filter_node_odom",
                 output="screen",
-                parameters=[ekf_lidar_phase_yaml, {"use_sim_time": use_sim_time}],
+                parameters=[
+                    ekf_lidar_phase_yaml,
+                    {"use_sim_time": use_sim_time},
+                ],
                 remappings=[
                     ("odometry/filtered", "/odometry/local"),
                     ("set_pose", "/ekf_filter_node_odom/set_pose"),
                 ],
             ),
+            # --- Debug: identity map -> odom for costmap-only testing ---
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
@@ -244,45 +224,50 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(_is_truthy(lidar_costmap_phase)),
             ),
-            Node(
-                package="robot_localization",
-                executable="ekf_node",
-                name="ekf_filter_node_map",
-                output="screen",
-                parameters=[ekf_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[
-                    ("odometry/filtered", "/odometry/global"),
-                    ("set_pose", "/ekf_filter_node_map/set_pose"),
-                ],
-                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
-            ),
+            # --- RTAB-Map SLAM: map -> odom via loop closure ---
             Node(
                 package="rtabmap_slam",
                 executable="rtabmap",
                 name="rtabmap",
                 output="screen",
-                parameters=[rtabmap_yaml, {"use_sim_time": use_sim_time}],
-                remappings=[*camera_remappings, ("odom", "/odometry/local")],
+                parameters=[
+                    rtabmap_yaml,
+                    {"use_sim_time": use_sim_time},
+                ],
+                remappings=[
+                    *camera_remappings,
+                    ("odom", "/odometry/local"),
+                    ("tag_detections", "/camera_front/tags"),
+                ],
                 arguments=["-d"],
-                condition=visual_slam_condition,
+                condition=normal_mode,
             ),
+            # --- AprilTag detector ---
             Node(
                 package="apriltag_ros",
                 executable="apriltag_node",
                 name="apriltag",
                 output="screen",
-                parameters=[apriltag_yaml, {"use_sim_time": use_sim_time}],
+                parameters=[
+                    apriltag_yaml,
+                    {"use_sim_time": use_sim_time},
+                ],
                 remappings=[
                     ("image_rect", "/camera_front/image"),
                     ("camera_info", "/camera_front/camera_info"),
                     ("detections", "/camera_front/tags"),
                 ],
-                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
+                condition=normal_mode,
             ),
+            # --- AprilTag debug overlay (optional) ---
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     PathJoinSubstitution(
-                        [FindPackageShare("apriltag_draw"), "launch", "draw.launch.py"]
+                        [
+                            FindPackageShare("apriltag_draw"),
+                            "launch",
+                            "draw.launch.py",
+                        ]
                     )
                 ),
                 launch_arguments={
@@ -293,6 +278,7 @@ def generate_launch_description():
                 }.items(),
                 condition=apriltag_debug_condition,
             ),
+            # --- Static TF: map -> tag (known arena placement) ---
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
@@ -314,8 +300,9 @@ def generate_launch_description():
                     "--child-frame-id",
                     "tag36h11:0",
                 ],
-                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
+                condition=normal_mode,
             ),
+            # --- Tag pose bridge: publishes /tag_pose for diagnostics ---
             Node(
                 package="lunabot_localisation",
                 executable="tag_pose_publisher",
@@ -332,8 +319,9 @@ def generate_launch_description():
                         "detections_topic": "/camera_front/tags",
                     },
                 ],
-                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
+                condition=normal_mode,
             ),
+            # --- Start-zone localiser: tag search + readiness gate ---
             Node(
                 package="lunabot_localisation",
                 executable="start_zone_localiser",
@@ -346,7 +334,7 @@ def generate_launch_description():
                         "cmd_vel_topic": cmd_vel_topic,
                     },
                 ],
-                condition=IfCondition(_is_falsey(lidar_costmap_phase)),
+                condition=normal_mode,
             ),
         ]
     )

@@ -4,7 +4,6 @@
     cmd_vel_topic: cmd_vel
     odometry_topic: /odometry/local
     tag_pose_topic: /tag_pose
-    set_pose_service: /ekf_filter_node_map/set_pose
     map_frame: map
     tag_frame: tag36h11:0
     camera_frame: camera_front_optical_frame
@@ -21,5 +20,3 @@
     max_lock_translation_spread_m: 0.15
     max_lock_yaw_spread_rad: 0.20
     tf_missing_timeout_s: 5.0
-    set_pose_service_wait_s: 0.1
-    set_pose_timeout_s: 5.0
