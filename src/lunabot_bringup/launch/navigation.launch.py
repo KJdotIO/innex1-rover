@@ -170,6 +170,7 @@ def generate_launch_description():
     )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
+    local_odometry_backend = LaunchConfiguration("local_odometry_backend")
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
@@ -187,6 +188,7 @@ def generate_launch_description():
         launch_arguments={
             "lidar_costmap_phase": lidar_costmap_phase,
             "enable_visual_slam": enable_visual_slam,
+            "local_odometry_backend": local_odometry_backend,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
             "cmd_vel_topic": localiser_cmd_vel_topic,
@@ -370,6 +372,14 @@ def generate_launch_description():
                 description=(
                     "Optionally enable RTAB-Map odometry and mapping for "
                     "experimentation; the June EKF baseline does not fuse VO."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "local_odometry_backend",
+                default_value="ekf",
+                description=(
+                    "Continuous local odometry backend. Use 'ekf' for wheel "
+                    "odom or 'lio' for Point-LIO."
                 ),
             ),
             DeclareLaunchArgument(

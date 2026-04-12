@@ -19,6 +19,7 @@ from launch_ros.substitutions import FindPackageShare
 
 TRUTHY_VALUES = ("1", "true", "yes", "on")
 FALSEY_VALUES = ("0", "false", "no", "off")
+LOCAL_ODOMETRY_BACKENDS = ("ekf", "lio")
 
 
 def _config_path(*parts: str) -> str:
@@ -38,6 +39,17 @@ def _normalise_bool_text(value, argument_name=None):
             f"got '{value}'."
         )
     raise ValueError(f"Expected a boolean-style launch value, got '{value}'.")
+
+
+def _normalise_choice_text(value, valid_values, argument_name):
+    """Return a normalised choice string or raise on invalid input."""
+    normalised = str(value).strip().lower()
+    if normalised in valid_values:
+        return normalised
+    choices = ", ".join(valid_values)
+    raise ValueError(
+        f"Expected one of {{{choices}}} for '{argument_name}', got '{value}'."
+    )
 
 
 def _is_truthy(value):
@@ -77,6 +89,21 @@ def _tag_pose_bridge_config(use_sim_time, sim_config, hardware_config):
     )
 
 
+def _lio_config_path(use_sim_time, sim_config, hardware_config):
+    """Return the correct Point-LIO config for sim or hardware bring-up."""
+    return PythonExpression(
+        [
+            "'",
+            sim_config,
+            "' if ",
+            _is_truthy(use_sim_time),
+            " else '",
+            hardware_config,
+            "'",
+        ]
+    )
+
+
 def _validate_boolean_launch_arguments(context):
     """Reject invalid boolean-style launch argument values early."""
     for argument_name in (
@@ -89,6 +116,11 @@ def _validate_boolean_launch_arguments(context):
             LaunchConfiguration(argument_name).perform(context),
             argument_name=argument_name,
         )
+    _normalise_choice_text(
+        LaunchConfiguration("local_odometry_backend").perform(context),
+        LOCAL_ODOMETRY_BACKENDS,
+        "local_odometry_backend",
+    )
     return []
 
 
@@ -112,10 +144,17 @@ def generate_launch_description():
         "config",
         "start_zone_localisation.yaml",
     )
+    lio_sim_yaml = PathJoinSubstitution(
+        [FindPackageShare("point_lio"), "config", "marsim.yaml"]
+    )
+    lio_hardware_yaml = PathJoinSubstitution(
+        [FindPackageShare("point_lio"), "config", "lunabot_ouster.yaml"]
+    )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    local_odometry_backend = LaunchConfiguration("local_odometry_backend")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     tag_map_x = LaunchConfiguration("tag_map_x")
     tag_map_y = LaunchConfiguration("tag_map_y")
@@ -137,6 +176,26 @@ def generate_launch_description():
                 _is_falsey(lidar_costmap_phase),
                 " and ",
                 _is_truthy(enable_apriltag_debug),
+            ]
+        )
+    )
+    local_ekf_condition = IfCondition(
+        PythonExpression(
+            [
+                _is_falsey(lidar_costmap_phase),
+                " and '",
+                local_odometry_backend,
+                "' == 'ekf'",
+            ]
+        )
+    )
+    lio_condition = IfCondition(
+        PythonExpression(
+            [
+                _is_falsey(lidar_costmap_phase),
+                " and '",
+                local_odometry_backend,
+                "' == 'lio'",
             ]
         )
     )
@@ -173,6 +232,14 @@ def generate_launch_description():
                 description=(
                     "Launch the apriltag_draw overlay for annotated front camera "
                     "debugging."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "local_odometry_backend",
+                default_value="ekf",
+                description=(
+                    "Continuous odometry backend. 'ekf' keeps the wheel-odom "
+                    "+ IMU baseline; 'lio' launches Point-LIO."
                 ),
             ),
             DeclareLaunchArgument(
@@ -220,6 +287,24 @@ def generate_launch_description():
                     ("odometry/filtered", "/odometry/local"),
                     ("set_pose", "/ekf_filter_node_odom/set_pose"),
                 ],
+                condition=local_ekf_condition,
+            ),
+            Node(
+                package="point_lio",
+                executable="pointlio_mapping",
+                name="pointlio_mapping",
+                output="screen",
+                parameters=[
+                    _lio_config_path(use_sim_time, lio_sim_yaml, lio_hardware_yaml),
+                    {
+                        "use_sim_time": use_sim_time,
+                        "odom_only": True,
+                        "odom_header_frame_id": "odom",
+                        "odom_child_frame_id": "base_footprint",
+                        "odometry.topic": "/odometry/local",
+                    },
+                ],
+                condition=lio_condition,
             ),
             Node(
                 package="tf2_ros",

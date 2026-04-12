@@ -97,6 +97,25 @@ def test_tag_pose_bridge_config_switches_between_sim_and_hardware_yaml():
     assert hardware_result.perform(context) == "/tmp/tag_pose_bridge.yaml"
 
 
+def test_lio_config_path_switches_between_sim_and_hardware_yaml():
+    launch_module = _load_launch_module()
+    context = LaunchContext()
+
+    sim_result = launch_module._lio_config_path(
+        "true",
+        "/tmp/marsim.yaml",
+        "/tmp/lunabot_ouster.yaml",
+    )
+    hardware_result = launch_module._lio_config_path(
+        "off",
+        "/tmp/marsim.yaml",
+        "/tmp/lunabot_ouster.yaml",
+    )
+
+    assert sim_result.perform(context) == "/tmp/marsim.yaml"
+    assert hardware_result.perform(context) == "/tmp/lunabot_ouster.yaml"
+
+
 def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     launch_module = _load_launch_module()
     context = LaunchContext()
@@ -104,8 +123,22 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     context.launch_configurations["enable_visual_slam"] = "false"
     context.launch_configurations["use_sim_time"] = "true"
     context.launch_configurations["enable_apriltag_debug"] = "false"
+    context.launch_configurations["local_odometry_backend"] = "ekf"
 
     with pytest.raises(ValueError, match="lidar_costmap_phase"):
+        launch_module._validate_boolean_launch_arguments(context)
+
+
+def test_validate_boolean_launch_arguments_rejects_invalid_backend():
+    launch_module = _load_launch_module()
+    context = LaunchContext()
+    context.launch_configurations["lidar_costmap_phase"] = "false"
+    context.launch_configurations["enable_visual_slam"] = "false"
+    context.launch_configurations["use_sim_time"] = "true"
+    context.launch_configurations["enable_apriltag_debug"] = "false"
+    context.launch_configurations["local_odometry_backend"] = "voodoo"
+
+    with pytest.raises(ValueError, match="local_odometry_backend"):
         launch_module._validate_boolean_launch_arguments(context)
 
 
@@ -131,9 +164,16 @@ def test_generate_launch_description_has_validation_and_one_tag_pose_node(
         if isinstance(entity, Node)
         and entity.__dict__.get("_Node__node_name") == "tag_pose_publisher"
     ]
+    pointlio_nodes = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__node_name") == "pointlio_mapping"
+    ]
 
     assert len(validators) == 1
     assert len(tag_pose_publishers) == 1
+    assert len(pointlio_nodes) == 1
 
 
 @pytest.mark.parametrize("config_name", ["ekf.yaml", "ekf_lidar_phase.yaml"])

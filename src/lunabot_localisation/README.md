@@ -20,10 +20,22 @@ continuously correct the global EKF while the rover is driving. RTAB-Map can
 still be launched for experimentation, but raw visual odometry is not fused
 into the EKFs as part of the June baseline.
 
+For backend testing, `launch/localisation.launch.py` now supports:
+
+- `local_odometry_backend:=ekf` for the wheel-odom + IMU baseline
+- `local_odometry_backend:=lio` for the Point-LIO path
+
+The LIO backend uses a rover-specific sim config when `use_sim_time:=true`
+and a hardware-oriented Ouster config otherwise.
+
 ## Key files
 
 - `config/ekf.yaml`: EKF fusion and frame configuration.
 - `launch/localisation.launch.py`: localisation bring-up path.
+- `../external/point_lio/config/marsim.yaml`: Point-LIO sim config for the
+  Gazebo Ouster bridge.
+- `../external/point_lio/config/lunabot_ouster.yaml`: Point-LIO hardware
+  placeholder config for the real Ouster path.
 - `lunabot_localisation/tag_pose_publisher.py`: bridge from tag detections to bounded pose seeding / recovery inputs.
 
 ## Common failure modes

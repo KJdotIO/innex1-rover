@@ -1,0 +1,63 @@
+/**:
+  ros__parameters:
+    common:
+      lid_topic: "/ouster/points"
+      imu_topic: "/imu/data_raw"
+      con_frame: false
+      con_frame_num: 1
+      cut_frame: false
+      cut_frame_time_interval: 0.1
+      time_lag_imu_to_lidar: 0.0
+
+    preprocess:
+      lidar_type: 6
+      scan_line: 32
+      scan_rate: 10
+      timestamp_unit: 1
+      blind: 0.2
+
+    mapping:
+      imu_en: true
+      start_in_aggressive_motion: false
+      extrinsic_est_en: false
+      imu_time_inte: 0.01
+      satu_acc: 30.0
+      satu_gyro: 35.0
+      acc_norm: 9.81
+      lidar_meas_cov: 0.1
+      acc_cov_output: 500.0
+      gyr_cov_output: 1000.0
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      imu_meas_acc_cov: 0.1
+      imu_meas_omg_cov: 0.1
+      gyr_cov_input: 0.01
+      acc_cov_input: 0.1
+      plane_thr: 0.1
+      match_s: 81.0
+      fov_degree: 180.0
+      det_range: 30.0
+      gravity_align: true
+      gravity: [0.0, 0.0, -9.81]
+      gravity_init: [0.0, 0.0, -9.81]
+      # Sim Leo IMU sits at (0.0628, -0.0314, -0.0393) in base_link and the
+      # simulated Ouster sits at (0.0, 0.0, 0.12), so lidar-in-IMU is:
+      # (-0.0628, 0.0314, 0.1593).
+      extrinsic_T: [-0.0628, 0.0314, 0.1593]
+      extrinsic_R: [1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0]
+
+    odometry:
+      topic: "/odometry/local"
+      publish_odometry_without_downsample: false
+
+    publish:
+      path_en: true
+      scan_publish_en: true
+      scan_bodyframe_pub_en: false
+      publish_tf: true
+
+    pcd_save:
+      pcd_save_en: false
+      interval: -1

@@ -25,6 +25,7 @@ def generate_launch_description():
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    local_odometry_backend = LaunchConfiguration("local_odometry_backend")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -35,6 +36,7 @@ def generate_launch_description():
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
+            "local_odometry_backend": local_odometry_backend,
             "cmd_vel_topic": cmd_vel_topic,
         }.items(),
     )
@@ -64,6 +66,14 @@ def generate_launch_description():
                 description=(
                     "Launch the apriltag_draw overlay for annotated front camera "
                     "debugging."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "local_odometry_backend",
+                default_value="ekf",
+                description=(
+                    "Continuous local odometry backend. Use 'ekf' for the "
+                    "wheel-odom baseline or 'lio' for Point-LIO."
                 ),
             ),
             DeclareLaunchArgument(
