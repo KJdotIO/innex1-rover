@@ -337,8 +337,4 @@ def main(args=None):
             executor.shutdown()
         if node is not None:
             node.destroy_node()
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:  # pragma: no cover - shutdown can already be in progress
-            pass
+        rclpy.try_shutdown()

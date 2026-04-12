@@ -220,7 +220,7 @@ class MissionDryRunHarness(Node):
             detail = "runtime preflight failed"
             self.get_logger().error(detail)
             return False, detail
-        except Exception as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
             detail = f"runtime preflight error: {exc}"
             self.get_logger().error(detail)
             return False, detail

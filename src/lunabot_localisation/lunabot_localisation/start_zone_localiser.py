@@ -407,9 +407,7 @@ class StartZoneLocaliser(Node):
                 self._stop_search_motion()
             return True
 
-        try:
-            self.pending_set_pose_future.result()
-        except Exception as exc:  # pragma: no cover - defensive path
+        if (exc := self.pending_set_pose_future.exception()) is not None:
             self._set_state(
                 STATE_FAILED,
                 REASON_SET_POSE_FAILED,
@@ -461,8 +459,7 @@ class StartZoneLocaliser(Node):
             self._stop_search_motion()
             return True
 
-        with suppress(Exception):  # pragma: no cover - discarded result only
-            self.discarded_set_pose_future.result()
+        self.discarded_set_pose_future.exception()
 
         self.discarded_set_pose_future = None
         self.discarded_set_pose_started_ns = None
@@ -629,8 +626,4 @@ def main(args=None) -> None:
             executor.shutdown()
         if node is not None:
             node.destroy_node()
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:  # pragma: no cover - shutdown can already be in progress
-            pass
+        rclpy.try_shutdown()
