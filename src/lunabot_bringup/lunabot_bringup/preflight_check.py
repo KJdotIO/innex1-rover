@@ -674,13 +674,13 @@ def main(args: list[str] | None = None) -> None:
         raise SystemExit(_exit_code(results))
     except SystemExit:
         raise
-    except Exception as exc:
+    except (OSError, ValueError, RuntimeError, yaml.YAMLError) as exc:
         print(f"Preflight checker internal error: {exc}")
         raise SystemExit(EXIT_INTERNAL_ERROR) from exc
     finally:
         if checker is not None:
             checker.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

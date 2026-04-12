@@ -133,11 +133,10 @@ class NavigateToPoseGate(Node):
 
         while rclpy.ok():
             if done.wait(timeout=0.05):
-                try:
-                    return future.result()
-                except Exception as exc:  # pragma: no cover - defensive logging
+                if (exc := future.exception()) is not None:
                     self.get_logger().error(f"NavigateToPose gate future failed: {exc}")
                     return None
+                return future.result()
 
             if (
                 goal_handle is not None
@@ -268,8 +267,4 @@ def main(args=None) -> None:
     finally:
         executor.shutdown()
         node.destroy_node()
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:  # pragma: no cover - shutdown can already be in progress
-            pass
+        rclpy.try_shutdown()
