@@ -12,6 +12,7 @@ def _relative_matches(pattern: str) -> list[str]:
         str(path.relative_to(package_root)) for path in package_root.glob(pattern)
     )
 
+
 setup(
     name=package_name,
     version="0.0.0",
