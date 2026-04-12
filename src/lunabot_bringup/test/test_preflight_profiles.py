@@ -1,8 +1,10 @@
 """Unit tests for phase-scoped preflight filtering and CLI helpers."""
 
 import argparse
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -11,6 +13,7 @@ from lunabot_bringup.preflight_check import (
     ACTION_TYPE_MAP,
     DURABILITY_MAP,
     RELIABILITY_MAP,
+    _merge_contract_requirements,
     _parse_bool_text,
     _parse_qos_policy,
     _strip_ros_cli_args,
@@ -225,3 +228,62 @@ def test_parse_qos_policy_accepts_known_value():
         )
         == DURABILITY_MAP["transient_local"]
     )
+
+
+def test_parse_qos_policy_rejects_unknown_durability_value():
+    with pytest.raises(ValueError, match="Unsupported durability policy"):
+        _parse_qos_policy(
+            "persistent",
+            DURABILITY_MAP,
+            field_name="durability",
+        )
+
+
+def test_merge_contract_requirements_ignores_malformed_existing_entries(
+    tmp_path, monkeypatch
+):
+    contract_path = tmp_path / "contracts" / "interfaces.json"
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_text(
+        json.dumps(
+            {
+                "topics": [
+                    {
+                        "kind": "publisher",
+                        "name": "/imu/data_raw",
+                        "type": "sensor_msgs/msg/Imu",
+                    }
+                ],
+                "tf_links": [
+                    {
+                        "parent": "map",
+                        "child": "base_link",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = {
+        "preflight": {
+            "required_topics": ["bad-topic-entry"],
+            "required_tf_links": ["bad-tf-entry"],
+        }
+    }
+    logger = SimpleNamespace(info=lambda _msg: None, warning=lambda _msg: None)
+
+    monkeypatch.setattr(
+        "lunabot_bringup.preflight_check._repo_contract_path",
+        lambda: contract_path,
+    )
+
+    merged = _merge_contract_requirements(config, logger)
+
+    assert merged["preflight"]["required_topics"][1]["name"] == "/imu/data_raw"
+    assert merged["preflight"]["required_tf_links"][1] == {
+        "parent": "map",
+        "child": "base_link",
+        "critical": True,
+        "phases": None,
+    }

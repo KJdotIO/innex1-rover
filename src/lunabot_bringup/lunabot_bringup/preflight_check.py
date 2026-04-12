@@ -119,7 +119,11 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         return config
 
     topics = preflight.setdefault("required_topics", [])
-    topic_keys = dict.fromkeys((item.get("name"), item.get("type")) for item in topics)
+    topic_keys = dict.fromkeys(
+        (item.get("name"), item.get("type"))
+        for item in topics
+        if isinstance(item, dict)
+    )
     for item in contract.get("topics", []):
         if not isinstance(item, dict):
             continue
@@ -141,7 +145,11 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         topic_keys[key] = None
 
     tf_links = preflight.setdefault("required_tf_links", [])
-    tf_keys = dict.fromkeys((item.get("parent"), item.get("child")) for item in tf_links)
+    tf_keys = dict.fromkeys(
+        (item.get("parent"), item.get("child"))
+        for item in tf_links
+        if isinstance(item, dict)
+    )
     for item in contract.get("tf_links", []):
         if not isinstance(item, dict):
             continue
@@ -295,7 +303,7 @@ class PreflightChecker(Node):
         received = {"count": 0}
         qos = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
-            depth=10,
+            depth=max(10, min_messages),
             reliability=reliability,
             durability=durability,
         )
