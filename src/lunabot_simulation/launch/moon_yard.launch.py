@@ -115,7 +115,10 @@ def generate_launch_description():
         package="ros_gz_bridge",
         executable="parameter_bridge",
         name="clock_bridge",
-        arguments=["/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock"],
+        arguments=["/world/moon_yard/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock"],
+        remappings=[
+            ("/world/moon_yard/clock", "/clock"),
+        ],
         output="screen",
     )
 
