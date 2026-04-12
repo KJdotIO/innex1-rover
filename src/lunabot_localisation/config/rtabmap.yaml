@@ -29,7 +29,7 @@ rtabmap:
     Grid/CellSize: "0.05"
     Grid/FromDepth: "true"
     Grid/3D: "true"
-    Grid/Sensor: "2"
+    Grid/Sensor: "0"
     Grid/MaxGroundAngle: "30"
     Grid/MinGroundHeight: "-0.05"
     Grid/MaxGroundHeight: "0.10"
