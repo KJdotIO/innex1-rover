@@ -1,16 +1,15 @@
 """Gate visual odometry before it is fused into the EKFs."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 import rclpy
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rtabmap_msgs.msg import OdomInfo
 from std_msgs.msg import Bool
-from geometry_msgs.msg import Twist
 
 
 @dataclass
@@ -54,7 +53,9 @@ class VisualOdometryGate(Node):
 
         self.min_inliers = int(self.get_parameter("min_inliers").value)
         self.min_matches = int(self.get_parameter("min_matches").value)
-        self.max_position_variance = float(self.get_parameter("max_position_variance").value)
+        self.max_position_variance = float(
+            self.get_parameter("max_position_variance").value
+        )
         self.max_yaw_variance = float(self.get_parameter("max_yaw_variance").value)
         self.odom_info_timeout = Duration(
             seconds=float(self.get_parameter("odom_info_timeout_sec").value)
@@ -63,8 +64,8 @@ class VisualOdometryGate(Node):
             seconds=float(self.get_parameter("transition_log_interval_sec").value)
         )
 
-        self.latest_info: Optional[OdomInfo] = None
-        self.latest_health: Optional[HealthSnapshot] = None
+        self.latest_info: OdomInfo | None = None
+        self.latest_health: HealthSnapshot | None = None
         self.last_transition_log_time = None
         self.is_moving = False
 
@@ -122,20 +123,16 @@ class VisualOdometryGate(Node):
         if self.should_log_transition(snapshot):
             motion_state = "moving" if snapshot.moving else "stationary"
             self.get_logger().warn(
-                (
-                    "VO %s: reason=%s inliers=%d matches=%d features=%d "
-                    "pos_var=%.3f yaw_var=%.3f cmd=%s"
-                )
-                % (
-                    "HEALTHY" if snapshot.healthy else "UNHEALTHY",
-                    snapshot.reason,
-                    snapshot.inliers,
-                    snapshot.matches,
-                    snapshot.features,
-                    snapshot.position_variance,
-                    snapshot.yaw_variance,
-                    motion_state,
-                )
+                "VO %s: reason=%s inliers=%d matches=%d features=%d "
+                "pos_var=%.3f yaw_var=%.3f cmd=%s",
+                "HEALTHY" if snapshot.healthy else "UNHEALTHY",
+                snapshot.reason,
+                snapshot.inliers,
+                snapshot.matches,
+                snapshot.features,
+                snapshot.position_variance,
+                snapshot.yaw_variance,
+                motion_state,
             )
             self.last_transition_log_time = self.get_clock().now()
 
@@ -166,13 +163,11 @@ class VisualOdometryGate(Node):
             )
             if self.should_log_transition(snapshot):
                 self.get_logger().warn(
-                    "VO UNHEALTHY: reason=%s last_inliers=%d last_matches=%d cmd=%s"
-                    % (
-                        snapshot.reason,
-                        snapshot.inliers,
-                        snapshot.matches,
-                        "moving" if snapshot.moving else "stationary",
-                    )
+                    "VO UNHEALTHY: reason=%s last_inliers=%d last_matches=%d cmd=%s",
+                    snapshot.reason,
+                    snapshot.inliers,
+                    snapshot.matches,
+                    "moving" if snapshot.moving else "stationary",
                 )
                 self.last_transition_log_time = now
             self.latest_health = snapshot

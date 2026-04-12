@@ -1,19 +1,30 @@
-import os
-from launch.actions import DeclareLaunchArgument
-from launch.actions import OpaqueFunction
+from pathlib import Path
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import (
+    LaunchConfiguration,
+    PathJoinSubstitution,
+    PythonExpression,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from launch.actions import IncludeLaunchDescription
-from ament_index_python.packages import get_package_share_directory
-
 
 TRUTHY_VALUES = ("1", "true", "yes", "on")
 FALSEY_VALUES = ("0", "false", "no", "off")
+
+
+def _config_path(*parts: str) -> str:
+    """Return a localisation package path as a string for launch parameters."""
+    package_root = Path(get_package_share_directory("lunabot_localisation"))
+    return str(package_root.joinpath(*parts))
 
 
 def _normalise_bool_text(value, argument_name=None):
@@ -26,9 +37,7 @@ def _normalise_bool_text(value, argument_name=None):
             f"Expected a boolean-style launch value for '{argument_name}', "
             f"got '{value}'."
         )
-    raise ValueError(
-        f"Expected a boolean-style launch value, got '{value}'."
-    )
+    raise ValueError(f"Expected a boolean-style launch value, got '{value}'.")
 
 
 def _is_truthy(value):
@@ -93,22 +102,15 @@ def generate_launch_description():
     experimentation, but raw visual odometry is not fused into the June
     baseline EKFs.
     """
-    pkg_localisation = get_package_share_directory("lunabot_localisation")
-
-    rtabmap_yaml = os.path.join(pkg_localisation, "config", "rtabmap.yaml")
-    ekf_yaml = os.path.join(pkg_localisation, "config", "ekf.yaml")
-    ekf_lidar_phase_yaml = os.path.join(
-        pkg_localisation, "config", "ekf_lidar_phase.yaml"
-    )
-    apriltag_yaml = os.path.join(pkg_localisation, "config", "apriltag.yaml")
-    tag_pose_bridge_yaml = os.path.join(
-        pkg_localisation, "config", "tag_pose_bridge.yaml"
-    )
-    tag_pose_bridge_sim_yaml = os.path.join(
-        pkg_localisation, "config", "tag_pose_bridge_sim.yaml"
-    )
-    start_zone_localisation_yaml = os.path.join(
-        pkg_localisation, "config", "start_zone_localisation.yaml"
+    rtabmap_yaml = _config_path("config", "rtabmap.yaml")
+    ekf_yaml = _config_path("config", "ekf.yaml")
+    ekf_lidar_phase_yaml = _config_path("config", "ekf_lidar_phase.yaml")
+    apriltag_yaml = _config_path("config", "apriltag.yaml")
+    tag_pose_bridge_yaml = _config_path("config", "tag_pose_bridge.yaml")
+    tag_pose_bridge_sim_yaml = _config_path("config", "tag_pose_bridge_sim.yaml")
+    start_zone_localisation_yaml = _config_path(
+        "config",
+        "start_zone_localisation.yaml",
     )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
@@ -199,8 +201,6 @@ def generate_launch_description():
                 description="Configured map-frame yaw of the start-zone tag.",
             ),
             OpaqueFunction(function=_validate_boolean_launch_arguments),
-            # Optional RTAB-Map odometry for experimentation only.
-            # The June baseline does not fuse this topic into either EKF.
             Node(
                 package="rtabmap_odom",
                 executable="rgbd_odometry",
@@ -210,7 +210,6 @@ def generate_launch_description():
                 remappings=[*camera_remappings, ("odom", "/visual_odometry")],
                 condition=visual_slam_condition,
             ),
-            # Local EKF: odom -> base_footprint (smooth, continuous)
             Node(
                 package="robot_localization",
                 executable="ekf_node",
@@ -222,24 +221,29 @@ def generate_launch_description():
                     ("set_pose", "/ekf_filter_node_odom/set_pose"),
                 ],
             ),
-            # During the lidar debug phase there is no global localisation source,
-            # so publish an identity map->odom transform to keep Nav2 / RViz happy.
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
                 arguments=[
-                    "--x", "0",
-                    "--y", "0",
-                    "--z", "0",
-                    "--roll", "0",
-                    "--pitch", "0",
-                    "--yaw", "0",
-                    "--frame-id", "map",
-                    "--child-frame-id", "odom",
+                    "--x",
+                    "0",
+                    "--y",
+                    "0",
+                    "--z",
+                    "0",
+                    "--roll",
+                    "0",
+                    "--pitch",
+                    "0",
+                    "--yaw",
+                    "0",
+                    "--frame-id",
+                    "map",
+                    "--child-frame-id",
+                    "odom",
                 ],
                 condition=IfCondition(_is_truthy(lidar_costmap_phase)),
             ),
-            # Global EKF: map -> odom (corrects drift when tag seen)
             Node(
                 package="robot_localization",
                 executable="ekf_node",
@@ -252,7 +256,6 @@ def generate_launch_description():
                 ],
                 condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
-            # RTAB-Map SLAM (optional, map building only, no TF publishing)
             Node(
                 package="rtabmap_slam",
                 executable="rtabmap",
@@ -263,7 +266,6 @@ def generate_launch_description():
                 arguments=["-d"],
                 condition=visual_slam_condition,
             ),
-            # AprilTag detector
             Node(
                 package="apriltag_ros",
                 executable="apriltag_node",
@@ -291,23 +293,29 @@ def generate_launch_description():
                 }.items(),
                 condition=apriltag_debug_condition,
             ),
-            # Known position of tag 0 in the map frame
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
                 arguments=[
-                    "--x", tag_map_x,
-                    "--y", tag_map_y,
-                    "--z", tag_map_z,
-                    "--roll", "0",
-                    "--pitch", "0",
-                    "--yaw", tag_map_yaw,
-                    "--frame-id", "map",
-                    "--child-frame-id", "tag36h11:0",
+                    "--x",
+                    tag_map_x,
+                    "--y",
+                    tag_map_y,
+                    "--z",
+                    tag_map_z,
+                    "--roll",
+                    "0",
+                    "--pitch",
+                    "0",
+                    "--yaw",
+                    tag_map_yaw,
+                    "--frame-id",
+                    "map",
+                    "--child-frame-id",
+                    "tag36h11:0",
                 ],
                 condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
-            # Converts apriltag TF into PoseWithCovarianceStamped for global EKF
             Node(
                 package="lunabot_localisation",
                 executable="tag_pose_publisher",
@@ -322,7 +330,7 @@ def generate_launch_description():
                     {
                         "use_sim_time": use_sim_time,
                         "detections_topic": "/camera_front/tags",
-                    }
+                    },
                 ],
                 condition=IfCondition(_is_falsey(lidar_costmap_phase)),
             ),
