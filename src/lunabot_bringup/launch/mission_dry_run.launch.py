@@ -1,21 +1,28 @@
 """Launch the full simulation stack and run one mission dry run."""
 
-import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import EmitEvent
-from launch.actions import IncludeLaunchDescription
-from launch.actions import LogInfo
-from launch.actions import OpaqueFunction
-from launch.actions import RegisterEventHandler
+from launch.actions import (
+    DeclareLaunchArgument,
+    EmitEvent,
+    IncludeLaunchDescription,
+    LogInfo,
+    OpaqueFunction,
+    RegisterEventHandler,
+)
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+
+def _launch_file(package_name: str, *parts: str) -> str:
+    """Return one launch file path from a package share directory."""
+    return str(Path(get_package_share_directory(package_name)).joinpath(*parts))
 
 
 def _handle_harness_exit(event, _context):
@@ -39,10 +46,6 @@ def _raise_harness_failure(_context):
 
 def generate_launch_description():
     """Compose the simulation stack and the one-shot mission harness."""
-    pkg_bringup = get_package_share_directory("lunabot_bringup")
-    pkg_excavation = get_package_share_directory("lunabot_excavation")
-    pkg_simulation = get_package_share_directory("lunabot_simulation")
-
     use_sim_time = LaunchConfiguration("use_sim_time")
     launch_rviz = LaunchConfiguration("launch_rviz")
     runtime_preflight_enabled = LaunchConfiguration("runtime_preflight_enabled")
@@ -57,13 +60,13 @@ def generate_launch_description():
 
     moon_yard = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_simulation, "launch", "moon_yard.launch.py")
+            _launch_file("lunabot_simulation", "launch", "moon_yard.launch.py")
         )
     )
 
     navigation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_bringup, "launch", "navigation.launch.py")
+            _launch_file("lunabot_bringup", "launch", "navigation.launch.py")
         ),
         launch_arguments={
             "use_sim_time": use_sim_time,
@@ -74,7 +77,7 @@ def generate_launch_description():
 
     excavation_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_excavation, "launch", "excavation_sim.launch.py")
+            _launch_file("lunabot_excavation", "launch", "excavation_sim.launch.py")
         ),
         launch_arguments={
             "force_overcurrent": force_overcurrent,
@@ -128,8 +131,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "preflight_config",
-                default_value=os.path.join(
-                    pkg_bringup,
+                default_value=_launch_file(
+                    "lunabot_bringup",
                     "config",
                     "preflight_checks_dry_run.yaml",
                 ),
