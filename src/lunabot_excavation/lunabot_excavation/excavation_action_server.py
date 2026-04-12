@@ -1,5 +1,6 @@
 """Excavation action adapter."""
 
+from contextlib import suppress
 from math import isfinite
 from time import monotonic, sleep
 
@@ -13,7 +14,6 @@ from std_srvs.srv import Trigger
 
 from lunabot_interfaces.action import Excavate
 from lunabot_interfaces.msg import ExcavationStatus, ExcavationTelemetry
-
 
 STATE_TO_PHASE = {
     ExcavationStatus.STATE_IDLE: Excavate.Feedback.PHASE_PRECHECK,
@@ -129,9 +129,7 @@ class ExcavationActionServer(Node):
             return False
         if not isfinite(max_drive_speed_mps):
             return False
-        if max_drive_speed_mps < 0.0:
-            return False
-        return True
+        return not max_drive_speed_mps < 0.0
 
     def goal_callback(self, goal_request):
         """Accept only excavation goals that match the supported contract."""
@@ -228,27 +226,233 @@ class ExcavationActionServer(Node):
     ):
         """Apply a terminal goal state, log it once, and build the result."""
         if terminal_state == "succeed":
-            try:
+            with suppress(RuntimeError):
                 goal_handle.succeed()
-            except RuntimeError:
-                pass
             self.get_logger().info("Excavation action succeeded")
             return self._result(True, reason_code, reason, duration_s)
 
         if terminal_state == "cancel":
-            try:
+            with suppress(RuntimeError):
                 goal_handle.canceled()
-            except RuntimeError:
-                pass
             self.get_logger().info(reason)
             return self._result(success, reason_code, reason, duration_s)
 
-        try:
+        with suppress(RuntimeError):
             goal_handle.abort()
-        except RuntimeError:
-            pass
         self.get_logger().warn(reason)
         return self._result(success, reason_code, reason, duration_s)
+
+    def _current_state(self) -> int:
+        """Return the current controller state or idle when no status is available."""
+        if self._status is None:
+            return ExcavationStatus.STATE_IDLE
+        return self._status.state
+
+    def _abort_with_fault(self, goal_handle, duration_s: float):
+        """Abort the action using the latest controller fault information."""
+        code, reason = self._fault_reason()
+        return self._finish_goal(
+            goal_handle,
+            terminal_state="abort",
+            success=False,
+            reason_code=code,
+            reason=reason,
+            duration_s=duration_s,
+        )
+
+    def _validate_initial_state(self, goal_handle):
+        """Reject excavation when the controller is already faulted or busy."""
+        state = self._current_state()
+        if state == ExcavationStatus.STATE_FAULT:
+            return self._abort_with_fault(goal_handle, duration_s=0.0)
+
+        if state in (ExcavationStatus.STATE_IDLE, ExcavationStatus.STATE_READY):
+            return None
+
+        return self._finish_goal(
+            goal_handle,
+            terminal_state="abort",
+            success=False,
+            reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
+            reason=f"Excavation controller busy in state '{state}'",
+            duration_s=0.0,
+        )
+
+    def _home_until_ready(
+        self,
+        goal_handle,
+        *,
+        timeout_s: float,
+        stop_timeout_s: float,
+        start_time: float,
+    ):
+        """Home the controller when needed and resolve any terminal homing outcome."""
+        if self._current_state() == ExcavationStatus.STATE_READY:
+            return None
+
+        response = self._call_trigger(self._home_client, 2.0)
+        if response is None or not response.success:
+            return self._finish_goal(
+                goal_handle,
+                terminal_state="abort",
+                success=False,
+                reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
+                reason="Excavation home command was rejected",
+                duration_s=0.0,
+            )
+
+        homing_result, elapsed = self._wait_for_ready_or_fault(
+            timeout_s,
+            goal_handle,
+            start_time,
+        )
+        if homing_result == "ready":
+            return None
+        if homing_result == "cancel":
+            return self._resolve_stop_settle(
+                goal_handle,
+                elapsed=elapsed,
+                stop_timeout_s=stop_timeout_s,
+                settled_reason_code=Excavate.Result.REASON_CANCELED,
+                settled_reason="Excavation goal canceled during homing",
+                settle_timeout_reason=(
+                    "Excavation did not settle after cancel during homing"
+                ),
+                shutdown_reason="Node shutdown during cancel during homing",
+            )
+        if homing_result == "timeout":
+            return self._resolve_stop_settle(
+                goal_handle,
+                elapsed=elapsed,
+                stop_timeout_s=stop_timeout_s,
+                settled_reason_code=Excavate.Result.REASON_TIMEOUT,
+                settled_reason="Excavation timeout reached during homing",
+                settle_timeout_reason="Excavation did not settle after homing timeout",
+                shutdown_reason="Node shutdown during homing timeout handling",
+            )
+        if homing_result == "fault":
+            return self._abort_with_fault(goal_handle, duration_s=elapsed)
+        return self._finish_goal(
+            goal_handle,
+            terminal_state="abort",
+            success=False,
+            reason_code=Excavate.Result.REASON_SHUTDOWN,
+            reason="Node shutdown during excavation homing",
+            duration_s=elapsed,
+        )
+
+    def _start_excavation(self, goal_handle, start_time: float):
+        """Send the start command and reject the goal if the controller refuses."""
+        start_response = self._call_trigger(self._start_client, 2.0)
+        if start_response is not None and start_response.success:
+            return None
+        return self._finish_goal(
+            goal_handle,
+            terminal_state="abort",
+            success=False,
+            reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
+            reason="Excavation start command was rejected",
+            duration_s=monotonic() - start_time,
+        )
+
+    def _resolve_active_outcome(
+        self,
+        goal_handle,
+        *,
+        elapsed: float,
+        timeout_s: float,
+        stop_timeout_s: float,
+    ):
+        """Resolve cancel, timeout, or fault during an active excavation attempt."""
+        if goal_handle.is_cancel_requested:
+            return self._resolve_stop_settle(
+                goal_handle,
+                elapsed=elapsed,
+                stop_timeout_s=stop_timeout_s,
+                settled_reason_code=Excavate.Result.REASON_CANCELED,
+                settled_reason="Excavation goal canceled by client",
+                settle_timeout_reason="Excavation did not settle after cancel",
+                shutdown_reason="Node shutdown during cancel handling",
+            )
+        if timeout_s > 0.0 and elapsed >= timeout_s:
+            return self._resolve_stop_settle(
+                goal_handle,
+                elapsed=elapsed,
+                stop_timeout_s=stop_timeout_s,
+                settled_reason_code=Excavate.Result.REASON_TIMEOUT,
+                settled_reason="Excavation timeout reached",
+                settle_timeout_reason="Excavation did not settle after timeout",
+                shutdown_reason="Node shutdown during timeout handling",
+            )
+        if self._current_state() == ExcavationStatus.STATE_FAULT:
+            return self._abort_with_fault(goal_handle, duration_s=elapsed)
+        return None
+
+    def _excavation_finished_successfully(self, saw_excavating: bool):
+        """Return True when excavation has entered and then left the active phase."""
+        if not saw_excavating:
+            return False
+
+        state = self._current_state()
+        if state in (
+            ExcavationStatus.STATE_READY,
+            ExcavationStatus.STATE_IDLE,
+        ):
+            return True
+        return self._is_stopped_without_fault()
+
+    def _run_excavation_loop(
+        self,
+        goal_handle,
+        *,
+        start_time: float,
+        timeout_s: float,
+        nominal_duration: float,
+        stop_timeout_s: float,
+    ):
+        """Drive the bounded excavation loop until success, failure, or shutdown."""
+        saw_excavating = False
+        stop_requested = False
+
+        while rclpy.ok():
+            elapsed = monotonic() - start_time
+            outcome = self._resolve_active_outcome(
+                goal_handle,
+                elapsed=elapsed,
+                timeout_s=timeout_s,
+                stop_timeout_s=stop_timeout_s,
+            )
+            if outcome is not None:
+                return outcome
+
+            if self._current_state() == ExcavationStatus.STATE_EXCAVATING:
+                saw_excavating = True
+
+            if saw_excavating and elapsed >= nominal_duration and not stop_requested:
+                self._call_trigger(self._stop_client, stop_timeout_s)
+                stop_requested = True
+
+            if self._excavation_finished_successfully(saw_excavating):
+                return self._finish_goal(
+                    goal_handle,
+                    terminal_state="succeed",
+                    success=True,
+                    reason_code=Excavate.Result.REASON_SUCCESS,
+                    reason="",
+                    duration_s=elapsed,
+                )
+
+            self._publish_feedback(goal_handle, elapsed)
+            sleep(self.loop_period_s)
+
+        return self._finish_goal(
+            goal_handle,
+            terminal_state="abort",
+            success=False,
+            reason_code=Excavate.Result.REASON_SHUTDOWN,
+            reason="Node shutdown during excavation",
+            duration_s=monotonic() - start_time,
+        )
 
     def _wait_for_ready_or_fault(
         self, timeout_s: float, goal_handle, start_time: float
@@ -384,191 +588,31 @@ class ExcavationActionServer(Node):
         timeout_s = float(goal_handle.request.timeout_s)
         nominal_duration = float(self.get_parameter("nominal_duration_s").value)
         stop_timeout_s = float(self.get_parameter("stop_timeout_s").value)
-        start = monotonic()
-        saw_excavating = False
-        stop_requested = False
-        state = (
-            self._status.state
-            if self._status is not None
-            else ExcavationStatus.STATE_IDLE
-        )
+        start_time = monotonic()
 
-        if state == ExcavationStatus.STATE_FAULT:
-            code, reason = self._fault_reason()
-            return self._finish_goal(
-                goal_handle,
-                terminal_state="abort",
-                success=False,
-                reason_code=code,
-                reason=reason,
-                duration_s=0.0,
-            )
+        invalid_start_state = self._validate_initial_state(goal_handle)
+        if invalid_start_state is not None:
+            return invalid_start_state
 
-        if state not in (
-            ExcavationStatus.STATE_IDLE,
-            ExcavationStatus.STATE_READY,
-        ):
-            return self._finish_goal(
-                goal_handle,
-                terminal_state="abort",
-                success=False,
-                reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
-                reason=f"Excavation controller busy in state '{state}'",
-                duration_s=0.0,
-            )
-
-        if state != ExcavationStatus.STATE_READY:
-            response = self._call_trigger(self._home_client, 2.0)
-            if response is None or not response.success:
-                return self._finish_goal(
-                    goal_handle,
-                    terminal_state="abort",
-                    success=False,
-                    reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
-                    reason="Excavation home command was rejected",
-                    duration_s=0.0,
-                )
-
-            homing_result, elapsed = self._wait_for_ready_or_fault(
-                timeout_s,
-                goal_handle,
-                start,
-            )
-            if homing_result == "cancel":
-                return self._resolve_stop_settle(
-                    goal_handle,
-                    elapsed=elapsed,
-                    stop_timeout_s=stop_timeout_s,
-                    settled_reason_code=Excavate.Result.REASON_CANCELED,
-                    settled_reason="Excavation goal canceled during homing",
-                    settle_timeout_reason=(
-                        "Excavation did not settle after cancel during homing"
-                    ),
-                    shutdown_reason="Node shutdown during cancel during homing",
-                )
-            if homing_result == "timeout":
-                return self._resolve_stop_settle(
-                    goal_handle,
-                    elapsed=elapsed,
-                    stop_timeout_s=stop_timeout_s,
-                    settled_reason_code=Excavate.Result.REASON_TIMEOUT,
-                    settled_reason="Excavation timeout reached during homing",
-                    settle_timeout_reason="Excavation did not settle after homing timeout",
-                    shutdown_reason="Node shutdown during homing timeout handling",
-                )
-            if homing_result == "fault":
-                code, reason = self._fault_reason()
-                return self._finish_goal(
-                    goal_handle,
-                    terminal_state="abort",
-                    success=False,
-                    reason_code=code,
-                    reason=reason,
-                    duration_s=elapsed,
-                )
-            if homing_result == "shutdown":
-                return self._finish_goal(
-                    goal_handle,
-                    terminal_state="abort",
-                    success=False,
-                    reason_code=Excavate.Result.REASON_SHUTDOWN,
-                    reason="Node shutdown during excavation homing",
-                    duration_s=elapsed,
-                )
-
-        start_response = self._call_trigger(self._start_client, 2.0)
-        if start_response is None or not start_response.success:
-            return self._finish_goal(
-                goal_handle,
-                terminal_state="abort",
-                success=False,
-                reason_code=Excavate.Result.REASON_INTERLOCK_BLOCKED,
-                reason="Excavation start command was rejected",
-                duration_s=monotonic() - start,
-            )
-
-        while rclpy.ok():
-            elapsed = monotonic() - start
-
-            if goal_handle.is_cancel_requested:
-                return self._resolve_stop_settle(
-                    goal_handle,
-                    elapsed=elapsed,
-                    stop_timeout_s=stop_timeout_s,
-                    settled_reason_code=Excavate.Result.REASON_CANCELED,
-                    settled_reason="Excavation goal canceled by client",
-                    settle_timeout_reason="Excavation did not settle after cancel",
-                    shutdown_reason="Node shutdown during cancel handling",
-                )
-
-            if timeout_s > 0.0 and elapsed >= timeout_s:
-                return self._resolve_stop_settle(
-                    goal_handle,
-                    elapsed=elapsed,
-                    stop_timeout_s=stop_timeout_s,
-                    settled_reason_code=Excavate.Result.REASON_TIMEOUT,
-                    settled_reason="Excavation timeout reached",
-                    settle_timeout_reason="Excavation did not settle after timeout",
-                    shutdown_reason="Node shutdown during timeout handling",
-                )
-
-            if (
-                self._status is not None
-                and self._status.state == ExcavationStatus.STATE_FAULT
-            ):
-                code, reason = self._fault_reason()
-                return self._finish_goal(
-                    goal_handle,
-                    terminal_state="abort",
-                    success=False,
-                    reason_code=code,
-                    reason=reason,
-                    duration_s=elapsed,
-                )
-
-            if (
-                self._status is not None
-                and self._status.state == ExcavationStatus.STATE_EXCAVATING
-            ):
-                saw_excavating = True
-
-            if saw_excavating and elapsed >= nominal_duration and not stop_requested:
-                self._call_trigger(self._stop_client, stop_timeout_s)
-                stop_requested = True
-
-            if saw_excavating and self._status is not None and self._status.state in (
-                ExcavationStatus.STATE_READY,
-                ExcavationStatus.STATE_IDLE,
-            ):
-                return self._finish_goal(
-                    goal_handle,
-                    terminal_state="succeed",
-                    success=True,
-                    reason_code=Excavate.Result.REASON_SUCCESS,
-                    reason="",
-                    duration_s=elapsed,
-                )
-
-            if saw_excavating and self._is_stopped_without_fault():
-                return self._finish_goal(
-                    goal_handle,
-                    terminal_state="succeed",
-                    success=True,
-                    reason_code=Excavate.Result.REASON_SUCCESS,
-                    reason="",
-                    duration_s=elapsed,
-                )
-
-            self._publish_feedback(goal_handle, elapsed)
-            sleep(self.loop_period_s)
-
-        return self._finish_goal(
+        homing_result = self._home_until_ready(
             goal_handle,
-            terminal_state="abort",
-            success=False,
-            reason_code=Excavate.Result.REASON_SHUTDOWN,
-            reason="Node shutdown during excavation",
-            duration_s=monotonic() - start,
+            timeout_s=timeout_s,
+            stop_timeout_s=stop_timeout_s,
+            start_time=start_time,
+        )
+        if homing_result is not None:
+            return homing_result
+
+        start_result = self._start_excavation(goal_handle, start_time)
+        if start_result is not None:
+            return start_result
+
+        return self._run_excavation_loop(
+            goal_handle,
+            start_time=start_time,
+            timeout_s=timeout_s,
+            nominal_duration=nominal_duration,
+            stop_timeout_s=stop_timeout_s,
         )
 
 
