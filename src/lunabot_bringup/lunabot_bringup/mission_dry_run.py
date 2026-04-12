@@ -374,16 +374,16 @@ class MissionDryRunHarness(Node):
             goal,
             timeout_detail="excavate goal response timed out",
         )
-        goal_handle = self._accepted_goal_handle(
+        accepted_goal_handle = self._accepted_goal_handle(
             goal_handle,
             rejection_detail="excavate goal rejected",
         )
-        if isinstance(goal_handle, str):
-            self.get_logger().error(goal_handle)
-            return False, goal_handle
+        if isinstance(accepted_goal_handle, str):
+            self.get_logger().error(accepted_goal_handle)
+            return False, accepted_goal_handle
 
         result = self._wait_for_goal_result(
-            goal_handle,
+            accepted_goal_handle,
             timeout_s=goal.timeout_s + self._result_timeout_padding_s(),
             timeout_detail="excavate result timed out",
         )

@@ -151,11 +151,6 @@ class NavigateToPoseGate(Node):
         return None
 
     @staticmethod
-    def _empty_result() -> NavigateToPose.Result:
-        """Return an empty NavigateToPose result."""
-        return NavigateToPose.Result()
-
-    @staticmethod
     def _finish_goal(goal_handle, *, canceled: bool) -> NavigateToPose.Result:
         """Finish the public goal with a terminal state."""
         if canceled:
