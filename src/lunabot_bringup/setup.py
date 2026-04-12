@@ -1,11 +1,11 @@
 """Setup script for the lunabot_bringup package."""
 
-import os
-from glob import glob
+from pathlib import Path
 
 from setuptools import find_packages, setup
 
 package_name = "lunabot_bringup"
+package_root = Path(__file__).resolve().parent
 
 setup(
     name=package_name,
@@ -14,20 +14,29 @@ setup(
     data_files=[
         (
             "share/ament_index/resource_index/packages",
-            ["resource/" + package_name],
+            [f"resource/{package_name}"],
         ),
-        ("share/" + package_name, ["package.xml"]),
+        (f"share/{package_name}", ["package.xml"]),
         (
-            os.path.join("share", package_name, "launch"),
-            glob("launch/*.launch.py"),
+            f"share/{package_name}/launch",
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("launch").glob("*.launch.py")
+            ],
         ),
         (
-            os.path.join("share", package_name, "config"),
-            glob("config/*.yaml"),
+            f"share/{package_name}/config",
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("config").glob("*.yaml")
+            ],
         ),
         (
-            os.path.join("share", package_name, "rviz"),
-            glob("rviz/*.rviz"),
+            f"share/{package_name}/rviz",
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("rviz").glob("*.rviz")
+            ],
         ),
     ],
     install_requires=["setuptools"],
@@ -36,11 +45,7 @@ setup(
     maintainer_email="ko129@student.le.ac.uk",
     description="System bringup launch files and checks for Lunabot",
     license="Apache-2.0",
-    extras_require={
-        "test": [
-            "pytest",
-        ],
-    },
+    extras_require={"test": ["pytest"]},
     entry_points={
         "console_scripts": [
             "navigate_to_pose_gate = lunabot_bringup.navigate_to_pose_gate:main",

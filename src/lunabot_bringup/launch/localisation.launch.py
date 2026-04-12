@@ -1,13 +1,18 @@
 """Launch file for the localisation stack."""
 
-import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+
+
+def _launch_file(package_name: str, *parts: str) -> str:
+    """Return a package launch path as a string."""
+    package_root = Path(get_package_share_directory(package_name))
+    return str(package_root.joinpath(*parts))
 
 
 def generate_launch_description():
@@ -16,7 +21,6 @@ def generate_launch_description():
 
     Includes the master localisation launch from lunabot_localisation.
     """
-    pkg_localisation = get_package_share_directory("lunabot_localisation")
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -24,7 +28,7 @@ def generate_launch_description():
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     localisation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_localisation, "launch", "localisation.launch.py")
+            _launch_file("lunabot_localisation", "launch", "localisation.launch.py")
         ),
         launch_arguments={
             "lidar_costmap_phase": lidar_costmap_phase,

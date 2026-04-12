@@ -2,8 +2,7 @@ import importlib.util
 from pathlib import Path
 
 from launch import LaunchContext
-from launch.actions import DeclareLaunchArgument
-from launch.actions import ExecuteProcess
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch_ros.actions import Node
 
 
@@ -16,8 +15,9 @@ def _load_launch_module():
     spec = importlib.util.spec_from_file_location(
         "mission_manager_launch", launch_path
     )
-    module = importlib.util.module_from_spec(spec)
+    assert spec is not None
     assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
@@ -39,7 +39,7 @@ def test_mission_manager_launch_starts_one_supervisor_node(monkeypatch):
 
     context = LaunchContext()
     context.launch_configurations["use_sim_time"] = "false"
-    monkeypatch.setattr(ExecuteProcess, "execute", lambda self, context: None)
+    monkeypatch.setattr(ExecuteProcess, "execute", lambda _self, _context: None)
     nodes[0].execute(context)
 
     assert nodes[0].node_name.rsplit("/", 1)[-1] == "mission_manager"

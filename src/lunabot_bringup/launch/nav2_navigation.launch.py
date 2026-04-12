@@ -1,26 +1,25 @@
 """Local Nav2 navigation launch."""
 
-import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import GroupAction
-from launch.actions import SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
-from launch.substitutions import PythonExpression
-from launch_ros.actions import LoadComposableNodes
-from launch_ros.actions import Node
-from launch_ros.descriptions import ComposableNode
-from launch_ros.descriptions import ParameterFile
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import LoadComposableNodes, Node
+from launch_ros.descriptions import ComposableNode, ParameterFile
 from nav2_common.launch import RewrittenYaml
+
+
+def _bringup_path(*parts: str) -> str:
+    """Return a Nav2 bringup package path as a string."""
+    package_root = Path(get_package_share_directory("nav2_bringup"))
+    return str(package_root.joinpath(*parts))
 
 
 def generate_launch_description():
     """Launch Nav2 with its standard NavigateToPose action surface."""
-    bringup_dir = get_package_share_directory("nav2_bringup")
-
     namespace = LaunchConfiguration("namespace")
     use_sim_time = LaunchConfiguration("use_sim_time")
     autostart = LaunchConfiguration("autostart")
@@ -81,7 +80,7 @@ def generate_launch_description():
 
     declare_params_file_cmd = DeclareLaunchArgument(
         "params_file",
-        default_value=os.path.join(bringup_dir, "params", "nav2_params.yaml"),
+        default_value=_bringup_path("params", "nav2_params.yaml"),
         description="Full path to the ROS2 parameters file to use for all launched nodes",
     )
 
@@ -126,7 +125,7 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
-                remappings=remappings + [("cmd_vel", "cmd_vel_nav")],
+                remappings=[*remappings, ("cmd_vel", "cmd_vel_nav")],
             ),
             Node(
                 package="nav2_smoother",
@@ -192,8 +191,11 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
-                remappings=remappings
-                + [("cmd_vel", "cmd_vel_nav"), ("cmd_vel_smoothed", "cmd_vel")],
+                remappings=[
+                    *remappings,
+                    ("cmd_vel", "cmd_vel_nav"),
+                    ("cmd_vel_smoothed", "cmd_vel"),
+                ],
             ),
             Node(
                 package="nav2_lifecycle_manager",
@@ -219,7 +221,7 @@ def generate_launch_description():
                 plugin="nav2_controller::ControllerServer",
                 name="controller_server",
                 parameters=[configured_params],
-                remappings=remappings + [("cmd_vel", "cmd_vel_nav")],
+                remappings=[*remappings, ("cmd_vel", "cmd_vel_nav")],
             ),
             ComposableNode(
                 package="nav2_smoother",
@@ -261,8 +263,11 @@ def generate_launch_description():
                 plugin="nav2_velocity_smoother::VelocitySmoother",
                 name="velocity_smoother",
                 parameters=[configured_params],
-                remappings=remappings
-                + [("cmd_vel", "cmd_vel_nav"), ("cmd_vel_smoothed", "cmd_vel")],
+                remappings=[
+                    *remappings,
+                    ("cmd_vel", "cmd_vel_nav"),
+                    ("cmd_vel_smoothed", "cmd_vel"),
+                ],
             ),
             ComposableNode(
                 package="nav2_lifecycle_manager",
