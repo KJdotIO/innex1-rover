@@ -2,27 +2,23 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from math import cos
-from math import sin
+from math import cos, sin
 from pathlib import Path
-from typing import Callable
 
-from ament_index_python.packages import get_package_share_directory
-from action_msgs.msg import GoalStatus
-from lunabot_interfaces.action import Deposit
-from lunabot_interfaces.action import Excavate
-from nav2_msgs.action import NavigateToPose
 import rclpy
+from action_msgs.msg import GoalStatus
+from ament_index_python.packages import get_package_share_directory
+from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
+from lunabot_bringup.preflight_check import PreflightChecker, _load_yaml
 from lunabot_bringup.preflight_check import _exit_code as preflight_exit_code
-from lunabot_bringup.preflight_check import _load_yaml
 from lunabot_bringup.preflight_check import _print_summary as print_preflight_summary
-from lunabot_bringup.preflight_check import PreflightChecker
 from lunabot_bringup.preflight_profiles import PHASE_RUNTIME
-
+from lunabot_interfaces.action import Deposit, Excavate
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -254,6 +250,49 @@ class MissionDryRunHarness(Node):
             return future.result()
         return timeout_detail
 
+    def _send_goal(
+        self,
+        client: ActionClient,
+        goal,
+        *,
+        timeout_detail: str,
+    ):
+        """Send one goal and return the accepted goal handle."""
+        send_goal_future = client.send_goal_async(goal)
+        return self._wait_for_future(
+            send_goal_future,
+            self._action_wait_timeout_s(),
+            timeout_detail,
+        )
+
+    def _accepted_goal_handle(
+        self,
+        goal_handle,
+        *,
+        rejection_detail: str,
+    ):
+        """Return the accepted goal handle or a rejection detail string."""
+        if isinstance(goal_handle, str):
+            return goal_handle
+        if goal_handle is None or not goal_handle.accepted:
+            return rejection_detail
+        return goal_handle
+
+    def _wait_for_goal_result(
+        self,
+        goal_handle,
+        *,
+        timeout_s: float,
+        timeout_detail: str,
+    ):
+        """Wait for one goal result and return the wrapped result."""
+        result_future = goal_handle.get_result_async()
+        return self._wait_for_future(result_future, timeout_s, timeout_detail)
+
+    def _goal_status_detail(self, action_name: str, status: int) -> str:
+        """Return a readable action status detail string."""
+        return f"{action_name} finished with {_goal_status_text(status)} status"
+
     def _run_travel_step(self) -> tuple[bool, str]:
         """Send one bounded travel goal through the gate action."""
         self.get_logger().info("Starting travel phase")
@@ -275,25 +314,23 @@ class MissionDryRunHarness(Node):
         goal.pose.pose.orientation.z = sin(yaw / 2.0)
         goal.pose.pose.orientation.w = cos(yaw / 2.0)
 
-        send_goal_future = self._navigate_client.send_goal_async(goal)
-        goal_handle = self._wait_for_future(
-            send_goal_future,
-            self._action_wait_timeout_s(),
-            "travel goal response timed out",
+        goal_handle = self._send_goal(
+            self._navigate_client,
+            goal,
+            timeout_detail="travel goal response timed out",
         )
-        if isinstance(goal_handle, str):
-            self.get_logger().error(goal_handle)
-            return False, goal_handle
-        if goal_handle is None or not goal_handle.accepted:
-            detail = "travel goal rejected"
-            self.get_logger().error(detail)
-            return False, detail
+        accepted_goal_handle = self._accepted_goal_handle(
+            goal_handle,
+            rejection_detail="travel goal rejected",
+        )
+        if isinstance(accepted_goal_handle, str):
+            self.get_logger().error(accepted_goal_handle)
+            return False, accepted_goal_handle
 
-        result_future = goal_handle.get_result_async()
-        result = self._wait_for_future(
-            result_future,
-            float(self.get_parameter("travel_result_timeout_s").value),
-            "travel result timed out",
+        result = self._wait_for_goal_result(
+            accepted_goal_handle,
+            timeout_s=float(self.get_parameter("travel_result_timeout_s").value),
+            timeout_detail="travel result timed out",
         )
         if isinstance(result, str):
             self.get_logger().error(result)
@@ -303,7 +340,7 @@ class MissionDryRunHarness(Node):
             self.get_logger().error(detail)
             return False, detail
         if result.status != GoalStatus.STATUS_SUCCEEDED:
-            detail = f"travel finished with {_goal_status_text(result.status)} status"
+            detail = self._goal_status_detail("travel", result.status)
             self.get_logger().error(detail)
             return False, detail
 
@@ -332,25 +369,23 @@ class MissionDryRunHarness(Node):
             self.get_parameter("excavate_max_drive_speed_mps").value
         )
 
-        send_goal_future = self._excavate_client.send_goal_async(goal)
-        goal_handle = self._wait_for_future(
-            send_goal_future,
-            self._action_wait_timeout_s(),
-            "excavate goal response timed out",
+        goal_handle = self._send_goal(
+            self._excavate_client,
+            goal,
+            timeout_detail="excavate goal response timed out",
         )
-        if isinstance(goal_handle, str):
-            self.get_logger().error(goal_handle)
-            return False, goal_handle
-        if goal_handle is None or not goal_handle.accepted:
-            detail = "excavate goal rejected"
-            self.get_logger().error(detail)
-            return False, detail
+        accepted_goal_handle = self._accepted_goal_handle(
+            goal_handle,
+            rejection_detail="excavate goal rejected",
+        )
+        if isinstance(accepted_goal_handle, str):
+            self.get_logger().error(accepted_goal_handle)
+            return False, accepted_goal_handle
 
-        result_future = goal_handle.get_result_async()
-        result = self._wait_for_future(
-            result_future,
-            goal.timeout_s + self._result_timeout_padding_s(),
-            "excavate result timed out",
+        result = self._wait_for_goal_result(
+            accepted_goal_handle,
+            timeout_s=goal.timeout_s + self._result_timeout_padding_s(),
+            timeout_detail="excavate result timed out",
         )
         if isinstance(result, str):
             self.get_logger().error(result)
@@ -360,7 +395,7 @@ class MissionDryRunHarness(Node):
             self.get_logger().error(detail)
             return False, detail
         if result.status != GoalStatus.STATUS_SUCCEEDED:
-            detail = f"excavate finished with {_goal_status_text(result.status)} status"
+            detail = self._goal_status_detail("excavate", result.status)
             self.get_logger().error(detail)
             return False, detail
         if not result.result.success:
@@ -396,25 +431,23 @@ class MissionDryRunHarness(Node):
             self.get_parameter("deposit_require_close_after_dump").value
         )
 
-        send_goal_future = self._deposit_client.send_goal_async(goal)
-        goal_handle = self._wait_for_future(
-            send_goal_future,
-            self._action_wait_timeout_s(),
-            "deposit goal response timed out",
+        goal_handle = self._send_goal(
+            self._deposit_client,
+            goal,
+            timeout_detail="deposit goal response timed out",
+        )
+        goal_handle = self._accepted_goal_handle(
+            goal_handle,
+            rejection_detail="deposit goal rejected",
         )
         if isinstance(goal_handle, str):
             self.get_logger().error(goal_handle)
             return False, goal_handle
-        if goal_handle is None or not goal_handle.accepted:
-            detail = "deposit goal rejected"
-            self.get_logger().error(detail)
-            return False, detail
 
-        result_future = goal_handle.get_result_async()
-        result = self._wait_for_future(
-            result_future,
-            goal.timeout_s + self._result_timeout_padding_s(),
-            "deposit result timed out",
+        result = self._wait_for_goal_result(
+            goal_handle,
+            timeout_s=goal.timeout_s + self._result_timeout_padding_s(),
+            timeout_detail="deposit result timed out",
         )
         if isinstance(result, str):
             self.get_logger().error(result)
@@ -424,7 +457,7 @@ class MissionDryRunHarness(Node):
             self.get_logger().error(detail)
             return False, detail
         if result.status != GoalStatus.STATUS_SUCCEEDED:
-            detail = f"deposit finished with {_goal_status_text(result.status)} status"
+            detail = self._goal_status_detail("deposit", result.status)
             self.get_logger().error(detail)
             return False, detail
         if not result.result.success:

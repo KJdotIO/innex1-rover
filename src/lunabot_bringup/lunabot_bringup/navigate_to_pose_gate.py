@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import threading
 
-from action_msgs.msg import GoalStatus
-from lunabot_bringup.localisation_readiness import is_localisation_ready
-from lunabot_interfaces.msg import LocalisationStartZoneStatus
-from nav2_msgs.action import NavigateToPose
 import rclpy
-from rclpy.action import ActionClient
-from rclpy.action import ActionServer
-from rclpy.action import CancelResponse
-from rclpy.action import GoalResponse
+from action_msgs.msg import GoalStatus
+from nav2_msgs.action import NavigateToPose
+from rclpy.action import ActionClient, ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+
+from lunabot_bringup.localisation_readiness import is_localisation_ready
+from lunabot_interfaces.msg import LocalisationStartZoneStatus
 
 
 def _parse_bool(value) -> bool:
@@ -152,39 +150,55 @@ class NavigateToPoseGate(Node):
 
         return None
 
-    def _execute_goal(self, goal_handle) -> None:
-        """Forward the accepted goal to Nav2 and mirror the result."""
-        if not self._action_client.wait_for_server(
+    @staticmethod
+    def _finish_goal(goal_handle, *, canceled: bool) -> NavigateToPose.Result:
+        """Finish the public goal with a terminal state."""
+        if canceled:
+            goal_handle.canceled()
+        else:
+            goal_handle.abort()
+        return NavigateToPose.Result()
+
+    def _wait_for_internal_server(self, goal_handle) -> NavigateToPose.Result | None:
+        """Return a terminal result if Nav2 is unavailable."""
+        if self._action_client.wait_for_server(
             timeout_sec=self.internal_action_wait_timeout_s
         ):
-            self.get_logger().warn(
-                "Ending NavigateToPose goal because the internal Nav2 action "
-                "server is unavailable."
-            )
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-            else:
-                goal_handle.abort()
-            return NavigateToPose.Result()
+            return None
 
+        self.get_logger().warn(
+            "Ending NavigateToPose goal because the internal Nav2 action "
+            "server is unavailable."
+        )
+        return self._finish_goal(
+            goal_handle,
+            canceled=goal_handle.is_cancel_requested,
+        )
+
+    def _forward_goal(self, goal_handle):
+        """Forward the public goal to the internal Nav2 action server."""
         send_goal_future = self._action_client.send_goal_async(
             goal_handle.request,
             feedback_callback=lambda feedback: goal_handle.publish_feedback(
                 feedback.feedback
             ),
         )
-
-        client_goal_handle = self._wait_for_future(
+        return self._wait_for_future(
             send_goal_future,
             goal_handle=goal_handle,
         )
-        if client_goal_handle is None or not client_goal_handle.accepted:
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-            else:
-                goal_handle.abort()
-            return NavigateToPose.Result()
 
+    def _accepted_client_goal(self, client_goal_handle, goal_handle):
+        """Return the accepted internal goal handle or finish the public goal."""
+        if client_goal_handle is None or not client_goal_handle.accepted:
+            return self._finish_goal(
+                goal_handle,
+                canceled=goal_handle.is_cancel_requested,
+            )
+        return client_goal_handle
+
+    def _wait_for_wrapped_result(self, client_goal_handle, goal_handle):
+        """Wait for the internal goal result and forward cancellation once."""
         result_future = client_goal_handle.get_result_async()
         cancel_future = None
 
@@ -193,17 +207,23 @@ class NavigateToPoseGate(Node):
             if cancel_future is None:
                 cancel_future = client_goal_handle.cancel_goal_async()
 
-        wrapped_result = self._wait_for_future(
+        return self._wait_for_future(
             result_future,
             goal_handle=goal_handle,
             on_cancel=_forward_cancel,
         )
+
+    def _finish_from_wrapped_result(
+        self,
+        goal_handle,
+        wrapped_result,
+    ) -> NavigateToPose.Result:
+        """Mirror the downstream terminal status on the public goal."""
         if wrapped_result is None:
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-            else:
-                goal_handle.abort()
-            return NavigateToPose.Result()
+            return self._finish_goal(
+                goal_handle,
+                canceled=goal_handle.is_cancel_requested,
+            )
 
         result = wrapped_result.result
         status = wrapped_result.status
@@ -216,6 +236,23 @@ class NavigateToPoseGate(Node):
             goal_handle.abort()
 
         return result
+
+    def _execute_goal(self, goal_handle) -> None:
+        """Forward the accepted goal to Nav2 and mirror the result."""
+        server_result = self._wait_for_internal_server(goal_handle)
+        if server_result is not None:
+            return server_result
+
+        client_goal_handle = self._forward_goal(goal_handle)
+        if isinstance(client_goal_handle, NavigateToPose.Result):
+            return client_goal_handle
+
+        client_goal_handle = self._accepted_client_goal(client_goal_handle, goal_handle)
+        if isinstance(client_goal_handle, NavigateToPose.Result):
+            return client_goal_handle
+
+        wrapped_result = self._wait_for_wrapped_result(client_goal_handle, goal_handle)
+        return self._finish_from_wrapped_result(goal_handle, wrapped_result)
 
 
 def main(args=None) -> None:

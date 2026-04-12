@@ -1,25 +1,29 @@
 """Launch file for the navigation stack."""
 
-import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.actions import LogInfo
-from launch.actions import GroupAction
-from launch.actions import IncludeLaunchDescription
-from launch.actions import OpaqueFunction
-from launch.actions import RegisterEventHandler
-from launch.conditions import IfCondition
-from launch.conditions import UnlessCondition
+from launch.actions import (
+    DeclareLaunchArgument,
+    GroupAction,
+    IncludeLaunchDescription,
+    LogInfo,
+    OpaqueFunction,
+    RegisterEventHandler,
+)
+from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-from launch.substitutions import PythonExpression
-from launch_ros.actions import Node
-from launch_ros.actions import SetRemap
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import Node, SetRemap
 
 from lunabot_bringup.launch_gate import select_preflight_config_path
+
+
+def _share_path(package_name: str, *parts: str) -> str:
+    """Return one path inside a package share directory."""
+    return str(Path(get_package_share_directory(package_name)).joinpath(*parts))
 
 
 def _is_truthy(value):
@@ -45,15 +49,13 @@ def _is_falsey(value):
 
 
 def _build_nav2_start_actions(
-    pkg_bringup, nav_params_path, use_sim_time, enable_teleop
+    nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
 ):
     """Return Nav2 start actions for direct or muxed operation."""
     nav2_launch = GroupAction(
         [
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(pkg_bringup, "launch", "nav2_navigation.launch.py")
-                ),
+                PythonLaunchDescriptionSource(nav2_launch_path),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
@@ -69,9 +71,7 @@ def _build_nav2_start_actions(
             SetRemap(src="cmd_vel", dst="cmd_vel_nav"),
             SetRemap(src="cmd_vel_smoothed", dst="cmd_vel_nav"),
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(pkg_bringup, "launch", "nav2_navigation.launch.py")
-                ),
+                PythonLaunchDescriptionSource(nav2_launch_path),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
@@ -99,7 +99,7 @@ def _select_localiser_cmd_vel_topic(enable_teleop):
 def _handle_preflight_exit(
     event,
     _context,
-    pkg_bringup,
+    nav2_launch_path,
     nav_params_path,
     use_sim_time,
     enable_teleop,
@@ -107,7 +107,7 @@ def _handle_preflight_exit(
     """Start Nav2 only when the launch-gate preflight passes."""
     if event.returncode == 0:
         return _build_nav2_start_actions(
-            pkg_bringup, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
         )
 
     return [
@@ -137,21 +137,26 @@ def generate_launch_description():
     autonomous and manual velocity commands through a twist mux.
     """
     # Locate the configuration files
-    pkg_bringup = get_package_share_directory("lunabot_bringup")
-    pkg_nav = get_package_share_directory("lunabot_navigation")
-    pkg_teleop = get_package_share_directory("lunabot_teleop")
-
-    nav_params_path = os.path.join(pkg_nav, "config", "nav2_params.yaml")
-    blank_map_path = os.path.join(pkg_nav, "maps", "moon_yard_blank.yaml")
-    rviz_config_path = os.path.join(pkg_bringup, "rviz", "navigation.rviz")
-    twist_mux_params_path = os.path.join(
-        pkg_bringup, "config", "twist_mux.yaml"
+    nav2_launch_path = _share_path(
+        "lunabot_bringup", "launch", "nav2_navigation.launch.py"
     )
-    preflight_config_path = os.path.join(
-        pkg_bringup, "config", "preflight_checks.yaml"
+    localisation_launch_path = _share_path(
+        "lunabot_bringup", "launch", "localisation.launch.py"
     )
-    preflight_lidar_debug_config_path = os.path.join(
-        pkg_bringup, "config", "preflight_checks_lidar_debug.yaml"
+    teleop_launch_path = _share_path(
+        "lunabot_teleop", "launch", "joystick_teleop.launch.py"
+    )
+    nav_params_path = _share_path("lunabot_navigation", "config", "nav2_params.yaml")
+    blank_map_path = _share_path("lunabot_navigation", "maps", "moon_yard_blank.yaml")
+    rviz_config_path = _share_path("lunabot_bringup", "rviz", "navigation.rviz")
+    twist_mux_params_path = _share_path(
+        "lunabot_bringup", "config", "twist_mux.yaml"
+    )
+    preflight_config_path = _share_path(
+        "lunabot_bringup", "config", "preflight_checks.yaml"
+    )
+    preflight_lidar_debug_config_path = _share_path(
+        "lunabot_bringup", "config", "preflight_checks_lidar_debug.yaml"
     )
     default_preflight_config = select_preflight_config_path(
         False,
@@ -178,9 +183,7 @@ def generate_launch_description():
     localiser_cmd_vel_topic = _select_localiser_cmd_vel_topic(enable_teleop)
 
     localisation_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_bringup, "launch", "localisation.launch.py")
-        ),
+        PythonLaunchDescriptionSource(localisation_launch_path),
         launch_arguments={
             "lidar_costmap_phase": lidar_costmap_phase,
             "enable_visual_slam": enable_visual_slam,
@@ -211,9 +214,7 @@ def generate_launch_description():
     )
 
     teleop_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_teleop, "launch", "joystick_teleop.launch.py")
-        ),
+        PythonLaunchDescriptionSource(teleop_launch_path),
         launch_arguments={
             "use_sim_time": use_sim_time,
             "joy_device_id": joy_device_id,
@@ -322,7 +323,7 @@ def generate_launch_description():
             on_exit=lambda event, context: _handle_preflight_exit(
                 event,
                 context,
-                pkg_bringup,
+                nav2_launch_path,
                 nav_params_path,
                 use_sim_time,
                 enable_teleop,
@@ -337,7 +338,7 @@ def generate_launch_description():
             on_exit=lambda event, context: _handle_preflight_exit(
                 event,
                 context,
-                pkg_bringup,
+                nav2_launch_path,
                 nav_params_path,
                 use_sim_time,
                 enable_teleop,
@@ -348,7 +349,7 @@ def generate_launch_description():
 
     direct_nav2_start = GroupAction(
         _build_nav2_start_actions(
-            pkg_bringup, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
         ),
         condition=IfCondition(_is_falsey(enforce_preflight)),
     )
