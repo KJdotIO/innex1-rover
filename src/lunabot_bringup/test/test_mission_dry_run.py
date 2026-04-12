@@ -3,10 +3,12 @@
 from types import SimpleNamespace
 
 from lunabot_bringup import mission_dry_run as dry_run_module
-from lunabot_bringup.mission_dry_run import dry_run_exit_code
-from lunabot_bringup.mission_dry_run import execute_dry_run
-from lunabot_bringup.mission_dry_run import MissionDryRunHarness
-from lunabot_bringup.mission_dry_run import summary_lines
+from lunabot_bringup.mission_dry_run import (
+    MissionDryRunHarness,
+    dry_run_exit_code,
+    execute_dry_run,
+    summary_lines,
+)
 
 
 def _fake_logger():
@@ -15,6 +17,11 @@ def _fake_logger():
         error=lambda _msg: None,
         warn=lambda _msg: None,
     )
+
+
+def _failed_runtime_preflight(self):
+    del self
+    return False, "runtime preflight failed"
 
 
 def test_execute_dry_run_runs_each_step_once_on_success():
@@ -123,7 +130,7 @@ def test_run_returns_non_zero_when_runtime_preflight_fails(monkeypatch):
     monkeypatch.setattr(
         dry_run_module.MissionDryRunHarness,
         "_run_runtime_preflight",
-        lambda self: (False, "runtime preflight failed"),
+        _failed_runtime_preflight,
     )
 
     status = MissionDryRunHarness.run(harness)
@@ -139,7 +146,7 @@ def test_run_prints_flat_summary_when_runtime_preflight_fails(
     monkeypatch.setattr(
         dry_run_module.MissionDryRunHarness,
         "_run_runtime_preflight",
-        lambda self: (False, "runtime preflight failed"),
+        _failed_runtime_preflight,
     )
 
     status = MissionDryRunHarness.run(harness)
