@@ -58,9 +58,7 @@ class MaterialActionServer(Node):
             return False
         if not isfinite(dump_duration_s):
             return False
-        if dump_duration_s < 0.0:
-            return False
-        return True
+        return not dump_duration_s < 0.0
 
     def goal_callback(self, goal_request):
         """Accept only deposit goals that match the supported contract."""
@@ -95,88 +93,94 @@ class MaterialActionServer(Node):
         result.duration_s = float(duration_s)
         return result
 
-    def execute_deposit(self, goal_handle):
-        """Run deposition stub with success, timeout, and failure paths."""
+    def _deposit_nominal_duration(self, goal_handle):
+        """Return the simulated deposit duration for this goal."""
         nominal_duration = float(self.get_parameter("deposit_nominal_duration_s").value)
         dump_duration = float(goal_handle.request.dump_duration_s)
         if dump_duration > 0.0:
-            nominal_duration = max(nominal_duration, dump_duration + 2.0)
+            return max(nominal_duration, dump_duration + 2.0)
+        return nominal_duration
 
-        timeout_s = float(goal_handle.request.timeout_s)
-        start = monotonic()
+    @staticmethod
+    def _deposit_phase(progress):
+        """Map progress to the current deposit feedback phase."""
+        if progress < 0.2:
+            return Deposit.Feedback.PHASE_PRECHECK
+        if progress < 0.45:
+            return Deposit.Feedback.PHASE_OPENING
+        if progress < 0.65:
+            return Deposit.Feedback.PHASE_RAISING
+        if progress < 0.85:
+            return Deposit.Feedback.PHASE_DUMPING
+        return Deposit.Feedback.PHASE_CLOSING
 
-        while rclpy.ok():
-            elapsed = monotonic() - start
+    def _publish_deposit_feedback(self, goal_handle, elapsed, nominal_duration):
+        """Publish one bounded deposit feedback update and return progress."""
+        progress = min(elapsed / max(nominal_duration, 0.1), 1.0)
 
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                return self._deposit_result(
-                    False,
-                    Deposit.Result.REASON_CANCELED,
-                    "Deposit goal canceled by client",
-                    1.0,
-                    elapsed,
-                )
+        feedback = Deposit.Feedback()
+        feedback.phase = self._deposit_phase(progress)
+        feedback.elapsed_s = float(elapsed)
+        feedback.actuator_current_a = float(3.5 + 2.5 * progress)
+        feedback.door_open = feedback.phase in (
+            Deposit.Feedback.PHASE_OPENING,
+            Deposit.Feedback.PHASE_RAISING,
+            Deposit.Feedback.PHASE_DUMPING,
+        )
+        feedback.bed_raised = feedback.phase in (
+            Deposit.Feedback.PHASE_RAISING,
+            Deposit.Feedback.PHASE_DUMPING,
+        )
+        feedback.estop_active = False
+        goal_handle.publish_feedback(feedback)
+        return progress
 
-            if timeout_s > 0.0 and elapsed >= timeout_s:
-                goal_handle.abort()
-                return self._deposit_result(
-                    False,
-                    Deposit.Result.REASON_TIMEOUT,
-                    "Deposition timeout reached",
-                    1.0,
-                    elapsed,
-                )
+    def _canceled_deposit_result(self, goal_handle, elapsed):
+        """Cancel the active goal and return the matching result."""
+        goal_handle.canceled()
+        return self._deposit_result(
+            False,
+            Deposit.Result.REASON_CANCELED,
+            "Deposit goal canceled by client",
+            1.0,
+            elapsed,
+        )
 
-            if self._should_force_failure("deposit"):
-                goal_handle.abort()
-                return self._deposit_result(
-                    False,
-                    Deposit.Result.REASON_FORCED_FAILURE,
-                    "Forced failure for bench testing",
-                    1.0,
-                    elapsed,
-                )
+    def _timeout_deposit_result(self, goal_handle, elapsed):
+        """Abort the active goal after a deposit timeout."""
+        goal_handle.abort()
+        return self._deposit_result(
+            False,
+            Deposit.Result.REASON_TIMEOUT,
+            "Deposition timeout reached",
+            1.0,
+            elapsed,
+        )
 
-            progress = min(elapsed / max(nominal_duration, 0.1), 1.0)
+    def _forced_failure_result(self, goal_handle, elapsed):
+        """Abort the goal when the bench is configured to force failure."""
+        goal_handle.abort()
+        return self._deposit_result(
+            False,
+            Deposit.Result.REASON_FORCED_FAILURE,
+            "Forced failure for bench testing",
+            1.0,
+            elapsed,
+        )
 
-            feedback = Deposit.Feedback()
-            if progress < 0.2:
-                feedback.phase = Deposit.Feedback.PHASE_PRECHECK
-            elif progress < 0.45:
-                feedback.phase = Deposit.Feedback.PHASE_OPENING
-            elif progress < 0.65:
-                feedback.phase = Deposit.Feedback.PHASE_RAISING
-            elif progress < 0.85:
-                feedback.phase = Deposit.Feedback.PHASE_DUMPING
-            else:
-                feedback.phase = Deposit.Feedback.PHASE_CLOSING
-            feedback.elapsed_s = float(elapsed)
-            feedback.actuator_current_a = float(3.5 + 2.5 * progress)
-            feedback.door_open = feedback.phase in (
-                Deposit.Feedback.PHASE_OPENING,
-                Deposit.Feedback.PHASE_RAISING,
-                Deposit.Feedback.PHASE_DUMPING,
-            )
-            feedback.bed_raised = feedback.phase in (
-                Deposit.Feedback.PHASE_RAISING,
-                Deposit.Feedback.PHASE_DUMPING,
-            )
-            feedback.estop_active = False
-            goal_handle.publish_feedback(feedback)
+    def _succeeded_deposit_result(self, goal_handle, elapsed):
+        """Mark the goal successful and return the result."""
+        goal_handle.succeed()
+        return self._deposit_result(
+            True,
+            Deposit.Result.REASON_SUCCESS,
+            "",
+            0.05,
+            elapsed,
+        )
 
-            if progress >= 1.0:
-                goal_handle.succeed()
-                return self._deposit_result(
-                    True,
-                    Deposit.Result.REASON_SUCCESS,
-                    "",
-                    0.05,
-                    elapsed,
-                )
-
-            sleep(self.loop_period_s)
-
+    def _shutdown_deposit_result(self, goal_handle, start):
+        """Abort active work during shutdown and report a bounded result."""
         if goal_handle.is_active:
             goal_handle.abort()
         return self._deposit_result(
@@ -186,6 +190,40 @@ class MaterialActionServer(Node):
             1.0,
             monotonic() - start,
         )
+
+    def _terminal_deposit_result(self, goal_handle, elapsed, timeout_s):
+        """Return a terminal result when the deposit loop should stop."""
+        if goal_handle.is_cancel_requested:
+            return self._canceled_deposit_result(goal_handle, elapsed)
+        if timeout_s > 0.0 and elapsed >= timeout_s:
+            return self._timeout_deposit_result(goal_handle, elapsed)
+        if self._should_force_failure("deposit"):
+            return self._forced_failure_result(goal_handle, elapsed)
+        return None
+
+    def execute_deposit(self, goal_handle):
+        """Run deposition stub with success, timeout, and failure paths."""
+        nominal_duration = self._deposit_nominal_duration(goal_handle)
+        timeout_s = float(goal_handle.request.timeout_s)
+        start = monotonic()
+
+        while rclpy.ok():
+            elapsed = monotonic() - start
+            terminal_result = self._terminal_deposit_result(
+                goal_handle, elapsed, timeout_s
+            )
+            if terminal_result is not None:
+                return terminal_result
+
+            progress = self._publish_deposit_feedback(
+                goal_handle, elapsed, nominal_duration
+            )
+            if progress >= 1.0:
+                return self._succeeded_deposit_result(goal_handle, elapsed)
+
+            sleep(self.loop_period_s)
+
+        return self._shutdown_deposit_result(goal_handle, start)
 
 
 def main(args=None):
