@@ -3,8 +3,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from lunabot_bringup.mission_manager import MissionManager
-from lunabot_bringup.mission_manager import MissionState
+from lunabot_bringup.mission_manager import MissionManager, MissionState
 from lunabot_bringup.mission_timer import MissionTimer
 
 
@@ -21,7 +20,7 @@ def _make_manager(monkeypatch):
     """Construct a MissionManager without spinning a real ROS node."""
     monkeypatch.setattr(
         "rclpy.node.Node.__init__",
-        lambda self, *args, **kwargs: None,
+        lambda _self, *_args, **_kwargs: None,
     )
     manager = object.__new__(MissionManager)
     manager.get_logger = _fake_logger

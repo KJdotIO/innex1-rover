@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import time
 
-from nav2_msgs.action import NavigateToPose
 import rclpy
-from rclpy.action import ActionServer
-from rclpy.action import CancelResponse
-from rclpy.action import GoalResponse
+from nav2_msgs.action import NavigateToPose
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node

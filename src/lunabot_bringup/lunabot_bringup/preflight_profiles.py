@@ -5,7 +5,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-
 CHECK_SECTIONS = (
     "required_topics",
     "required_tf_links",
