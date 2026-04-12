@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import rclpy
+from rclpy.exceptions import RCLError
 from rclpy.node import Node
 from rosgraph_msgs.msg import Clock
 
@@ -64,7 +65,11 @@ def main() -> None:
         rclpy.spin(node)
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except RCLError:
+            pass
 
 
 if __name__ == "__main__":
