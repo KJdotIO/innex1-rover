@@ -25,8 +25,24 @@ rtabmap:
     sync_queue_size: 10
     wait_for_transform: 0.2
 
-    # Grid resolution (matches Nav2 costmap)
+    # Grid: ground/obstacle segmentation for /cloud_obstacles output
     Grid/CellSize: "0.05"
+    Grid/FromDepth: "true"
+    Grid/3D: "true"
+    Grid/Sensor: "2"
+    Grid/MaxGroundAngle: "30"
+    Grid/MinGroundHeight: "-0.05"
+    Grid/MaxGroundHeight: "0.10"
+    Grid/MaxObstacleHeight: "0.8"
+    Grid/MinClusterSize: "20"
+    Grid/ClusterRadius: "0.1"
+    Grid/RangeMin: "0.3"
+    Grid/RangeMax: "4.0"
+    Grid/RayTracing: "true"
+    Grid/GroundIsObstacle: "false"
+    Grid/FlatObstacleDetected: "true"
+    Grid/NormalsSegmentation: "false"
+    RGBD/CreateOccupancyGrid: "true"
 
     # Flat arena: constrain optimisation to 2D
     Optimizer/Slam2D: "true"
