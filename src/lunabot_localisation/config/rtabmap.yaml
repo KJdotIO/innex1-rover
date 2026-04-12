@@ -44,6 +44,16 @@ rtabmap:
     Grid/NormalsSegmentation: "false"
     RGBD/CreateOccupancyGrid: "true"
 
+    # Only create new SLAM nodes when the rover has moved
+    RGBD/LinearUpdate: "0.2"
+    RGBD/AngularUpdate: "0.2"
+    RGBD/StartAtOrigin: "true"
+
+    # Ensure global grid covers the arena even before full exploration
+    GridGlobal/MinSize: "20.0"
+    GridGlobal/OccupancyThr: "0.5"
+    GridGlobal/FullUpdate: "true"
+
     # Flat arena: constrain optimisation to 2D
     Optimizer/Slam2D: "true"
     Optimizer/Strategy: "2"

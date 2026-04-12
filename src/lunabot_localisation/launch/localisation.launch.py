@@ -238,8 +238,6 @@ def generate_launch_description():
                     *camera_remappings,
                     ("odom", "/odometry/local"),
                     ("tag_detections", "/camera_front/tags"),
-                    ("map", "/rtabmap/map"),
-                    ("grid_map", "/rtabmap/grid_map"),
                 ],
                 arguments=["-d"],
                 condition=normal_mode,
