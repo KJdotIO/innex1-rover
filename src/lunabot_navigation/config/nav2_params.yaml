@@ -43,8 +43,9 @@ planner_server:
       max_planning_time: 5.0
 
 # --- Global costmap ---
-# Uses RTAB-Map's /cloud_obstacles (ground already filtered) in a VoxelLayer.
-# Ground segmentation is handled by RTAB-Map's Grid/* parameters.
+# Depth camera point cloud with height-based ground filtering.
+# min_obstacle_height 0.15m excludes ground and small terrain bumps
+# (camera sits at ~0.25m; ground in base_footprint frame is z ≈ 0).
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -68,7 +69,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
         footprint_clearing_enabled: true
-        max_obstacle_height: 2.0
+        max_obstacle_height: 1.0
         publish_voxel_map: false
         origin_z: 0.0
         z_resolution: 0.05
@@ -76,18 +77,21 @@ global_costmap:
         unknown_threshold: 15
         mark_threshold: 0
         combination_method: 1
-        observation_sources: depth_obstacles
-        depth_obstacles:
-          topic: /cloud_obstacles
+        observation_sources: front_depth
+        front_depth:
+          topic: /camera_front/points
           data_type: "PointCloud2"
           marking: true
-          clearing: false
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
+          clearing: true
+          min_obstacle_height: 0.15
+          max_obstacle_height: 1.0
           obstacle_max_range: 4.0
-          obstacle_min_range: 0.0
+          obstacle_min_range: 0.3
           raytrace_max_range: 5.0
           raytrace_min_range: 0.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -97,8 +101,7 @@ global_costmap:
       always_send_full_costmap: true
 
 # --- Local costmap ---
-# Rolling window around the robot for reactive obstacle avoidance.
-# Uses /cloud_obstacles from RTAB-Map for depth camera perception.
+# Rolling window with depth camera for reactive avoidance.
 local_costmap:
   local_costmap:
     ros__parameters:
@@ -118,7 +121,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
         footprint_clearing_enabled: true
-        max_obstacle_height: 2.0
+        max_obstacle_height: 1.0
         publish_voxel_map: false
         origin_z: 0.0
         z_resolution: 0.10
@@ -126,21 +129,22 @@ local_costmap:
         unknown_threshold: 15
         mark_threshold: 0
         combination_method: 1
-        observation_sources: depth_obstacles
-        depth_obstacles:
-          topic: /cloud_obstacles
+        observation_sources: front_depth
+        front_depth:
+          topic: /camera_front/points
           data_type: "PointCloud2"
           marking: true
           clearing: true
-          expected_update_rate: 2.0
-          observation_persistence: 0.0
-          footprint_clearing_enabled: true
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
+          min_obstacle_height: 0.15
+          max_obstacle_height: 1.0
           obstacle_max_range: 4.0
-          obstacle_min_range: 0.0
+          obstacle_min_range: 0.3
           raytrace_max_range: 5.0
           raytrace_min_range: 0.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          footprint_clearing_enabled: true
+          inf_is_valid: false
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
