@@ -9,10 +9,10 @@
     camera_frame: camera_front_optical_frame
     target_frame: base_footprint
     search_direction: left
-    angular_speed_rad_s: 0.25
-    candidate_alignment_angular_speed_rad_s: 0.08
-    max_search_duration_s: 30.0
-    max_search_yaw_rad: 6.283185307179586
+    angular_speed_rad_s: 0.0
+    candidate_alignment_angular_speed_rad_s: 0.0
+    max_search_duration_s: 5.0
+    max_search_yaw_rad: 0.0
     candidate_settle_duration_s: 0.35
     stable_window_duration_s: 0.8
     stable_window_min_samples: 4
