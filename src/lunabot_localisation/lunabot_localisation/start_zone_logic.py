@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from dataclasses import dataclass
-import math
 
 
 @dataclass(frozen=True)
@@ -93,10 +93,7 @@ class StableLockTracker:
         if self.translation_spread() > max_translation_spread_m:
             return False
 
-        if self.yaw_spread() > max_yaw_spread_rad:
-            return False
-
-        return True
+        return not self.yaw_spread() > max_yaw_spread_rad
 
     def translation_spread(self) -> float:
         """Return the maximum planar distance between tracked samples."""
