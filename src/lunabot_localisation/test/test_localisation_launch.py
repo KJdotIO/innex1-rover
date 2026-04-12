@@ -144,3 +144,12 @@ def test_june_baseline_ekf_does_not_fuse_visual_odometry(config_name):
 
     assert "odom1" not in odom_parameters
     assert "/visual_odometry" not in odom_parameters.values()
+
+
+def test_competition_baseline_global_ekf_does_not_fuse_tag_pose_continuously():
+    ekf_path = Path(__file__).resolve().parents[1] / "config" / "ekf.yaml"
+    config = yaml.safe_load(ekf_path.read_text())
+    map_parameters = config["ekf_filter_node_map"]["ros__parameters"]
+
+    assert "pose0" not in map_parameters
+    assert "/tag_pose" not in map_parameters.values()

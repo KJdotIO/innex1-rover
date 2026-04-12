@@ -4,31 +4,33 @@ This package contains localisation launch/config and localisation helper nodes f
 
 ## What this package is responsible for
 
-`lunabot_localisation` provides fused localisation outputs consumed by planning and mapping components. It owns configuration around EKF-based local/global pose estimation and tag-based correction paths.
+`lunabot_localisation` provides fused localisation outputs consumed by planning and mapping components. It owns configuration around EKF-based local/global pose estimation and the bounded start-zone tag initialisation path.
 
 ## Core outputs
 
 - Local fused odometry for navigation smoothness.
-- Global correction path through tag-derived pose updates.
+- Global pose initialisation and bounded stationary recovery through the start-zone tag path.
 - TF relationships required by planning components.
 
 ## June baseline
 
-The current baseline is deliberately simple: wheel odom, IMU, and start-zone
-AprilTag correction. RTAB-Map can still be launched for experimentation, but
-raw visual odometry is not fused into the EKFs as part of the June baseline.
+The current baseline is deliberately simple: wheel odom, IMU, and a start-zone
+AprilTag pose seed. The tag is used to initialise the global pose, not to
+continuously correct the global EKF while the rover is driving. RTAB-Map can
+still be launched for experimentation, but raw visual odometry is not fused
+into the EKFs as part of the June baseline.
 
 ## Key files
 
 - `config/ekf.yaml`: EKF fusion and frame configuration.
 - `launch/localisation.launch.py`: localisation bring-up path.
-- `lunabot_localisation/tag_pose_publisher.py`: bridge from tag detections to pose updates.
+- `lunabot_localisation/tag_pose_publisher.py`: bridge from tag detections to bounded pose seeding / recovery inputs.
 
 ## Common failure modes
 
 - Frame mismatch (`base_link` vs `base_footprint`) causing downstream planner instability.
 - Covariances set unrealistically low, making the filter overconfident.
-- Missing tag detections causing global drift to accumulate over longer runs.
+- Weak continuous odometry causing drift to accumulate after the start-zone seed.
 
 ## Where to read next
 

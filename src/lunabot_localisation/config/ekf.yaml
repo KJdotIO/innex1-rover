@@ -1,6 +1,7 @@
 ### Dual EKF Configuration ###
 # Local EKF: smooth odom -> base_footprint (continuous, never jumps)
-# Global EKF: map -> odom (jumps when AprilTag seen, corrects drift)
+# Global EKF: seeded once from the start-zone tag, then propagated from the
+# local EKF without continuous tag fusion while driving.
 
 ekf_filter_node_odom:
   ros__parameters:
@@ -83,8 +84,9 @@ ekf_filter_node_map:
 
     # [X, Y, Z, Roll, Pitch, Yaw, VX, VY, VZ, VRoll, VPitch, VYaw, AX, AY, AZ]
 
-    # Continuous motion source from local EKF (odom -> base_footprint)
-    # Keep global EKF lightweight: local filtered odom + intermittent tag pose.
+    # Continuous motion source from local EKF (odom -> base_footprint).
+    # The competition baseline treats AprilTag as an initialisation / recovery
+    # aid, not as a live correction source while the rover is moving.
     odom0: /odometry/local
     odom0_config:
       [
@@ -104,27 +106,3 @@ ekf_filter_node_map:
         false,
         false,
       ]
-
-    # AprilTag pose correction (discontinuous, only in global EKF)
-    pose0: /tag_pose
-    pose0_config:
-      [
-        true,
-        true,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-      ]
-    pose0_differential: false
-    pose0_relative: false
-    pose0_rejection_threshold: 4.0
