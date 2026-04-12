@@ -11,6 +11,7 @@ from lunabot_interfaces.action import Deposit
 
 def _material_server():
     server = object.__new__(MaterialActionServer)
+
     def _parameter(name):
         values = {
             "deposit_nominal_duration_s": 5.0,
