@@ -117,8 +117,15 @@ def generate_launch_description():
         name="clock_bridge",
         arguments=["/world/moon_yard/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock"],
         remappings=[
-            ("/world/moon_yard/clock", "/clock"),
+            ("/world/moon_yard/clock", "/clock/raw"),
         ],
+        output="screen",
+    )
+
+    sim_clock_relay = Node(
+        package="lunabot_simulation",
+        executable="sim_clock_relay",
+        name="sim_clock_relay",
         output="screen",
     )
 
@@ -168,6 +175,7 @@ def generate_launch_description():
             robot_state_publisher,
             spawn_robot,
             clock_bridge,
+            sim_clock_relay,
             robot_bridge,
             camera_bridge,
             camera_points_bridge,

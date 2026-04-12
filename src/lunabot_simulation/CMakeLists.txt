@@ -32,6 +32,12 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/sim_clock_relay.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME sim_clock_relay
+)
+
 # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our models
 set(ENV{GZ_SIM_RESOURCE_PATH} "${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/models:$ENV{GZ_SIM_RESOURCE_PATH}")
 
