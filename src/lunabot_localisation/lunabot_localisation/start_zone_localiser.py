@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from contextlib import suppress
 
 import rclpy
 import tf2_ros
