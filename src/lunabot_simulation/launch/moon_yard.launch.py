@@ -1,6 +1,7 @@
 import os
 import platform
 import tempfile
+from pathlib import Path
 
 import xacro
 from ament_index_python.packages import get_package_share_directory
@@ -11,35 +12,60 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+def _package_path(package_name: str) -> Path:
+    """Return the package share directory as a Path."""
+    return Path(get_package_share_directory(package_name))
+
+
+def _patched_world_path(world_path: Path) -> Path:
+    """Swap Ogre2 for Ogre on macOS and keep the original world elsewhere."""
+    if platform.system() != "Darwin":
+        return world_path
+
+    content = world_path.read_text()
+    if "<render_engine>ogre2</render_engine>" not in content:
+        return world_path
+
+    patched_content = content.replace(
+        "<render_engine>ogre2</render_engine>",
+        "<render_engine>ogre</render_engine>",
+    )
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        prefix="moon_yard_mac_",
+        suffix=".sdf",
+        delete=False,
+    ) as temp_file:
+        temp_file.write(patched_content)
+
+    patched_world_path = Path(temp_file.name)
+    print(f"macOS detected: using patched Ogre1 world at {patched_world_path}")
+    return patched_world_path
+
+
+def _prepend_resource_path(models_path: Path) -> None:
+    """Add the simulation models path to GZ_SIM_RESOURCE_PATH once."""
+    path_text = str(models_path)
+    resource_paths = [
+        entry
+        for entry in os.environ.get("GZ_SIM_RESOURCE_PATH", "").split(os.pathsep)
+        if entry
+    ]
+    if path_text not in resource_paths:
+        os.environ["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join([path_text, *resource_paths])
+
+
 def generate_launch_description():
     pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
-    pkg_lunabot_description = get_package_share_directory("lunabot_description")
-    pkg_lunabot_simulation = get_package_share_directory("lunabot_simulation")
-    world_path = os.path.join(pkg_lunabot_simulation, "worlds", "moon_yard.sdf")
+    pkg_lunabot_description = _package_path("lunabot_description")
+    pkg_lunabot_simulation = _package_path("lunabot_simulation")
+    world_path = _patched_world_path(pkg_lunabot_simulation / "worlds" / "moon_yard.sdf")
 
-    # switches to ogre 1 preflight if on mac. doesnt affect linux
-    if platform.system() == "Darwin":
-        with open(world_path, "r") as f:
-            content = f.read()
-        if "<render_engine>ogre2</render_engine>" in content:
-            patched_content = content.replace(
-                "<render_engine>ogre2</render_engine>",
-                "<render_engine>ogre</render_engine>",
-            )
-            tmp_world = os.path.join(tempfile.gettempdir(), "moon_yard_mac.sdf")
-            with open(tmp_world, "w") as f:
-                f.write(patched_content)
-            world_path = tmp_world
-            print(f"macOS detected: Using patched Ogre1 world at {world_path}")
-
-    # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our custom models
-    models_path = os.path.join(pkg_lunabot_simulation, "models")
-    gz_resource_path = os.environ.get("GZ_SIM_RESOURCE_PATH", "")
-    if models_path not in gz_resource_path:
-        os.environ["GZ_SIM_RESOURCE_PATH"] = models_path + ":" + gz_resource_path
+    _prepend_resource_path(pkg_lunabot_simulation / "models")
 
     robot_description = xacro.process(
-        os.path.join(pkg_lunabot_description, "urdf", "lunabot.urdf.xacro")
+        str(pkg_lunabot_description / "urdf" / "lunabot.urdf.xacro")
     )
 
     # Spawn position - surface mesh is at z=0, rover spawns above and drops
@@ -50,7 +76,7 @@ def generate_launch_description():
     # we'll run the sim without gazebo gui to save resources for now
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, "launch", "gz_sim.launch.py")
+            str(Path(pkg_ros_gz_sim) / "launch" / "gz_sim.launch.py")
         ),
         launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
     )
