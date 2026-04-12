@@ -1,13 +1,42 @@
 """Launch joystick teleoperation nodes for Lunabot."""
 
-import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+
+def _config_path(*parts: str) -> str:
+    """Return a teleop package path as a string for launch parameters."""
+    return str(Path(get_package_share_directory("lunabot_teleop")).joinpath(*parts))
+
+
+def _validate_non_negative_int(value: str, argument_name: str) -> str:
+    """Return a normalised integer string or raise on invalid input."""
+    try:
+        parsed = int(str(value).strip())
+    except ValueError as error:
+        raise ValueError(
+            f"Expected an integer launch value for '{argument_name}', got '{value}'."
+        ) from error
+    if parsed < 0:
+        raise ValueError(
+            f"Expected '{argument_name}' to be zero or greater, got '{value}'."
+        )
+    return str(parsed)
+
+
+def _validate_launch_arguments(context):
+    """Reject invalid launch arguments before any teleop nodes start."""
+    _validate_non_negative_int(
+        LaunchConfiguration("joy_device_id").perform(context),
+        argument_name="joy_device_id",
+    )
+    return []
 
 
 def generate_launch_description():
@@ -18,8 +47,7 @@ def generate_launch_description():
     Lunabot Xbox-style mapping. Teleop commands are published on
     /cmd_vel_teleop so a mux can arbitrate between manual and autonomous input.
     """
-    pkg_share = get_package_share_directory("lunabot_teleop")
-    teleop_config = os.path.join(pkg_share, "config", "xbox_teleop.yaml")
+    teleop_config = _config_path("config", "xbox_teleop.yaml")
     use_sim_time = LaunchConfiguration("use_sim_time")
     joy_device_id = LaunchConfiguration("joy_device_id")
 
@@ -58,10 +86,9 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "joy_device_id",
                 default_value="0",
-                description=(
-                    "SDL device index for the connected controller."
-                ),
+                description=("SDL device index for the connected controller."),
             ),
+            OpaqueFunction(function=_validate_launch_arguments),
             game_controller,
             teleop_twist,
         ]
