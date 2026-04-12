@@ -14,8 +14,10 @@ BLOCKING_BASE_PYTHON_TARGETS = [
 ]
 BLOCKING_STRICT_PYTHON_TARGETS = [
     ".github/scripts",
+    "src/lunabot_bringup",
     "src/lunabot_control",
     "src/lunabot_excavation",
+    "src/lunabot_localisation",
 ]
 ADVISORY_PYTHON_TARGETS = [
     ".github/scripts",
@@ -31,8 +33,10 @@ BLOCKING_YAML_TARGETS = [
     ".yamllint.yml",
 ]
 BLOCKING_COMPLEXITY_TARGETS = [
+    "src/lunabot_bringup",
     "src/lunabot_control",
     "src/lunabot_excavation",
+    "src/lunabot_localisation",
 ]
 ADVISORY_COMPLEXITY_TARGETS = [
     "tools",
