@@ -1,5 +1,6 @@
 """Launch sim, navigation, and a rosbag recorder for manual LIO testing."""
 
+from datetime import datetime
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
@@ -22,6 +23,7 @@ def _launch_file(package_name: str, *parts: str) -> str:
 
 
 def generate_launch_description():
+    default_bag_output = datetime.now().strftime("bags/navigation_lio_debug_%Y%m%d_%H%M%S")
     bag_output = LaunchConfiguration("bag_output")
     enable_bag_recording = LaunchConfiguration("enable_bag_recording")
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -78,7 +80,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "bag_output",
-                default_value="bags/navigation_lio_debug",
+                default_value=default_bag_output,
                 description="Output directory for rosbag2 debug recordings.",
             ),
             DeclareLaunchArgument(

@@ -7,7 +7,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import rclpy
-from rclpy.exceptions import RCLError
 from rclpy.node import Node
 from rosgraph_msgs.msg import Clock
 
@@ -68,7 +67,7 @@ def main() -> None:
         try:
             if rclpy.ok():
                 rclpy.shutdown()
-        except RCLError:
+        except Exception:
             pass
 
 
