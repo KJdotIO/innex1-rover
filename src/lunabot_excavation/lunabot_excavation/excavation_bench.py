@@ -11,7 +11,6 @@ from std_srvs.srv import Trigger
 from lunabot_interfaces.msg import ExcavationStatus
 from lunabot_interfaces.srv import ExcavationJog
 
-
 STATE_LABELS = {
     ExcavationStatus.STATE_IDLE: "idle",
     ExcavationStatus.STATE_HOMING: "homing",

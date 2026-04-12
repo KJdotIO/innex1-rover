@@ -4,10 +4,34 @@ from types import SimpleNamespace
 
 from rclpy.action import GoalResponse
 
-from lunabot_excavation import excavation_action_server as excavation_module
+import lunabot_excavation.excavation_action_server as excavation_module
 from lunabot_excavation.excavation_action_server import ExcavationActionServer
 from lunabot_interfaces.action import Excavate
 from lunabot_interfaces.msg import ExcavationStatus, ExcavationTelemetry
+
+
+def _ignore_feedback(goal_handle, elapsed):
+    del goal_handle, elapsed
+
+
+def _settled_stop(timeout_s):
+    del timeout_s
+    return "settled"
+
+
+def _fault_stop(timeout_s):
+    del timeout_s
+    return "fault"
+
+
+def _wait_timeout(timeout_s, goal_handle, start_time):
+    del timeout_s, goal_handle, start_time
+    return "timeout", 1.1
+
+
+def _wait_cancel(timeout_s, goal_handle, start_time):
+    del timeout_s, goal_handle, start_time
+    return "cancel", 0.8
 
 
 def _excavation_server():
@@ -33,7 +57,7 @@ def _excavation_server():
         info=lambda _msg: None,
         warn=lambda _msg: None,
     )
-    server._publish_feedback = lambda _goal_handle, _elapsed: None
+    server._publish_feedback = _ignore_feedback
     return server
 
 
@@ -103,7 +127,7 @@ def test_execute_excavate_returns_timeout_result(monkeypatch):
     server._call_trigger = lambda client, timeout_s: (
         trigger_calls.append((client, timeout_s)) or SimpleNamespace(success=True)
     )
-    server._wait_for_stop_settle = lambda _timeout_s: "settled"
+    server._wait_for_stop_settle = _settled_stop
 
     result = server.execute_excavate(goal_handle)
 
@@ -131,7 +155,7 @@ def test_execute_excavate_returns_canceled_result(monkeypatch):
     server._call_trigger = lambda client, timeout_s: (
         trigger_calls.append((client, timeout_s)) or SimpleNamespace(success=True)
     )
-    server._wait_for_stop_settle = lambda _timeout_s: "settled"
+    server._wait_for_stop_settle = _settled_stop
 
     result = server.execute_excavate(goal_handle)
 
@@ -209,8 +233,8 @@ def test_execute_excavate_returns_timeout_result_during_homing():
     server._call_trigger = lambda client, timeout_s: (
         trigger_calls.append((client, timeout_s)) or SimpleNamespace(success=True)
     )
-    server._wait_for_ready_or_fault = lambda *_args: ("timeout", 1.1)
-    server._wait_for_stop_settle = lambda _timeout_s: "settled"
+    server._wait_for_ready_or_fault = _wait_timeout
+    server._wait_for_stop_settle = _settled_stop
 
     result = server.execute_excavate(goal_handle)
 
@@ -247,7 +271,7 @@ def test_execute_excavate_fault_beats_cancel_during_stop_settle(monkeypatch):
         return SimpleNamespace(success=True)
 
     server._call_trigger = _call_trigger
-    server._wait_for_stop_settle = lambda _timeout_s: "fault"
+    server._wait_for_stop_settle = _fault_stop
 
     result = server.execute_excavate(goal_handle)
 
@@ -283,7 +307,7 @@ def test_execute_excavate_fault_beats_timeout_during_stop_settle(monkeypatch):
         return SimpleNamespace(success=True)
 
     server._call_trigger = _call_trigger
-    server._wait_for_stop_settle = lambda _timeout_s: "fault"
+    server._wait_for_stop_settle = _fault_stop
 
     result = server.execute_excavate(goal_handle)
 
@@ -321,8 +345,8 @@ def test_execute_excavate_estop_beats_cancel_during_homing_stop_settle():
         return SimpleNamespace(success=True)
 
     server._call_trigger = _call_trigger
-    server._wait_for_ready_or_fault = lambda *_args: ("cancel", 0.8)
-    server._wait_for_stop_settle = lambda _timeout_s: "fault"
+    server._wait_for_ready_or_fault = _wait_cancel
+    server._wait_for_stop_settle = _fault_stop
 
     result = server.execute_excavate(goal_handle)
 

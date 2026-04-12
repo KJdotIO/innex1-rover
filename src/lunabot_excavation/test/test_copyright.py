@@ -1,5 +1,4 @@
 import pytest
-
 from ament_copyright.main import main
 
 
