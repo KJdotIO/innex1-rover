@@ -137,7 +137,6 @@ def generate_launch_description():
     autonomous and manual velocity commands through a twist mux.
     """
     # Locate the configuration files
-    pkg_bringup = get_package_share_directory("lunabot_bringup")
     nav2_launch_path = _share_path(
         "lunabot_bringup", "launch", "nav2_navigation.launch.py"
     )
