@@ -1,9 +1,16 @@
-import os
-from glob import glob
+from pathlib import Path
 
 from setuptools import find_packages, setup
 
 package_name = "lunabot_teleop"
+package_root = Path(__file__).resolve().parent
+
+
+def _relative_matches(pattern: str) -> list[str]:
+    """Return package-local files relative to the setup.py directory."""
+    return sorted(
+        str(path.relative_to(package_root)) for path in package_root.glob(pattern)
+    )
 
 setup(
     name=package_name,
@@ -16,12 +23,12 @@ setup(
         ),
         ("share/" + package_name, ["package.xml"]),
         (
-            os.path.join("share", package_name, "launch"),
-            glob("launch/*.launch.py"),
+            f"share/{package_name}/launch",
+            _relative_matches("launch/*.launch.py"),
         ),
         (
-            os.path.join("share", package_name, "config"),
-            glob("config/*.yaml"),
+            f"share/{package_name}/config",
+            _relative_matches("config/*.yaml"),
         ),
     ],
     install_requires=["setuptools"],
