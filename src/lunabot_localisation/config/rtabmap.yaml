@@ -15,7 +15,7 @@ rtabmap:
     subscribe_rgbd: false
     subscribe_odom_info: false
     approx_sync: true
-    approx_sync_max_interval: 0.02
+    approx_sync_max_interval: 0.1
 
     frame_id: "base_footprint"
     odom_frame_id: "odom"
@@ -23,7 +23,7 @@ rtabmap:
 
     topic_queue_size: 10
     sync_queue_size: 10
-    wait_for_transform: 0.2
+    wait_for_transform: 1.0
 
     # Grid: ground/obstacle segmentation for /cloud_obstacles output
     Grid/CellSize: "0.05"
