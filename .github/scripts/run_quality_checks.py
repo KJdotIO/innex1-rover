@@ -18,6 +18,10 @@ BLOCKING_STRICT_PYTHON_TARGETS = [
     "src/lunabot_control",
     "src/lunabot_excavation",
     "src/lunabot_localisation",
+    "src/lunabot_navigation",
+    "src/lunabot_perception",
+    "src/lunabot_simulation",
+    "src/lunabot_teleop",
 ]
 ADVISORY_PYTHON_TARGETS = [
     ".github/scripts",
@@ -26,6 +30,10 @@ ADVISORY_PYTHON_TARGETS = [
     "src/lunabot_control",
     "src/lunabot_excavation",
     "src/lunabot_localisation",
+    "src/lunabot_navigation",
+    "src/lunabot_perception",
+    "src/lunabot_simulation",
+    "src/lunabot_teleop",
 ]
 BLOCKING_YAML_TARGETS = [
     ".github",
@@ -37,6 +45,10 @@ BLOCKING_COMPLEXITY_TARGETS = [
     "src/lunabot_control",
     "src/lunabot_excavation",
     "src/lunabot_localisation",
+    "src/lunabot_navigation",
+    "src/lunabot_perception",
+    "src/lunabot_simulation",
+    "src/lunabot_teleop",
 ]
 ADVISORY_COMPLEXITY_TARGETS = [
     "tools",
@@ -44,6 +56,10 @@ ADVISORY_COMPLEXITY_TARGETS = [
     "src/lunabot_control",
     "src/lunabot_excavation",
     "src/lunabot_localisation",
+    "src/lunabot_navigation",
+    "src/lunabot_perception",
+    "src/lunabot_simulation",
+    "src/lunabot_teleop",
 ]
 
 
