@@ -199,7 +199,7 @@ def generate_launch_description():
                 "scan_height": 60,
                 "range_min": 0.3,
                 "range_max": 4.0,
-                "output_frame_id": "camera_front_link",
+                "output_frame": "camera_front_link",
                 "scan_time": 0.067,
                 "use_sim_time": use_sim_time,
             },
