@@ -1,16 +1,21 @@
 """Unit tests for phase-scoped preflight filtering and CLI helpers."""
 
+import argparse
 import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-from lunabot_bringup.preflight_check import ACTION_TYPE_MAP
-from lunabot_bringup.preflight_check import _parse_bool_text
-from lunabot_bringup.preflight_check import _strip_ros_cli_args
-from lunabot_bringup.preflight_profiles import filter_preflight_config
-from lunabot_bringup.preflight_profiles import validate_phase
+from lunabot_bringup.preflight_check import (
+    ACTION_TYPE_MAP,
+    DURABILITY_MAP,
+    RELIABILITY_MAP,
+    _parse_bool_text,
+    _parse_qos_policy,
+    _strip_ros_cli_args,
+)
+from lunabot_bringup.preflight_profiles import filter_preflight_config, validate_phase
 
 
 def test_filter_preflight_config_keeps_all_checks_in_full_phase():
@@ -198,5 +203,25 @@ def test_parse_bool_text_accepts_common_launch_values(text, expected):
 
 
 def test_parse_bool_text_rejects_invalid_value():
-    with pytest.raises(Exception):
+    with pytest.raises(argparse.ArgumentTypeError):
         _parse_bool_text("maybe")
+
+
+def test_parse_qos_policy_rejects_unknown_value():
+    with pytest.raises(ValueError, match="Unsupported reliability policy"):
+        _parse_qos_policy(
+            "eventual",
+            RELIABILITY_MAP,
+            field_name="reliability",
+        )
+
+
+def test_parse_qos_policy_accepts_known_value():
+    assert (
+        _parse_qos_policy(
+            "transient_local",
+            DURABILITY_MAP,
+            field_name="durability",
+        )
+        == DURABILITY_MAP["transient_local"]
+    )

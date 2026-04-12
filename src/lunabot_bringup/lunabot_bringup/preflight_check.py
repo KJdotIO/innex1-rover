@@ -6,34 +6,34 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import asdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from ament_index_python.packages import get_package_share_directory
-from lunabot_interfaces.action import Deposit
-from lunabot_interfaces.action import Excavate
-from nav2_msgs.action import NavigateToPose
 import rclpy
+import yaml
+from ament_index_python.packages import get_package_share_directory
+from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-from rclpy.qos import QoSDurabilityPolicy
-from rclpy.qos import QoSHistoryPolicy
-from rclpy.qos import QoSProfile
-from rclpy.qos import QoSReliabilityPolicy
+from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
+    QoSProfile,
+    QoSReliabilityPolicy,
+)
 from rclpy.time import Time
 from rclpy.utilities import remove_ros_args
 from rosidl_runtime_py.utilities import get_message
-from tf2_ros import Buffer
-from tf2_ros import TransformListener
-import yaml
+from tf2_ros import Buffer, TransformListener
 
-from lunabot_bringup.preflight_profiles import filter_preflight_config
-from lunabot_bringup.preflight_profiles import PHASE_FULL
-from lunabot_bringup.preflight_profiles import VALID_PHASES
-
+from lunabot_bringup.preflight_profiles import (
+    PHASE_FULL,
+    VALID_PHASES,
+    filter_preflight_config,
+)
+from lunabot_interfaces.action import Deposit, Excavate
 
 EXIT_OK = 0
 EXIT_CRITICAL_FAILURE = 2
@@ -47,6 +47,14 @@ ACTION_TYPE_MAP: dict[str, type] = {
 
 TRUE_STRINGS = {"1", "true", "yes", "on"}
 FALSE_STRINGS = {"0", "false", "no", "off"}
+RELIABILITY_MAP = {
+    "best_effort": QoSReliabilityPolicy.BEST_EFFORT,
+    "reliable": QoSReliabilityPolicy.RELIABLE,
+}
+DURABILITY_MAP = {
+    "volatile": QoSDurabilityPolicy.VOLATILE,
+    "transient_local": QoSDurabilityPolicy.TRANSIENT_LOCAL,
+}
 
 
 @dataclass
@@ -73,6 +81,24 @@ def _repo_contract_path() -> Path:
     return Path.cwd() / ".github" / "contracts" / "interface_contracts.json"
 
 
+def _parse_qos_policy(
+    value: str,
+    mapping: dict[str, Any],
+    *,
+    field_name: str,
+) -> Any:
+    """Parse one named QoS policy and reject unknown configuration values."""
+    normalised = value.strip().lower()
+    try:
+        return mapping[normalised]
+    except KeyError as exc:
+        supported_values = ", ".join(sorted(mapping))
+        raise ValueError(
+            f"Unsupported {field_name} policy '{value}'. "
+            f"Expected one of: {supported_values}"
+        ) from exc
+
+
 def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, Any]:
     """Merge contract-defined topics and TF checks into preflight config."""
     preflight = config.setdefault("preflight", {})
@@ -93,7 +119,7 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         return config
 
     topics = preflight.setdefault("required_topics", [])
-    topic_keys = {(item.get("name"), item.get("type")) for item in topics}
+    topic_keys = dict.fromkeys((item.get("name"), item.get("type")) for item in topics)
     for item in contract.get("topics", []):
         if not isinstance(item, dict):
             continue
@@ -112,10 +138,10 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
             }
         )
         logger.info(f"Added contract topic check: {item.get('name')}")
-        topic_keys.add(key)
+        topic_keys[key] = None
 
     tf_links = preflight.setdefault("required_tf_links", [])
-    tf_keys = {(item.get("parent"), item.get("child")) for item in tf_links}
+    tf_keys = dict.fromkeys((item.get("parent"), item.get("child")) for item in tf_links)
     for item in contract.get("tf_links", []):
         if not isinstance(item, dict):
             continue
@@ -133,7 +159,7 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         parent = item.get("parent")
         child = item.get("child")
         logger.info(f"Added contract TF check: {parent}->{child}")
-        tf_keys.add(key)
+        tf_keys[key] = None
 
     return config
 
@@ -220,25 +246,77 @@ class PreflightChecker(Node):
 
     def _topic_types(self) -> dict[str, list[str]]:
         """Return discovered topic types keyed by topic name."""
-        return {name: types for name, types in self.get_topic_names_and_types()}
+        return dict(self.get_topic_names_and_types())
 
     @staticmethod
     def _parse_reliability(value: str) -> QoSReliabilityPolicy:
         """Return QoS reliability from config text."""
-        mapping = {
-            "best_effort": QoSReliabilityPolicy.BEST_EFFORT,
-            "reliable": QoSReliabilityPolicy.RELIABLE,
-        }
-        return mapping.get(value.lower(), QoSReliabilityPolicy.BEST_EFFORT)
+        return _parse_qos_policy(
+            value,
+            RELIABILITY_MAP,
+            field_name="reliability",
+        )
 
     @staticmethod
     def _parse_durability(value: str) -> QoSDurabilityPolicy:
         """Return QoS durability from config text."""
-        mapping = {
-            "volatile": QoSDurabilityPolicy.VOLATILE,
-            "transient_local": QoSDurabilityPolicy.TRANSIENT_LOCAL,
-        }
-        return mapping.get(value.lower(), QoSDurabilityPolicy.VOLATILE)
+        return _parse_qos_policy(
+            value,
+            DURABILITY_MAP,
+            field_name="durability",
+        )
+
+    def _wait_for_topic_discovery(
+        self,
+        topic_name: str,
+        *,
+        timeout_s: float,
+    ) -> list[str] | None:
+        """Wait until one topic appears on the graph and return its types."""
+        discovery_deadline = time.monotonic() + timeout_s
+        while time.monotonic() < discovery_deadline:
+            discovered_types = self._topic_types().get(topic_name)
+            if discovered_types:
+                return discovered_types
+            rclpy.spin_once(self, timeout_sec=0.1)
+        return None
+
+    def _wait_for_required_messages(
+        self,
+        topic_name: str,
+        message_type,
+        *,
+        min_messages: int,
+        timeout_s: float,
+        reliability: QoSReliabilityPolicy,
+        durability: QoSDurabilityPolicy,
+    ) -> int:
+        """Wait for the required message count on one topic."""
+        received = {"count": 0}
+        qos = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+            reliability=reliability,
+            durability=durability,
+        )
+
+        subscription = self.create_subscription(
+            message_type,
+            topic_name,
+            lambda _msg, bucket=received: bucket.__setitem__(
+                "count", bucket["count"] + 1
+            ),
+            qos,
+        )
+
+        try:
+            deadline = time.monotonic() + timeout_s
+            while time.monotonic() < deadline and received["count"] < min_messages:
+                rclpy.spin_once(self, timeout_sec=0.1)
+        finally:
+            self.destroy_subscription(subscription)
+
+        return received["count"]
 
     def _check_required_topics(self) -> None:
         """Check required topics for type and message flow."""
@@ -254,21 +332,29 @@ class PreflightChecker(Node):
             expected_type = topic_cfg["type"]
             min_messages = int(topic_cfg.get("min_messages", 1))
             critical = bool(topic_cfg.get("critical", True))
-            reliability = self._parse_reliability(
-                str(topic_cfg.get("reliability", "best_effort"))
-            )
-            durability = self._parse_durability(
-                str(topic_cfg.get("durability", "volatile"))
-            )
             started = time.monotonic()
 
-            discovery_deadline = time.monotonic() + discovery_timeout_s
-            discovered_types: list[str] | None = None
-            while time.monotonic() < discovery_deadline:
-                discovered_types = self._topic_types().get(topic_name)
-                if discovered_types:
-                    break
-                rclpy.spin_once(self, timeout_sec=0.1)
+            try:
+                reliability = self._parse_reliability(
+                    str(topic_cfg.get("reliability", "best_effort"))
+                )
+                durability = self._parse_durability(
+                    str(topic_cfg.get("durability", "volatile"))
+                )
+            except ValueError as exc:
+                self._record(
+                    f"topic:{topic_name}",
+                    critical,
+                    False,
+                    str(exc),
+                    started,
+                )
+                continue
+
+            discovered_types = self._wait_for_topic_discovery(
+                topic_name,
+                timeout_s=discovery_timeout_s,
+            )
 
             if not discovered_types:
                 self._record(
@@ -293,40 +379,26 @@ class PreflightChecker(Node):
                 continue
 
             message_type = get_message(expected_type)
-            received = {"count": 0}
-            qos = QoSProfile(
-                history=QoSHistoryPolicy.KEEP_LAST,
-                depth=10,
+            received_count = self._wait_for_required_messages(
+                topic_name,
+                message_type,
+                min_messages=min_messages,
+                timeout_s=msg_timeout_s,
                 reliability=reliability,
                 durability=durability,
             )
 
-            subscription = self.create_subscription(
-                message_type,
-                topic_name,
-                lambda _msg, bucket=received: bucket.__setitem__(
-                    "count", bucket["count"] + 1
-                ),
-                qos,
-            )
-
-            deadline = time.monotonic() + msg_timeout_s
-            while time.monotonic() < deadline and received["count"] < min_messages:
-                rclpy.spin_once(self, timeout_sec=0.1)
-
-            self.destroy_subscription(subscription)
-
-            if received["count"] >= min_messages:
+            if received_count >= min_messages:
                 self._record(
                     f"topic:{topic_name}",
                     critical,
                     True,
-                    f"received {received['count']} msg(s)",
+                    f"received {received_count} msg(s)",
                     started,
                 )
                 continue
 
-            detail = f"received {received['count']} msg(s), "
+            detail = f"received {received_count} msg(s), "
             detail += f"expected >= {min_messages}"
             self._record(
                 f"topic:{topic_name}",
