@@ -107,9 +107,10 @@ def test_first_cycle_halted_when_prehoc_would_overrun():
 def test_first_cycle_raises_when_no_prehoc_supplied():
     """canStartCycle raises ValueError when completedCycles==0 and no estimate given."""
     timer = MissionTimer()
-    with patch("time.monotonic", return_value=0.0):
-        with pytest.raises(ValueError, match="pre_hoc_time_s"):
-            timer.canStartCycle()
+    with patch("time.monotonic", return_value=0.0), pytest.raises(
+        ValueError, match="pre_hoc_time_s"
+    ):
+        timer.canStartCycle()
 
 
 def test_later_cycle_allowed_when_worst_cycle_fits(monkeypatch):
