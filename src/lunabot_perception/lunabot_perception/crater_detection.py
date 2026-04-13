@@ -132,7 +132,12 @@ class CraterDetectionNode(Node):
                 Time.from_msg(msg.header.stamp),
                 timeout=Duration(seconds=0.2),
             )
-        except Exception:
+        except Exception as e:
+            self.get_logger().warning(
+                f"TF lookup {msg.header.frame_id} -> {self.target_frame} "
+                f"failed: {e}",
+                throttle_duration_sec=5.0,
+            )
             return
 
         points = read_points_numpy(msg, field_names=["x", "y", "z"], skip_nans=True)
