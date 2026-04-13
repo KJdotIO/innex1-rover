@@ -18,6 +18,12 @@ def _bringup_path(*parts: str) -> str:
     return str(package_root.joinpath(*parts))
 
 
+def _nav_config_path(*parts: str) -> str:
+    """Return a path inside the lunabot_navigation config share directory."""
+    package_root = Path(get_package_share_directory("lunabot_navigation"))
+    return str(package_root.joinpath("config", *parts))
+
+
 def generate_launch_description():
     """Launch Nav2 with its standard NavigateToPose action surface."""
     namespace = LaunchConfiguration("namespace")
@@ -38,6 +44,7 @@ def generate_launch_description():
         "bt_navigator",
         "waypoint_follower",
         "velocity_smoother",
+        "collision_monitor",
     ]
 
     # Humble does not reliably remap action names for Nav2's rclcpp_action
@@ -51,6 +58,8 @@ def generate_launch_description():
         "use_sim_time": use_sim_time,
         "autostart": autostart,
     }
+
+    collision_monitor_params = _nav_config_path("collision_monitor.yaml")
 
     configured_params = ParameterFile(
         RewrittenYaml(
@@ -198,6 +207,20 @@ def generate_launch_description():
                 ],
             ),
             Node(
+                package="nav2_collision_monitor",
+                executable="collision_monitor",
+                name="collision_monitor",
+                output="screen",
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[
+                    collision_monitor_params,
+                    {"use_sim_time": use_sim_time},
+                ],
+                arguments=["--ros-args", "--log-level", log_level],
+                remappings=remappings,
+            ),
+            Node(
                 package="nav2_lifecycle_manager",
                 executable="lifecycle_manager",
                 name="lifecycle_manager_navigation",
@@ -268,6 +291,16 @@ def generate_launch_description():
                     ("cmd_vel", "cmd_vel_nav"),
                     ("cmd_vel_smoothed", "cmd_vel"),
                 ],
+            ),
+            ComposableNode(
+                package="nav2_collision_monitor",
+                plugin="nav2_collision_monitor::CollisionMonitor",
+                name="collision_monitor",
+                parameters=[
+                    collision_monitor_params,
+                    {"use_sim_time": use_sim_time},
+                ],
+                remappings=remappings,
             ),
             ComposableNode(
                 package="nav2_lifecycle_manager",
