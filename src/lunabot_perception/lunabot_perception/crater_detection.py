@@ -19,17 +19,17 @@ identifies cells significantly below the local ground plane, and publishes
 an OccupancyGrid marking those cells as lethal for Nav2 costmap consumption.
 """
 
+from nav_msgs.msg import MapMetaData, OccupancyGrid
 import numpy as np
 import rclpy
-from nav_msgs.msg import OccupancyGrid, MapMetaData
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from rclpy.time import Time
 from rclpy.duration import Duration
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from scipy.ndimage import binary_dilation
 from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
-from sensor_msgs_py.point_cloud2 import read_points_numpy, create_cloud_xyz32
+from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points_numpy
 from std_msgs.msg import Header
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
