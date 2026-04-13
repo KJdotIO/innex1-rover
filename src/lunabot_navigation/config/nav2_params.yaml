@@ -33,20 +33,17 @@ global_costmap:
     ros__parameters:
       update_frequency: 1.0
       publish_frequency: 1.0
-      global_frame: map
+      global_frame: odom
       robot_base_frame: base_link
       robot_radius: 0.25
       resolution: 0.05
       track_unknown_space: false
-      rolling_window: false
+      rolling_window: true
+      width: 10
+      height: 8
       use_maximum: true
-      plugins: ["static_layer", "crater_layer", "obstacle_layer", "inflation_layer"]
+      plugins: ["crater_layer", "obstacle_layer", "inflation_layer"]
 
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: true
-
-      # Crater / negative obstacle layer — fed by crater_detection_node
       crater_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_topic: "/crater_grid"
