@@ -32,8 +32,9 @@ class MissionState(IntEnum):
     DEPOSIT = 7
     CHECK_NEXT_CYCLE_TIME = 8
     SAFE_FAIL = 9
-    HALT_MISSION = 10
     PREHOC_TRAVERSAL = 11
+    HALT = 99
+    HALT_MISSION = HALT
 
 
 class MissionManager(Node):
