@@ -257,10 +257,7 @@ class CraterDetectionNode(Node):
 
 
 def main(args=None):
-    """Run the crater detection node.
-
-    Initialise rclpy, create the node, spin it, and shut down cleanly.
-    """
+    """Run the crater detection node."""
     rclpy.init(args=args)
     node = CraterDetectionNode()
     rclpy.spin(node)
