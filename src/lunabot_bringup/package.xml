@@ -25,6 +25,7 @@
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_collision_monitor</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
   <exec_depend>nav2_map_server</exec_depend>
   <exec_depend>lunabot_interfaces</exec_depend>

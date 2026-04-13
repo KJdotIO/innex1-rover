@@ -6,8 +6,9 @@ from pathlib import Path
 import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -53,14 +54,34 @@ def _prepend_resource_path(models_path: Path) -> None:
         if entry
     ]
     if path_text not in resource_paths:
-        os.environ["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join([path_text, *resource_paths])
+        os.environ["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join(
+            [path_text, *resource_paths]
+        )
+
+
+def _resolve_world(context):
+    """Resolve the world file and return the gz_sim launch action."""
+    pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
+    pkg_lunabot_simulation = _package_path("lunabot_simulation")
+
+    world_name = LaunchConfiguration("world").perform(context).strip()
+    world_path = _patched_world_path(
+        pkg_lunabot_simulation / "worlds" / f"{world_name}.sdf"
+    )
+
+    return [
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                str(Path(pkg_ros_gz_sim) / "launch" / "gz_sim.launch.py")
+            ),
+            launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
+        )
+    ]
 
 
 def generate_launch_description():
-    pkg_ros_gz_sim = FindPackageShare("ros_gz_sim").find("ros_gz_sim")
     pkg_lunabot_description = _package_path("lunabot_description")
     pkg_lunabot_simulation = _package_path("lunabot_simulation")
-    world_path = _patched_world_path(pkg_lunabot_simulation / "worlds" / "moon_yard.sdf")
 
     _prepend_resource_path(pkg_lunabot_simulation / "models")
 
@@ -72,14 +93,6 @@ def generate_launch_description():
     spawn_x = "0.0"
     spawn_y = "0.0"
     spawn_z = "0.5"  # Start above surface, gravity will settle it
-
-    # we'll run the sim without gazebo gui to save resources for now
-    gz_sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            str(Path(pkg_ros_gz_sim) / "launch" / "gz_sim.launch.py")
-        ),
-        launch_arguments={"gz_args": f"-r -s '{world_path}'"}.items(),
-    )
 
     robot_state_publisher = Node(
         package="robot_state_publisher",
@@ -119,6 +132,8 @@ def generate_launch_description():
         output="screen",
     )
 
+    # The /cmd_vel remap lets the collision monitor output on /cmd_vel_safe
+    # while the Ignition-side topic stays as "cmd_vel" for the DiffDrive plugin.
     robot_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -133,6 +148,7 @@ def generate_launch_description():
         ],
         remappings=[
             ("/ouster/points/points", "/ouster/points"),
+            ("/cmd_vel", "/cmd_vel_safe"),
         ],
         output="screen",
     )
@@ -161,7 +177,15 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            gz_sim,
+            DeclareLaunchArgument(
+                "world",
+                default_value="moon_yard",
+                description=(
+                    "World to load: moon_yard (flat) or "
+                    "moon_yard_craters (with craters)."
+                ),
+            ),
+            OpaqueFunction(function=_resolve_world),
             robot_state_publisher,
             spawn_robot,
             clock_bridge,

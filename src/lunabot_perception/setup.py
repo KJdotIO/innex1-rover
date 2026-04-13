@@ -24,5 +24,9 @@ setup(
             "pytest",
         ],
     },
-    entry_points={"console_scripts": []},
+    entry_points={
+        "console_scripts": [
+            "crater_detection = lunabot_perception.crater_detection:main",
+        ],
+    },
 )

@@ -1,0 +1,134 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot Model
+      Enabled: true
+      Description Topic:
+        Value: /robot_description
+      TF Prefix: ""
+
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Axes: true
+      Show Names: false
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        base_link:
+          Value: true
+        odom:
+          Value: true
+        map:
+          Value: true
+        camera_front_link:
+          Value: true
+
+    - Class: rviz_default_plugins/Map
+      Name: Crater Grid
+      Enabled: true
+      Topic:
+        Value: /crater_grid
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+      Alpha: 0.7
+      Color Scheme: costmap
+      Draw Behind: false
+
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Crater Points Debug
+      Enabled: true
+      Topic:
+        Value: /crater_points_debug
+      Size (Pixels): 8
+      Style: Spheres
+      Size (m): 0.08
+      Color Transformer: FlatColor
+      Color: 255; 0; 0
+
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Camera Points
+      Enabled: true
+      Topic:
+        Value: /camera_front/points
+      Size (Pixels): 2
+      Style: Points
+      Color Transformer: AxisColor
+      Axis: Z
+      Decay Time: 0
+
+    - Class: rviz_default_plugins/Map
+      Name: Local Costmap
+      Enabled: true
+      Topic:
+        Value: /local_costmap/costmap
+      Alpha: 0.5
+      Color Scheme: costmap
+      Draw Behind: true
+
+    - Class: rviz_default_plugins/Map
+      Name: Global Costmap
+      Enabled: true
+      Topic:
+        Value: /global_costmap/costmap
+      Alpha: 0.3
+      Color Scheme: costmap
+      Draw Behind: true
+
+    - Class: rviz_default_plugins/Path
+      Name: Nav2 Plan
+      Enabled: true
+      Topic:
+        Value: /plan
+      Color: 0; 255; 0
+      Line Style: Lines
+
+    - Class: rviz_default_plugins/Polygon
+      Name: Collision Stop Zone
+      Enabled: true
+      Topic:
+        Value: /polygon_stop
+      Color: 255; 0; 0
+      Alpha: 0.4
+
+    - Class: rviz_default_plugins/Polygon
+      Name: Collision Slow Zone
+      Enabled: true
+      Topic:
+        Value: /polygon_slowdown
+      Color: 255; 165; 0
+      Alpha: 0.3
+
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Line Style:
+        Value: Lines
+      Normal Cell Count: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: odom
+
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/ThirdPersonFollower
+      Distance: 8
+      Focal Point:
+        X: 2.0
+        Y: -1.0
+        Z: 0.0
+      Pitch: 0.8
+      Target Frame: base_link
+      Yaw: 3.14
