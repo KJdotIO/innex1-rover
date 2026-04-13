@@ -89,22 +89,6 @@ Visualization Manager:
       Color: 0; 255; 0
       Line Style: Lines
 
-    - Class: rviz_default_plugins/Polygon
-      Name: Collision Stop Zone
-      Enabled: true
-      Topic:
-        Value: /polygon_stop
-      Color: 255; 0; 0
-      Alpha: 0.4
-
-    - Class: rviz_default_plugins/Polygon
-      Name: Collision Slow Zone
-      Enabled: true
-      Topic:
-        Value: /polygon_slowdown
-      Color: 255; 165; 0
-      Alpha: 0.3
-
     - Class: rviz_default_plugins/Grid
       Name: Grid
       Enabled: true
