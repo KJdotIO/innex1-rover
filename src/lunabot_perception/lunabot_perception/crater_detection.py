@@ -24,13 +24,19 @@ import rclpy
 from nav_msgs.msg import MapMetaData, OccupancyGrid
 from rclpy.duration import Duration
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+    qos_profile_sensor_data,
+)
 from rclpy.time import Time
 from scipy.ndimage import binary_dilation
 from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points_numpy
 from std_msgs.msg import Header
+from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
@@ -73,6 +79,15 @@ class CraterDetectionNode(Node):
         self.decay = self.get_parameter("accumulator_decay").value
         self.fixed_ground_z = self.get_parameter("fixed_ground_z").value
 
+        if self.resolution <= 0.0:
+            raise ValueError("grid_resolution must be > 0")
+        if self.grid_width_m <= 0.0 or self.grid_height_m <= 0.0:
+            raise ValueError("grid_width and grid_height must be > 0")
+        if self.min_points < 1:
+            raise ValueError("min_points_per_cell must be >= 1")
+        if self.decay <= 0.0 or self.decay > 1.0:
+            raise ValueError("accumulator_decay must be in (0, 1]")
+
         # Grid dimensions in cells
         self.grid_w = int(self.grid_width_m / self.resolution)
         self.grid_h = int(self.grid_height_m / self.resolution)
@@ -97,7 +112,7 @@ class CraterDetectionNode(Node):
             PointCloud2,
             "/camera_front/points",
             self._cloud_callback,
-            10,
+            qos_profile_sensor_data,
         )
 
         # --- Publishers ---
@@ -110,11 +125,13 @@ class CraterDetectionNode(Node):
         self.grid_pub = self.create_publisher(OccupancyGrid, "/crater_grid", grid_qos)
 
         self.debug_cloud_pub = self.create_publisher(
-            PointCloud2, "/crater_points_debug", 10
+            PointCloud2, "/crater_points_debug", qos_profile_sensor_data
         )
 
         # --- Publish timer ---
         rate = self.get_parameter("update_rate").value
+        if rate <= 0.0:
+            raise ValueError("update_rate must be > 0")
         self.create_timer(1.0 / rate, self._publish_grid)
 
         self.get_logger().info(
@@ -132,7 +149,7 @@ class CraterDetectionNode(Node):
                 Time.from_msg(msg.header.stamp),
                 timeout=Duration(seconds=0.2),
             )
-        except Exception as e:
+        except TransformException as e:
             self.get_logger().warning(
                 f"TF lookup {msg.header.frame_id} -> {self.target_frame} "
                 f"failed: {e}",
@@ -240,7 +257,10 @@ class CraterDetectionNode(Node):
 
 
 def main(args=None):
-    """Run the crater detection node."""
+    """Run the crater detection node.
+
+    Initialise rclpy, create the node, spin it, and shut down cleanly.
+    """
     rclpy.init(args=args)
     node = CraterDetectionNode()
     rclpy.spin(node)

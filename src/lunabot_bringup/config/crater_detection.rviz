@@ -36,7 +36,7 @@ Visualization Manager:
       Topic:
         Value: /crater_grid
         Reliability Policy: Reliable
-        Durability Policy: Transient Local
+        Durability Policy: Volatile
       Alpha: 0.7
       Color Scheme: costmap
       Draw Behind: false
