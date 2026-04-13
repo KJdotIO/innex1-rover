@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from enum import IntEnum
 
 import rclpy
@@ -31,7 +32,9 @@ class MissionState(IntEnum):
     DEPOSIT = 7
     CHECK_NEXT_CYCLE_TIME = 8
     SAFE_FAIL = 9
-    HALT_MISSION = 10
+    PREHOC_TRAVERSAL = 11
+    HALT = 99
+    HALT_MISSION = HALT
 
 
 class MissionManager(Node):
@@ -48,6 +51,10 @@ class MissionManager(Node):
         super().__init__("mission_manager")
 
         self.declare_parameter("use_sim_time", False)
+        self.declare_parameter("prehoc_v_estimated_mps", 0.3)
+        self.declare_parameter("prehoc_t_margin_s", 60.0)
+        self.declare_parameter("prehoc_s_start_exc_m", 5.0)
+        self.declare_parameter("prehoc_s_exc_dep_m", 5.0)
 
         self._state: MissionState = MissionState.INITIALIZE_MISSION
         self._timer: MissionTimer | None = None
@@ -88,6 +95,7 @@ class MissionManager(Node):
         handler = {
             MissionState.INITIALIZE_MISSION: self._handle_initialize_mission,
             MissionState.ACQUIRE_TAG: self._handle_acquire_tag,
+            MissionState.PREHOC_TRAVERSAL: self._handle_prehoc_traversal,
             MissionState.TURN_TO_EXCAVATION: self._handle_turn_to_excavation,
             MissionState.NAV_TO_EXCAVATION: self._handle_nav_to_excavation,
             MissionState.EXCAVATE: self._handle_excavate,
@@ -118,11 +126,106 @@ class MissionManager(Node):
         return MissionState.ACQUIRE_TAG
 
     def _handle_acquire_tag(self) -> MissionState:
-        """Begin a new cycle and acquire the localisation tag."""
+        """
+        Begin a new cycle and acquire the localisation tag.
+
+        On the first cycle (``completedCycles == 0``) transitions to
+        ``PREHOC_TRAVERSAL`` to gate entry using a conservative time estimate.
+        On later cycles, transitions directly to ``TURN_TO_EXCAVATION``.
+        """
         self.get_logger().info("Acquiring localisation tag.")
         if self._timer is not None:
             self._timer.beginCycle()
+
+        if self._timer is not None and self._timer.completedCycles == 0:
+            return MissionState.PREHOC_TRAVERSAL
+
         return MissionState.TURN_TO_EXCAVATION
+
+    def _safe_float_parameter(self, name: str) -> float | None:
+        """Convert a ROS parameter value to float, returning None on failure."""
+        raw_value = self.get_parameter(name).value
+
+        if raw_value is None:
+            self.get_logger().error(f"Parameter '{name}' is unset.")
+            return None
+
+        if isinstance(raw_value, bool) or not isinstance(
+            raw_value, int | float | str | bytes
+        ):
+            self.get_logger().error(
+                f"Parameter '{name}' has unsupported type "
+                f"{type(raw_value).__name__}."
+            )
+            return None
+
+        try:
+            return float(raw_value)
+        except (TypeError, ValueError):
+            self.get_logger().error(
+                f"Parameter '{name}' with value {raw_value!r} is not numeric."
+            )
+            return None
+
+    def _handle_prehoc_traversal(self) -> MissionState:
+        """
+        Gate the first cycle using a conservative pre-hoc traversal estimate.
+
+        Computes ``T_prehoc = (S_start_exc / v) + (S_exc_dep / v) + T_margin``
+        and asks the timer whether the mission budget allows proceeding.
+        Transitions to ``TURN_TO_EXCAVATION`` if allowed, ``HALT_MISSION``
+        otherwise.
+        """
+        v = self._safe_float_parameter("prehoc_v_estimated_mps")
+        t_margin = self._safe_float_parameter("prehoc_t_margin_s")
+        s_start_exc = self._safe_float_parameter("prehoc_s_start_exc_m")
+        s_exc_dep = self._safe_float_parameter("prehoc_s_exc_dep_m")
+
+        if (
+            v is None
+            or t_margin is None
+            or s_start_exc is None
+            or s_exc_dep is None
+        ):
+            return MissionState.HALT_MISSION
+
+        if not math.isfinite(v) or v <= 0.0:
+            self.get_logger().error(
+                "Invalid pre-hoc traversal parameter "
+                "'prehoc_v_estimated_mps'; expected a finite value > 0.0."
+            )
+            return MissionState.HALT_MISSION
+
+        invalid_non_negative_params = []
+        if not math.isfinite(t_margin) or t_margin < 0.0:
+            invalid_non_negative_params.append("prehoc_t_margin_s")
+        if not math.isfinite(s_start_exc) or s_start_exc < 0.0:
+            invalid_non_negative_params.append("prehoc_s_start_exc_m")
+        if not math.isfinite(s_exc_dep) or s_exc_dep < 0.0:
+            invalid_non_negative_params.append("prehoc_s_exc_dep_m")
+
+        if invalid_non_negative_params:
+            invalid_param_names = ", ".join(invalid_non_negative_params)
+            self.get_logger().error(
+                "Invalid pre-hoc traversal parameter(s) "
+                f"{invalid_param_names}; expected finite values >= 0.0."
+            )
+            return MissionState.HALT_MISSION
+
+        t_prehoc = (s_start_exc / v) + (s_exc_dep / v) + t_margin
+
+        if self._timer is not None and self._timer.canStartCycle(
+            pre_hoc_time_s=t_prehoc
+        ):
+            self.get_logger().info(
+                f"Pre-hoc estimate {t_prehoc:.1f}s fits budget; proceeding."
+            )
+            return MissionState.TURN_TO_EXCAVATION
+
+        self.get_logger().info(
+            f"Pre-hoc estimate {t_prehoc:.1f}s would exceed budget; halting."
+        )
+        return MissionState.HALT_MISSION
 
     def _handle_turn_to_excavation(self) -> MissionState:
         """Turn the rover to face the excavation zone."""
