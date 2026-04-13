@@ -121,7 +121,7 @@
       <always_on>1</always_on>
       <update_rate>15</update_rate>
       <topic>camera_front</topic>
-      <gz_frame_id>camera_front_optical_frame</gz_frame_id>
+      <gz_frame_id>camera_front_link</gz_frame_id>
       </sensor>
     </gazebo>
 </robot>
