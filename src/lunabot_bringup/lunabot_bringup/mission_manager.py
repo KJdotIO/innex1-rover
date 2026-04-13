@@ -124,7 +124,8 @@ class MissionManager(Node):
         return MissionState.ACQUIRE_TAG
 
     def _handle_acquire_tag(self) -> MissionState:
-        """Begin a new cycle and acquire the localisation tag.
+        """
+        Begin a new cycle and acquire the localisation tag.
 
         On the first cycle (``completedCycles == 0``) transitions to
         ``PREHOC_TRAVERSAL`` to gate entry using a conservative time estimate.
@@ -140,7 +141,8 @@ class MissionManager(Node):
         return MissionState.TURN_TO_EXCAVATION
 
     def _handle_prehoc_traversal(self) -> MissionState:
-        """Gate the first cycle using a conservative pre-hoc traversal estimate.
+        """
+        Gate the first cycle using a conservative pre-hoc traversal estimate.
 
         Computes ``T_prehoc = (S_start_exc / v) + (S_exc_dep / v) + T_margin``
         and asks the timer whether the mission budget allows proceeding.
