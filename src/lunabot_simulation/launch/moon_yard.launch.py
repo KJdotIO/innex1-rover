@@ -132,6 +132,8 @@ def generate_launch_description():
         output="screen",
     )
 
+    # The /cmd_vel remap lets the collision monitor output on /cmd_vel_safe
+    # while the Ignition-side topic stays as "cmd_vel" for the DiffDrive plugin.
     robot_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -146,6 +148,7 @@ def generate_launch_description():
         ],
         remappings=[
             ("/ouster/points/points", "/ouster/points"),
+            ("/cmd_vel", "/cmd_vel_safe"),
         ],
         output="screen",
     )
