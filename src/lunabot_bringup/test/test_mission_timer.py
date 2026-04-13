@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -61,7 +62,9 @@ def test_record_cycle_time_updates_worst_cycle_time_for_slower_cycle(monkeypatch
     assert timer.worstCycleTime == pytest.approx(20.0)
 
 
-def test_record_cycle_time_does_not_update_worst_cycle_time_for_faster_cycle(monkeypatch):
+def test_record_cycle_time_does_not_update_worst_cycle_time_for_faster_cycle(
+    monkeypatch,
+):
     """Verify worstCycleTime is not updated when a faster cycle is recorded."""
     timer = MissionTimer()
 
@@ -83,29 +86,33 @@ def test_record_cycle_time_does_not_update_worst_cycle_time_for_faster_cycle(mon
     assert timer.worstCycleTime == pytest.approx(20.0)
 
 
-def test_can_start_cycle_returns_true_when_no_cycles_completed():
-    """Verify canStartCycle() always returns True before any cycle has been recorded."""
+def test_first_cycle_allowed_when_prehoc_fits_budget():
+    """First cycle is allowed when elapsed + pre_hoc estimate is under 1200 s."""
     timer = MissionTimer()
-    assert timer.canStartCycle() is True
-
-
-def test_can_start_cycle_returns_false_when_budget_would_be_exceeded(monkeypatch):
-    """Verify canStartCycle() returns False when elapsed + worstCycleTime >= 1200."""
-    timer = MissionTimer()
-
-    # Simulate missionStartTime at t=0
     timer.missionStartTime = 0.0
-    # Worst cycle observed: 100 s
-    timer.worstCycleTime = 100.0
-    # At least one cycle has been completed
-    timer.completedCycles = 1
-
-    # monotonic() returns 1150 — elapsed 1150 + worst 100 = 1250 >= 1200 → False
-    monkeypatch.setattr(time, "monotonic", lambda: 1150.0)
-    assert timer.canStartCycle() is False
+    # elapsed = 0, pre_hoc = 100 → 100 < 1200
+    with patch("time.monotonic", return_value=0.0):
+        assert timer.canStartCycle(pre_hoc_time_s=100.0) is True
 
 
-def test_can_start_cycle_returns_true_when_budget_is_sufficient(monkeypatch):
+def test_first_cycle_halted_when_prehoc_would_overrun():
+    """First cycle is denied when elapsed + pre_hoc estimate would exceed 1200 s."""
+    timer = MissionTimer()
+    timer.missionStartTime = 0.0
+    # elapsed = 1100, pre_hoc = 200 → 1300 >= 1200
+    with patch("time.monotonic", return_value=1100.0):
+        assert timer.canStartCycle(pre_hoc_time_s=200.0) is False
+
+
+def test_first_cycle_raises_when_no_prehoc_supplied():
+    """canStartCycle raises ValueError when completedCycles==0 and no estimate given."""
+    timer = MissionTimer()
+    with patch("time.monotonic", return_value=0.0):
+        with pytest.raises(ValueError, match="pre_hoc_time_s"):
+            timer.canStartCycle()
+
+
+def test_later_cycle_allowed_when_worst_cycle_fits(monkeypatch):
     """Verify canStartCycle() returns True when elapsed + worstCycleTime < 1200."""
     timer = MissionTimer()
 
@@ -116,3 +123,29 @@ def test_can_start_cycle_returns_true_when_budget_is_sufficient(monkeypatch):
     # monotonic() returns 1000 — elapsed 1000 + worst 100 = 1100 < 1200 → True
     monkeypatch.setattr(time, "monotonic", lambda: 1000.0)
     assert timer.canStartCycle() is True
+
+
+def test_later_cycle_halted_when_worst_cycle_would_overrun(monkeypatch):
+    """Verify canStartCycle() returns False when elapsed + worstCycleTime >= 1200."""
+    timer = MissionTimer()
+
+    timer.missionStartTime = 0.0
+    timer.worstCycleTime = 100.0
+    timer.completedCycles = 1
+
+    # monotonic() returns 1150 — elapsed 1150 + worst 100 = 1250 >= 1200 → False
+    monkeypatch.setattr(time, "monotonic", lambda: 1150.0)
+    assert timer.canStartCycle() is False
+
+
+def test_later_cycle_ignores_prehoc_time_s(monkeypatch):
+    """pre_hoc_time_s is ignored when completedCycles > 0; worst cycle time is used."""
+    timer = MissionTimer()
+    timer.missionStartTime = 0.0
+    timer.worstCycleTime = 50.0
+    timer.completedCycles = 1
+
+    # Even with a huge pre_hoc value, the post-hoc path uses worstCycleTime
+    # elapsed=100, worstCycle=50 → 150 < 1200 → allowed despite large pre_hoc arg
+    monkeypatch.setattr(time, "monotonic", lambda: 100.0)
+    assert timer.canStartCycle(pre_hoc_time_s=9999.0) is True

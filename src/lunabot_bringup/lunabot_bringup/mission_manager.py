@@ -32,6 +32,7 @@ class MissionState(IntEnum):
     CHECK_NEXT_CYCLE_TIME = 8
     SAFE_FAIL = 9
     HALT_MISSION = 10
+    PREHOC_TRAVERSAL = 11
 
 
 class MissionManager(Node):
@@ -48,6 +49,10 @@ class MissionManager(Node):
         super().__init__("mission_manager")
 
         self.declare_parameter("use_sim_time", False)
+        self.declare_parameter("prehoc_v_estimated_mps", 0.3)
+        self.declare_parameter("prehoc_t_margin_s", 60.0)
+        self.declare_parameter("prehoc_s_start_exc_m", 5.0)
+        self.declare_parameter("prehoc_s_exc_dep_m", 5.0)
 
         self._state: MissionState = MissionState.INITIALIZE_MISSION
         self._timer: MissionTimer | None = None
@@ -88,6 +93,7 @@ class MissionManager(Node):
         handler = {
             MissionState.INITIALIZE_MISSION: self._handle_initialize_mission,
             MissionState.ACQUIRE_TAG: self._handle_acquire_tag,
+            MissionState.PREHOC_TRAVERSAL: self._handle_prehoc_traversal,
             MissionState.TURN_TO_EXCAVATION: self._handle_turn_to_excavation,
             MissionState.NAV_TO_EXCAVATION: self._handle_nav_to_excavation,
             MissionState.EXCAVATE: self._handle_excavate,
@@ -118,11 +124,56 @@ class MissionManager(Node):
         return MissionState.ACQUIRE_TAG
 
     def _handle_acquire_tag(self) -> MissionState:
-        """Begin a new cycle and acquire the localisation tag."""
+        """Begin a new cycle and acquire the localisation tag.
+
+        On the first cycle (``completedCycles == 0``) transitions to
+        ``PREHOC_TRAVERSAL`` to gate entry using a conservative time estimate.
+        On later cycles, transitions directly to ``TURN_TO_EXCAVATION``.
+        """
         self.get_logger().info("Acquiring localisation tag.")
         if self._timer is not None:
             self._timer.beginCycle()
+
+        if self._timer is not None and self._timer.completedCycles == 0:
+            return MissionState.PREHOC_TRAVERSAL
+
         return MissionState.TURN_TO_EXCAVATION
+
+    def _handle_prehoc_traversal(self) -> MissionState:
+        """Gate the first cycle using a conservative pre-hoc traversal estimate.
+
+        Computes ``T_prehoc = (S_start_exc / v) + (S_exc_dep / v) + T_margin``
+        and asks the timer whether the mission budget allows proceeding.
+        Transitions to ``TURN_TO_EXCAVATION`` if allowed, ``HALT_MISSION``
+        otherwise.
+        """
+        v = float(
+            self.get_parameter("prehoc_v_estimated_mps").value
+        )
+        t_margin = float(
+            self.get_parameter("prehoc_t_margin_s").value
+        )
+        s_start_exc = float(
+            self.get_parameter("prehoc_s_start_exc_m").value
+        )
+        s_exc_dep = float(
+            self.get_parameter("prehoc_s_exc_dep_m").value
+        )
+
+        t_prehoc = (s_start_exc / v) + (s_exc_dep / v) + t_margin
+
+        if self._timer is not None and self._timer.canStartCycle(
+            pre_hoc_time_s=t_prehoc
+        ):
+            self.get_logger().info(
+                f"Pre-hoc estimate {t_prehoc:.1f}s fits budget; proceeding."
+            )
+            return MissionState.TURN_TO_EXCAVATION
+
+        self.get_logger().info(
+            f"Pre-hoc estimate {t_prehoc:.1f}s would exceed budget; halting."
+        )
+        return MissionState.HALT_MISSION
 
     def _handle_turn_to_excavation(self) -> MissionState:
         """Turn the rover to face the excavation zone."""

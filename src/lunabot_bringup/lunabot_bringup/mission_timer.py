@@ -39,15 +39,29 @@ class MissionTimer:
         self.completedCycles += 1
         return duration
 
-    def canStartCycle(self) -> bool:
+    def canStartCycle(self, pre_hoc_time_s: float | None = None) -> bool:
         """
         Return whether there is enough time budget to start another cycle.
 
-        The first cycle (``completedCycles == 0``) is always allowed.
-        Subsequent cycles are allowed only when the elapsed mission time plus
-        the worst recorded cycle time stays below 1200 seconds.
+        For the first cycle (``completedCycles == 0``), a ``pre_hoc_time_s``
+        estimate **must** be supplied.  The cycle is allowed when
+        ``elapsed_mission_time + pre_hoc_time_s < 1200``.  Omitting the
+        estimate on the first cycle raises ``ValueError``; the method never
+        silently permits an unconstrained first cycle.
+
+        For subsequent cycles (``completedCycles > 0``), the worst recorded
+        cycle time is used as the budget estimate and ``pre_hoc_time_s`` is
+        ignored.
         """
-        if self.completedCycles == 0:
-            return True
         elapsed_mission_time: float = time.monotonic() - self.missionStartTime
+
+        if self.completedCycles == 0:
+            if pre_hoc_time_s is None:
+                raise ValueError(
+                    "pre_hoc_time_s must be supplied for the first cycle "
+                    "(completedCycles == 0); refusing to allow cycle without "
+                    "a time estimate"
+                )
+            return elapsed_mission_time + pre_hoc_time_s < 1200
+
         return elapsed_mission_time + self.worstCycleTime < 1200
