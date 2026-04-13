@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from enum import IntEnum
 import math
+from enum import IntEnum
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -149,7 +149,7 @@ class MissionManager(Node):
             self.get_logger().error(f"Parameter '{name}' is unset.")
             return None
 
-        if not isinstance(raw_value, (bool, int, float, str, bytes)):
+        if not isinstance(raw_value, bool | int | float | str | bytes):
             self.get_logger().error(
                 f"Parameter '{name}' has unsupported type "
                 f"{type(raw_value).__name__}."
