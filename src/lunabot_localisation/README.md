@@ -10,7 +10,7 @@ The localisation pipeline has two layers:
   a smooth `odom -> base_footprint` transform and `/odometry/local`.
 2. **RTAB-Map SLAM** (`rtabmap_slam`): subscribes to RGB-D images from the
   front depth camera and `/odometry/local`. Publishes the `map -> odom`
-   correction via visual loop closure and AprilTag landmark constraints.
+  correction via visual loop closure and AprilTag landmark constraints.
 
 The global EKF has been removed. RTAB-Map handles drift correction directly
 through its pose graph optimiser, which is the same pattern used by multiple

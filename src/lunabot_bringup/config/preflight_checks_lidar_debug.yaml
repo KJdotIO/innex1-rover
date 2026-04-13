@@ -82,8 +82,8 @@ preflight:
     - name: controller_server
       critical: true
       phases: [runtime]
-    - name: map_server
-      critical: true
+    - name: rtabmap
+      critical: false
     - name: planner_server
       critical: true
       phases: [runtime]
