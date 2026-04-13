@@ -1,8 +1,4 @@
 <?xml version="1.0" ?>
-<!-- moon_yard_craters.sdf — Competition-style world.
-     Lunar surface with craters at competition-spec depth (up to 50 cm)
-     and rocks. Use for crater detection testing, Nav2 obstacle avoidance
-     validation, and pre-competition dry runs. No network dependencies. -->
 <sdf version="1.8">
   <world name="moon_yard">
 
@@ -41,26 +37,15 @@
         >
     </plugin>
 
-    <light type="directional" name="sun">
-      <cast_shadows>true</cast_shadows>
-      <pose>0 0 10 0 0 0</pose>
-      <diffuse>0.8 0.8 0.8 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
-      <direction>-0.5 0.1 -0.9</direction>
-    </light>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+    </include>
 
     <!-- Crater terrain (replaces flat lunar_surface for crater detection work) -->
     <include>
       <uri>model://crater_terrain</uri>
       <name>crater_terrain</name>
       <pose>2.95 -1.1 0.0 0 0 0</pose>
-    </include>
-
-    <include>
-      <uri>model://apriltag_beacon</uri>
-      <name>apriltag_beacon</name>
-      <pose>0 1.08 0.25 0 0 0</pose>
-      <static>true</static>
     </include>
 
     <!-- Walls -->

@@ -13,4 +13,4 @@ def test_june_baseline_uses_stock_nav2_bt():
     bt_xml = config["bt_navigator"]["ros__parameters"]["default_bt_xml_filename"]
 
     assert "nav2_bt_navigator" in bt_xml
-    assert "mission_navigate_to_pose_bt.xml" not in bt_xml
+    assert "navigate_to_pose_w_replanning_and_recovery" in bt_xml
