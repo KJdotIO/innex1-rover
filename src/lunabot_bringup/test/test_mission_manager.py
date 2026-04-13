@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from lunabot_bringup.mission_manager import MissionManager, MissionState
 from lunabot_bringup.mission_timer import MissionTimer
 
@@ -123,6 +125,40 @@ def test_prehoc_traversal_transitions_to_halt_when_budget_exceeded(monkeypatch):
     )
     next_state = manager._handle_prehoc_traversal()
     assert next_state == MissionState.HALT_MISSION
+
+
+@pytest.mark.parametrize(
+    ("parameter_name", "parameter_value"),
+    [
+        ("prehoc_v_estimated_mps", None),
+        ("prehoc_v_estimated_mps", 0.0),
+        ("prehoc_v_estimated_mps", -0.5),
+        ("prehoc_t_margin_s", -1.0),
+        ("prehoc_s_start_exc_m", -1.0),
+        ("prehoc_s_exc_dep_m", -1.0),
+    ],
+)
+def test_prehoc_traversal_halts_on_invalid_parameters(
+    monkeypatch, parameter_name, parameter_value
+):
+    """PREHOC_TRAVERSAL must halt when its traversal parameters are unsafe."""
+    manager = _make_manager(monkeypatch)
+    mock_timer = MagicMock(spec=MissionTimer)
+    manager._timer = mock_timer
+
+    parameter_values = {
+        "prehoc_v_estimated_mps": 0.5,
+        "prehoc_t_margin_s": 30.0,
+        "prehoc_s_start_exc_m": 10.0,
+        "prehoc_s_exc_dep_m": 5.0,
+    }
+    parameter_values[parameter_name] = parameter_value
+    manager.get_parameter = lambda name: SimpleNamespace(value=parameter_values[name])
+
+    next_state = manager._handle_prehoc_traversal()
+
+    assert next_state == MissionState.HALT_MISSION
+    mock_timer.canStartCycle.assert_not_called()
 
 
 # ------------------------------------------------------------------

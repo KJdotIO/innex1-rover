@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
+import math
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -140,6 +141,29 @@ class MissionManager(Node):
 
         return MissionState.TURN_TO_EXCAVATION
 
+    def _safe_float_parameter(self, name: str) -> float | None:
+        """Convert a ROS parameter value to float, returning None on failure."""
+        raw_value = self.get_parameter(name).value
+
+        if raw_value is None:
+            self.get_logger().error(f"Parameter '{name}' is unset.")
+            return None
+
+        if not isinstance(raw_value, (bool, int, float, str, bytes)):
+            self.get_logger().error(
+                f"Parameter '{name}' has unsupported type "
+                f"{type(raw_value).__name__}."
+            )
+            return None
+
+        try:
+            return float(raw_value)
+        except ValueError:
+            self.get_logger().error(
+                f"Parameter '{name}' with value {raw_value!r} is not numeric."
+            )
+            return None
+
     def _handle_prehoc_traversal(self) -> MissionState:
         """
         Gate the first cycle using a conservative pre-hoc traversal estimate.
@@ -149,18 +173,41 @@ class MissionManager(Node):
         Transitions to ``TURN_TO_EXCAVATION`` if allowed, ``HALT_MISSION``
         otherwise.
         """
-        v = float(
-            self.get_parameter("prehoc_v_estimated_mps").value
-        )
-        t_margin = float(
-            self.get_parameter("prehoc_t_margin_s").value
-        )
-        s_start_exc = float(
-            self.get_parameter("prehoc_s_start_exc_m").value
-        )
-        s_exc_dep = float(
-            self.get_parameter("prehoc_s_exc_dep_m").value
-        )
+        v = self._safe_float_parameter("prehoc_v_estimated_mps")
+        t_margin = self._safe_float_parameter("prehoc_t_margin_s")
+        s_start_exc = self._safe_float_parameter("prehoc_s_start_exc_m")
+        s_exc_dep = self._safe_float_parameter("prehoc_s_exc_dep_m")
+
+        if (
+            v is None
+            or t_margin is None
+            or s_start_exc is None
+            or s_exc_dep is None
+        ):
+            return MissionState.HALT_MISSION
+
+        if not math.isfinite(v) or v <= 0.0:
+            self.get_logger().error(
+                "Invalid pre-hoc traversal parameter "
+                "'prehoc_v_estimated_mps'; expected a finite value > 0.0."
+            )
+            return MissionState.HALT_MISSION
+
+        invalid_non_negative_params = []
+        if not math.isfinite(t_margin) or t_margin < 0.0:
+            invalid_non_negative_params.append("prehoc_t_margin_s")
+        if not math.isfinite(s_start_exc) or s_start_exc < 0.0:
+            invalid_non_negative_params.append("prehoc_s_start_exc_m")
+        if not math.isfinite(s_exc_dep) or s_exc_dep < 0.0:
+            invalid_non_negative_params.append("prehoc_s_exc_dep_m")
+
+        if invalid_non_negative_params:
+            invalid_param_names = ", ".join(invalid_non_negative_params)
+            self.get_logger().error(
+                "Invalid pre-hoc traversal parameter(s) "
+                f"{invalid_param_names}; expected finite values >= 0.0."
+            )
+            return MissionState.HALT_MISSION
 
         t_prehoc = (s_start_exc / v) + (s_exc_dep / v) + t_margin
 
