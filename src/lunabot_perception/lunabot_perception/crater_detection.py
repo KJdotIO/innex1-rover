@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Crater (negative obstacle) detection from depth camera point clouds.
-
-Builds a rolling 2.5D elevation grid from the front camera's point cloud,
-identifies cells significantly below the local ground plane, and publishes
-an OccupancyGrid marking those cells as lethal for Nav2 costmap consumption.
-"""
+"""Crater (negative obstacle) detection from depth camera point clouds."""
 
 import numpy as np
 import rclpy
