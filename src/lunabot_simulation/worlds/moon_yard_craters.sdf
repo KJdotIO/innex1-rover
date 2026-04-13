@@ -1,0 +1,129 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="moon_yard">
+
+    <gravity>0 0 -9.81</gravity>
+
+    <physics name="1ms" type="ode">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>500</real_time_update_rate>
+    </physics>
+
+    <plugin
+            filename="ignition-gazebo-physics-system"
+            name="ignition::gazebo::systems::Physics"
+        >
+    </plugin>
+    <plugin
+            filename="ignition-gazebo-sensors-system"
+            name="ignition::gazebo::systems::Sensors"
+        >
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin
+            filename="ignition-gazebo-scene-broadcaster-system"
+            name="ignition::gazebo::systems::SceneBroadcaster"
+        >
+    </plugin>
+    <plugin
+            filename="ignition-gazebo-user-commands-system"
+            name="ignition::gazebo::systems::UserCommands"
+        >
+    </plugin>
+    <plugin
+            filename="ignition-gazebo-imu-system"
+            name="ignition::gazebo::systems::Imu"
+        >
+    </plugin>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+    </include>
+
+    <!-- Crater terrain (replaces flat lunar_surface for crater detection work) -->
+    <include>
+      <uri>model://crater_terrain</uri>
+      <name>crater_terrain</name>
+      <pose>2.95 -1.1 0.0 0 0 0</pose>
+    </include>
+
+    <!-- Walls -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>2.95 1.15 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
+                        >0.6 0.6 0.6 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>2.95 -3.35 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>7.9 0.1 0.5</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
+                        >0.6 0.6 0.6 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>6.95 -1.1 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
+                        >0.6 0.6 0.6 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-1.05 -1.1 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.1 4.4 0.5</size></box></geometry>
+          <material><ambient>0.4 0.4 0.4 1</ambient><diffuse
+                        >0.6 0.6 0.6 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Rocks -->
+    <include><uri>model://rock_rough</uri><name>rock_1</name><pose
+            >1.95 0.1 0.05 0 0 0.5</pose></include>
+    <include><uri>model://rock_round</uri><name>rock_2</name><pose
+            >3.25 -1.6 0.05 0 0 1.2</pose></include>
+    <include><uri>model://rock_rough</uri><name>rock_3</name><pose
+            >2.1 -2.5 0.05 0 0 2.1</pose></include>
+    <include><uri>model://rock_large</uri><name>rock_4</name><pose
+            >3.8 0.5 0.05 0 0 0.8</pose></include>
+    <include><uri>model://rock_round</uri><name>rock_5</name><pose
+            >5.75 0.4 0.05 0 0 1.5</pose></include>
+    <include><uri>model://rock_small</uri><name>rock_6</name><pose
+            >6.15 -2.1 0.05 0 0 0.3</pose></include>
+    <include><uri>model://rock_rough</uri><name>rock_7</name><pose
+            >5.2 -0.8 0.05 0 0 1.8</pose></include>
+
+  </world>
+</sdf>
