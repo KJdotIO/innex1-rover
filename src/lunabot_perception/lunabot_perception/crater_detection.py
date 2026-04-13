@@ -53,7 +53,7 @@ class CraterDetectionNode(Node):
         self.declare_parameter('update_rate', 5.0)
         self.declare_parameter('target_frame', 'odom')
         self.declare_parameter('ground_percentile', 80.0)
-        self.declare_parameter('inflation_cells', 5)
+        self.declare_parameter('inflation_cells', 2)
         self.declare_parameter('accumulator_decay', 0.95)
         # Fixed ground Z for competition arenas with known flat floor
         # Set to NaN to use automatic percentile-based estimation

@@ -113,5 +113,5 @@ local_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.50
-        cost_scaling_factor: 1.5
+        inflation_radius: 0.40
+        cost_scaling_factor: 2.0
