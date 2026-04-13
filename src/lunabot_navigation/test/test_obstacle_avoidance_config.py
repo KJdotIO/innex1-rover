@@ -78,13 +78,13 @@ class TestObstacleLayerConfig:
             )
 
     def test_height_bounds_are_positive(self):
-        for costmap_key, layer in self.layers:
+        for _key, layer in self.layers:
             pts = layer["camera_points"]
             assert pts["min_obstacle_height"] > 0.0
             assert pts["max_obstacle_height"] > pts["min_obstacle_height"]
 
     def test_marking_and_clearing_enabled(self):
-        for costmap_key, layer in self.layers:
+        for _key, layer in self.layers:
             pts = layer["camera_points"]
             assert pts["marking"] is True
             assert pts["clearing"] is True
@@ -102,11 +102,11 @@ class TestCraterLayerConfig:
                 self.layers.append((key, params["crater_layer"]))
 
     def test_crater_grid_topic(self):
-        for costmap_key, layer in self.layers:
+        for _key, layer in self.layers:
             assert layer["map_topic"] == "/crater_grid"
 
     def test_static_layer_plugin(self):
-        for costmap_key, layer in self.layers:
+        for _key, layer in self.layers:
             assert layer["plugin"] == "nav2_costmap_2d::StaticLayer"
 
 
