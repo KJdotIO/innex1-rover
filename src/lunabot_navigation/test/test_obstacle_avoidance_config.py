@@ -1,9 +1,4 @@
-"""Validate the integrated obstacle avoidance configuration.
-
-Checks that the Nav2 costmap layers and collision monitor config are
-internally consistent: sensor topics, height bounds, plugin ordering,
-and safety polygon definitions are all coherent.
-"""
+"""Validate the integrated obstacle avoidance configuration."""
 
 from pathlib import Path
 
