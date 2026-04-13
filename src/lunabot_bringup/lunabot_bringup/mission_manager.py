@@ -150,7 +150,9 @@ class MissionManager(Node):
             self.get_logger().error(f"Parameter '{name}' is unset.")
             return None
 
-        if not isinstance(raw_value, bool | int | float | str | bytes):
+        if isinstance(raw_value, bool) or not isinstance(
+            raw_value, int | float | str | bytes
+        ):
             self.get_logger().error(
                 f"Parameter '{name}' has unsupported type "
                 f"{type(raw_value).__name__}."
@@ -159,7 +161,7 @@ class MissionManager(Node):
 
         try:
             return float(raw_value)
-        except ValueError:
+        except (TypeError, ValueError):
             self.get_logger().error(
                 f"Parameter '{name}' with value {raw_value!r} is not numeric."
             )
