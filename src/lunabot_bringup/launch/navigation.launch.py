@@ -188,6 +188,14 @@ def generate_launch_description():
         }.items(),
     )
 
+    crater_detection = Node(
+        package="lunabot_perception",
+        executable="crater_detection",
+        name="crater_detection",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
+
     navigate_to_pose_gate = Node(
         package="lunabot_bringup",
         executable="navigate_to_pose_gate",
@@ -398,6 +406,7 @@ def generate_launch_description():
                 description=("SDL device index for the connected controller."),
             ),
             localisation_launch,
+            crater_detection,
             navigate_to_pose_gate,
             teleop_launch,
             twist_mux,
