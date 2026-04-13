@@ -15,6 +15,9 @@ controller_server:
       max_linear_vel: 0.3
       desired_linear_vel: 0.3
       max_angular_vel: 0.5
+      use_cost_regulated_linear_velocity_scaling: true
+      cost_scaling_dist: 0.6
+      cost_scaling_gain: 1.0
 
 planner_server:
   ros__parameters:
@@ -23,7 +26,7 @@ planner_server:
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.5
-      use_astar: false
+      use_astar: true
       allow_unknown: true
 
 # -- COSTMAPS --
