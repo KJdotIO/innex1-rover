@@ -15,15 +15,6 @@
   ],
   "tf_links": [
     {
-      "parent": "map",
-      "child": "odom",
-      "kind": "ekf_tf",
-      "source": "src/lunabot_localisation/config/ekf.yaml",
-      "node": "ekf_filter_node_map",
-      "parent_param": "map_frame",
-      "child_param": "odom_frame"
-    },
-    {
       "parent": "odom",
       "child": "base_footprint",
       "kind": "ekf_tf",

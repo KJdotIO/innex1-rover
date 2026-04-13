@@ -107,10 +107,8 @@ preflight:
     - name: controller_server
       critical: true
       phases: [runtime]
-    - name: ekf_filter_node_map
-      critical: true
-    - name: map_server
-      critical: true
+    - name: rtabmap
+      critical: false
     - name: start_zone_localiser
       critical: true
     - name: planner_server

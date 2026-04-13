@@ -1,61 +1,74 @@
-stereo_odometry:
-  ros__parameters:
-    # The EKF owns odom -> base_footprint. Stereo odometry only publishes
-    # the visual estimate and OdomInfo telemetry.
-    publish_tf: false
-    frame_id: "base_footprint"
-    odom_frame_id: "odom"
-    subscribe_rgb: false
-    subscribe_stereo: true
-    subscribe_depth: false
-    subscribe_rgbd: false
-    approx_sync: false
-    topic_queue_size: 10
-    sync_queue_size: 10
-    wait_for_transform: 0.2
-    wait_imu_to_init: false
-    subscribe_odom_info: true
-    # Frame-to-map is more tolerant of drift than frame-to-frame in this sim.
-    Odom/Strategy: "0" # Frame-to-Map
-    # Sim is still flaky, so reset quickly instead of staying lost forever.
-    Odom/ResetCountdown: "2"
-    # Conservative feature detection for sand and repetitive terrain.
-    Vis/MinInliers: "15"
-    Vis/FeatureType: "8" # GFTT/ORB
-    GFTT/MinDistance: "10"
-    GFTT/QualityLevel: "0.00001"
-
-rgbd_odometry:
-  ros__parameters:
-    publish_tf: false
-    frame_id: "base_footprint"
-    odom_frame_id: "odom"
-    subscribe_depth: false
-    subscribe_rgbd: true
-    approx_sync: false
-    Odom/Strategy: "0"
-    Vis/MinInliers: "15"
-    Vis/FeatureType: "8"
+### RTAB-Map SLAM Configuration ###
+# RTAB-Map owns the map -> odom transform via visual loop closure.
+# External EKF provides odom -> base_footprint via /odometry/local.
+# Internal visual odometry is disabled; the SLAM node only builds
+# and optimises the pose graph from RGB-D features and landmarks.
 
 rtabmap:
   ros__parameters:
-    # Global EKF now owns map -> odom; RTAB-Map only builds the map
-    publish_tf: false
-    subscribe_rgb: false
-    subscribe_stereo: true
-    subscribe_depth: false
+    publish_tf: true
+    publish_tf_odom: false
+
+    subscribe_depth: true
+    subscribe_rgb: true
+    subscribe_stereo: false
     subscribe_rgbd: false
-    approx_sync: false
-    subscribe_odom_info: true
-    topic_queue_size: 10
-    sync_queue_size: 10
-    wait_for_transform: 0.2
-    # Mapping resolution (matches Nav2)
-    Grid/CellSize: "0.05"
-    # Search for loops based on physical proximity
-    RGBD/ProximityBySpace: "true"
-    # Optimization for flat arena
-    Optimizer/Slam2D: "true"
+    subscribe_odom_info: false
+    approx_sync: true
+    approx_sync_max_interval: 0.1
+
     frame_id: "base_footprint"
     odom_frame_id: "odom"
     map_frame_id: "map"
+
+    topic_queue_size: 10
+    sync_queue_size: 10
+    wait_for_transform: 1.0
+
+    # Grid: ground/obstacle segmentation for /cloud_obstacles output
+    Grid/CellSize: "0.05"
+    Grid/FromDepth: "true"
+    Grid/3D: "true"
+    Grid/Sensor: "0"
+    Grid/MaxGroundAngle: "30"
+    Grid/MinGroundHeight: "-0.05"
+    Grid/MaxGroundHeight: "0.10"
+    Grid/MaxObstacleHeight: "0.8"
+    Grid/MinClusterSize: "20"
+    Grid/ClusterRadius: "0.1"
+    Grid/RangeMin: "0.3"
+    Grid/RangeMax: "4.0"
+    Grid/RayTracing: "true"
+    Grid/GroundIsObstacle: "false"
+    Grid/FlatObstacleDetected: "true"
+    Grid/NormalsSegmentation: "false"
+    RGBD/CreateOccupancyGrid: "true"
+
+    # Only create new SLAM nodes when the rover has moved
+    RGBD/LinearUpdate: "0.2"
+    RGBD/AngularUpdate: "0.2"
+    RGBD/StartAtOrigin: "true"
+
+    # Ensure global grid covers the arena even before full exploration
+    GridGlobal/MinSize: "20.0"
+    GridGlobal/OccupancyThr: "0.5"
+    GridGlobal/FullUpdate: "true"
+
+    # Flat arena: constrain optimisation to 2D
+    Optimizer/Slam2D: "true"
+    Optimizer/Strategy: "2"
+
+    # Proximity-based loop closure for revisited areas
+    RGBD/ProximityBySpace: "true"
+
+    # Feature detection for loop closure
+    Vis/MinInliers: "15"
+    Vis/FeatureType: "8"
+    Vis/MaxFeatures: "500"
+
+    # Keep the database in memory for speed (no disk I/O)
+    Rtabmap/DatabaseInMemory: "true"
+
+    # AprilTag landmark variance
+    landmark_linear_variance: 0.0001
+    landmark_angular_variance: 9999.0

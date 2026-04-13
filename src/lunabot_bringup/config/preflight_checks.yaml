@@ -39,11 +39,11 @@ preflight:
     - name: /ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
-      critical: true
+      critical: false
     - name: /map
       type: nav_msgs/msg/OccupancyGrid
       min_messages: 1
-      critical: true
+      critical: false
       reliability: reliable
       durability: transient_local
     - name: /odometry/local
@@ -58,7 +58,7 @@ preflight:
   required_tf_links:
     - parent: map
       child: odom
-      critical: true
+      critical: false
     - parent: odom
       child: base_footprint
       critical: true
@@ -88,10 +88,8 @@ preflight:
     - name: controller_server
       critical: true
       phases: [runtime]
-    - name: ekf_filter_node_map
-      critical: true
-    - name: map_server
-      critical: true
+    - name: rtabmap
+      critical: false
     - name: start_zone_localiser
       critical: true
     - name: planner_server

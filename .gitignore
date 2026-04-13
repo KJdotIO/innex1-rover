@@ -11,3 +11,4 @@ frames_*.pdf
 __pycache__/
 *.pyc
 research/
+.firecrawl/

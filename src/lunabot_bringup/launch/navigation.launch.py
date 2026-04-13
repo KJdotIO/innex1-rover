@@ -147,11 +147,8 @@ def generate_launch_description():
         "lunabot_teleop", "launch", "joystick_teleop.launch.py"
     )
     nav_params_path = _share_path("lunabot_navigation", "config", "nav2_params.yaml")
-    blank_map_path = _share_path("lunabot_navigation", "maps", "moon_yard_blank.yaml")
     rviz_config_path = _share_path("lunabot_bringup", "rviz", "navigation.rviz")
-    twist_mux_params_path = _share_path(
-        "lunabot_bringup", "config", "twist_mux.yaml"
-    )
+    twist_mux_params_path = _share_path("lunabot_bringup", "config", "twist_mux.yaml")
     preflight_config_path = _share_path(
         "lunabot_bringup", "config", "preflight_checks.yaml"
     )
@@ -176,9 +173,7 @@ def generate_launch_description():
     enable_teleop = LaunchConfiguration("enable_teleop")
     enforce_preflight = LaunchConfiguration("enforce_preflight")
     preflight_config = LaunchConfiguration("preflight_config")
-    preflight_lidar_debug_config = LaunchConfiguration(
-        "preflight_lidar_debug_config"
-    )
+    preflight_lidar_debug_config = LaunchConfiguration("preflight_lidar_debug_config")
     joy_device_id = LaunchConfiguration("joy_device_id")
     localiser_cmd_vel_topic = _select_localiser_cmd_vel_topic(enable_teleop)
 
@@ -222,28 +217,9 @@ def generate_launch_description():
         condition=IfCondition(enable_teleop),
     )
 
-    map_server = Node(
-        package="nav2_map_server",
-        executable="map_server",
-        name="map_server",
-        output="screen",
-        parameters=[
-            {"use_sim_time": use_sim_time},
-            {"yaml_filename": blank_map_path},
-        ],
-    )
-
-    map_lifecycle_manager = Node(
-        package="nav2_lifecycle_manager",
-        executable="lifecycle_manager",
-        name="lifecycle_manager_map",
-        output="screen",
-        parameters=[
-            {"use_sim_time": use_sim_time},
-            {"autostart": True},
-            {"node_names": ["map_server"]},
-        ],
-    )
+    # map_server removed: RTAB-Map publishes /map directly with its
+    # occupancy grid (RGBD/CreateOccupancyGrid: true). A separate blank
+    # map_server would conflict with RTAB-Map's /map topic.
 
     rviz = Node(
         package="rviz2",
@@ -360,8 +336,7 @@ def generate_launch_description():
                 "lidar_costmap_phase",
                 default_value="false",
                 description=(
-                    "Use odom-only debug localisation with an identity "
-                    "map->odom TF."
+                    "Use odom-only debug localisation with an identity map->odom TF."
                 ),
             ),
             DeclareLaunchArgument(
@@ -383,9 +358,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "use_sim_time",
                 default_value="true",
-                description=(
-                    "Use /clock instead of wall time for all launched nodes."
-                ),
+                description=("Use /clock instead of wall time for all launched nodes."),
             ),
             DeclareLaunchArgument(
                 "enable_apriltag_debug",
@@ -398,9 +371,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "enable_teleop",
                 default_value="false",
-                description=(
-                    "Launch joystick teleoperation through twist_mux."
-                ),
+                description=("Launch joystick teleoperation through twist_mux."),
             ),
             DeclareLaunchArgument(
                 "enforce_preflight",
@@ -412,9 +383,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "preflight_config",
                 default_value=default_preflight_config,
-                description=(
-                    "Preflight config used for the normal launch-gate path."
-                ),
+                description=("Preflight config used for the normal launch-gate path."),
             ),
             DeclareLaunchArgument(
                 "preflight_lidar_debug_config",
@@ -426,12 +395,8 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "joy_device_id",
                 default_value="0",
-                description=(
-                    "SDL device index for the connected controller."
-                ),
+                description=("SDL device index for the connected controller."),
             ),
-            map_server,
-            map_lifecycle_manager,
             localisation_launch,
             navigate_to_pose_gate,
             teleop_launch,
