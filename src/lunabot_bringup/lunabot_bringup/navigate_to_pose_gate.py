@@ -176,8 +176,14 @@ class NavigateToPoseGate(Node):
 
     def _forward_goal(self, goal_handle):
         """Forward the public goal to the internal Nav2 action server."""
+        request = goal_handle.request
+        # Use stamp=0 so TF2 picks the latest available transform instead of
+        # requiring an exact time match.  This prevents the "extrapolation into
+        # the future" failure when the goal sender's clock differs from the Nav2
+        # stack (e.g. wall-clock rviz2 vs simulation time).
+        request.pose.header.stamp = rclpy.time.Time().to_msg()
         send_goal_future = self._action_client.send_goal_async(
-            goal_handle.request,
+            request,
             feedback_callback=lambda feedback: goal_handle.publish_feedback(
                 feedback.feedback
             ),
