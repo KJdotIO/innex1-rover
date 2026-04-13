@@ -188,28 +188,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    depthimage_to_laserscan = Node(
-        package="depthimage_to_laserscan",
-        executable="depthimage_to_laserscan_node",
-        name="depthimage_to_laserscan",
-        output="screen",
-        parameters=[
-            {
-                "scan_height": 200,
-                "range_min": 0.3,
-                "range_max": 3.0,
-                "output_frame": "camera_front_link",
-                "scan_time": 0.067,
-                "use_sim_time": use_sim_time,
-            },
-        ],
-        remappings=[
-            ("depth", "/camera_front/depth_image"),
-            ("depth_camera_info", "/camera_front/camera_info"),
-            ("scan", "/depth_scan"),
-        ],
-    )
-
     navigate_to_pose_gate = Node(
         package="lunabot_bringup",
         executable="navigate_to_pose_gate",
@@ -420,7 +398,6 @@ def generate_launch_description():
                 description=("SDL device index for the connected controller."),
             ),
             localisation_launch,
-            depthimage_to_laserscan,
             navigate_to_pose_gate,
             teleop_launch,
             twist_mux,
