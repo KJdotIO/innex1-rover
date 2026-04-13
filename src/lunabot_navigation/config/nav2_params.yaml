@@ -31,7 +31,7 @@ planner_server:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
+      update_frequency: 2.0
       publish_frequency: 1.0
       global_frame: odom
       robot_base_frame: base_link
@@ -42,13 +42,7 @@ global_costmap:
       width: 10
       height: 8
       use_maximum: true
-      plugins: ["crater_layer", "obstacle_layer", "inflation_layer"]
-
-      crater_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: "/crater_grid"
-        map_subscribe_transient_local: true
-        subscribe_to_updates: false
+      plugins: ["obstacle_layer", "crater_layer", "inflation_layer"]
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -66,9 +60,15 @@ global_costmap:
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
 
+      crater_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: "/crater_grid"
+        map_subscribe_transient_local: false
+        subscribe_to_updates: false
+
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
+        cost_scaling_factor: 2.0
         inflation_radius: 0.55
 
       always_send_full_costmap: true
@@ -76,24 +76,18 @@ global_costmap:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0
-      publish_frequency: 2.0
+      update_frequency: 10.0
+      publish_frequency: 5.0
       global_frame: odom
       robot_base_frame: base_link
       robot_radius: 0.25
       rolling_window: true
+      track_unknown_space: false
       width: 3
       height: 3
       resolution: 0.05
       use_maximum: true
-      plugins: ["crater_layer", "obstacle_layer", "inflation_layer"]
-
-      # Crater layer on local costmap too
-      crater_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: "/crater_grid"
-        map_subscribe_transient_local: true
-        subscribe_to_updates: false
+      plugins: ["obstacle_layer", "crater_layer", "inflation_layer"]
 
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -111,7 +105,13 @@ local_costmap:
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
 
+      crater_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: "/crater_grid"
+        map_subscribe_transient_local: false
+        subscribe_to_updates: false
+
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.35
-        cost_scaling_factor: 2.0
+        inflation_radius: 0.50
+        cost_scaling_factor: 1.5

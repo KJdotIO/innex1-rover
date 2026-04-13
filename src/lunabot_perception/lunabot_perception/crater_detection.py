@@ -26,6 +26,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from rclpy.time import Time
 from rclpy.duration import Duration
+from scipy.ndimage import binary_dilation
 from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py.point_cloud2 import read_points_numpy, create_cloud_xyz32
@@ -47,12 +48,16 @@ class CraterDetectionNode(Node):
         self.declare_parameter('grid_height', 5.0)
         self.declare_parameter('grid_origin_x', -1.0)
         self.declare_parameter('grid_origin_y', -3.5)
-        self.declare_parameter('depth_threshold', 0.12)
-        self.declare_parameter('min_points_per_cell', 3)
+        self.declare_parameter('depth_threshold', 0.08)
+        self.declare_parameter('min_points_per_cell', 2)
         self.declare_parameter('update_rate', 5.0)
         self.declare_parameter('target_frame', 'odom')
         self.declare_parameter('ground_percentile', 80.0)
-        self.declare_parameter('inflation_cells', 2)
+        self.declare_parameter('inflation_cells', 5)
+        self.declare_parameter('accumulator_decay', 0.95)
+        # Fixed ground Z for competition arenas with known flat floor
+        # Set to NaN to use automatic percentile-based estimation
+        self.declare_parameter('fixed_ground_z', float('nan'))
 
         # --- Read parameters ---
         self.resolution = self.get_parameter('grid_resolution').value
@@ -65,16 +70,25 @@ class CraterDetectionNode(Node):
         self.target_frame = self.get_parameter('target_frame').value
         self.ground_percentile = self.get_parameter('ground_percentile').value
         self.inflation_cells = self.get_parameter('inflation_cells').value
+        self.decay = self.get_parameter('accumulator_decay').value
+        self.fixed_ground_z = self.get_parameter('fixed_ground_z').value
 
         # Grid dimensions in cells
         self.grid_w = int(self.grid_width_m / self.resolution)
         self.grid_h = int(self.grid_height_m / self.resolution)
 
-        # Elevation accumulators: sum of Z values and count per cell
+        # Elevation accumulators (float64 for both to support decay)
         self._z_sum = np.zeros((self.grid_h, self.grid_w), dtype=np.float64)
-        self._z_count = np.zeros(
-            (self.grid_h, self.grid_w), dtype=np.int32
-        )
+        self._z_count = np.zeros((self.grid_h, self.grid_w), dtype=np.float64)
+
+        # Pre-build dilation kernel for crater inflation
+        if self.inflation_cells > 0:
+            k = self.inflation_cells
+            self._inflate_kernel = np.ones(
+                (2 * k + 1, 2 * k + 1), dtype=bool
+            )
+        else:
+            self._inflate_kernel = None
 
         # --- TF2 ---
         self.tf_buffer = Buffer()
@@ -89,17 +103,16 @@ class CraterDetectionNode(Node):
         )
 
         # --- Publishers ---
-        # Latched QoS so Nav2 StaticLayer picks up the latest grid
-        latched_qos = QoSProfile(
+        # VOLATILE QoS so StaticLayer re-reads every publish
+        grid_qos = QoSProfile(
             depth=1,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            durability=DurabilityPolicy.VOLATILE,
             reliability=ReliabilityPolicy.RELIABLE,
         )
         self.grid_pub = self.create_publisher(
-            OccupancyGrid, '/crater_grid', latched_qos
+            OccupancyGrid, '/crater_grid', grid_qos
         )
 
-        # Debug: publish crater points as PointCloud2 for RViz
         self.debug_cloud_pub = self.create_publisher(
             PointCloud2, '/crater_points_debug', 10
         )
@@ -110,7 +123,8 @@ class CraterDetectionNode(Node):
 
         self.get_logger().info(
             f'Crater detection: {self.grid_w}x{self.grid_h} grid '
-            f'@ {self.resolution}m, depth threshold {self.depth_threshold}m'
+            f'@ {self.resolution}m, depth_threshold={self.depth_threshold}m, '
+            f'decay={self.decay}, inflation={self.inflation_cells} cells'
         )
 
     def _cloud_callback(self, msg: PointCloud2):
@@ -125,27 +139,23 @@ class CraterDetectionNode(Node):
         except Exception:
             return
 
-        # Read as (N, 3) array
         points = read_points_numpy(
             msg, field_names=['x', 'y', 'z'], skip_nans=True
         )
         if points.size == 0:
             return
 
-        # Remove infinites
         valid = np.all(np.isfinite(points), axis=1)
         points = points[valid]
         if points.shape[0] == 0:
             return
 
-        # Manual TF: rotate then translate (avoids do_transform_cloud bugs)
         q = tf.transform.rotation
         t = tf.transform.translation
         rot = Rotation.from_quat([q.x, q.y, q.z, q.w]).as_matrix()
         trans = np.array([t.x, t.y, t.z])
         points_odom = (rot @ points.T).T + trans
 
-        # Bin into grid cells
         col = ((points_odom[:, 0] - self.origin_x) / self.resolution).astype(
             np.int32
         )
@@ -154,7 +164,6 @@ class CraterDetectionNode(Node):
         )
         z = points_odom[:, 2]
 
-        # Mask to valid grid bounds
         mask = (
             (col >= 0) & (col < self.grid_w)
             & (row >= 0) & (row < self.grid_h)
@@ -166,9 +175,12 @@ class CraterDetectionNode(Node):
         if col.size == 0:
             return
 
-        # Accumulate per-cell Z values
+        # Decay old data so recent observations dominate
+        self._z_sum *= self.decay
+        self._z_count *= self.decay
+
         np.add.at(self._z_sum, (row, col), z)
-        np.add.at(self._z_count, (row, col), 1)
+        np.add.at(self._z_count, (row, col), 1.0)
 
     def _publish_grid(self):
         """Compute crater grid and publish OccupancyGrid."""
@@ -176,30 +188,26 @@ class CraterDetectionNode(Node):
         if not np.any(observed):
             return
 
-        # Mean elevation per cell
         elevation = np.where(
-            observed, self._z_sum / np.maximum(self._z_count, 1), np.nan
+            observed, self._z_sum / np.maximum(self._z_count, 1.0), np.nan
         )
 
-        # Ground reference: high percentile of observed elevations
-        # (most of the terrain is flat ground, craters are the minority)
-        observed_elevations = elevation[observed]
-        ground_z = np.percentile(observed_elevations, self.ground_percentile)
+        # Ground reference: fixed value or auto-percentile
+        if np.isfinite(self.fixed_ground_z):
+            ground_z = self.fixed_ground_z
+        else:
+            observed_elevations = elevation[observed]
+            ground_z = np.percentile(
+                observed_elevations, self.ground_percentile
+            )
 
-        # Crater cells: observed, and significantly below ground
         crater_mask = observed & (elevation < (ground_z - self.depth_threshold))
 
-        # Inflate crater cells to add a safety margin
-        if self.inflation_cells > 0:
-            inflated = np.copy(crater_mask)
-            k = self.inflation_cells
-            for dr in range(-k, k + 1):
-                for dc in range(-k, k + 1):
-                    if dr == 0 and dc == 0:
-                        continue
-                    shifted = np.roll(np.roll(crater_mask, dr, axis=0), dc, axis=1)
-                    inflated |= shifted
-            crater_mask = inflated
+        # Inflate using proper dilation (no wraparound)
+        if self._inflate_kernel is not None and np.any(crater_mask):
+            crater_mask = binary_dilation(
+                crater_mask, structure=self._inflate_kernel
+            )
 
         # Build OccupancyGrid
         grid_msg = OccupancyGrid()
@@ -216,8 +224,7 @@ class CraterDetectionNode(Node):
 
         data = np.full(self.grid_h * self.grid_w, 0, dtype=np.int8)
         data[crater_mask.ravel()] = 100  # LETHAL
-        # Mark unobserved as unknown (-1) so Nav2 doesn't treat them as free
-        data[~observed.ravel()] = -1
+        data[~observed.ravel()] = -1     # UNKNOWN
         grid_msg.data = data.tolist()
 
         self.grid_pub.publish(grid_msg)
