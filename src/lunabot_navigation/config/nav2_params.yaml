@@ -39,7 +39,7 @@ planner_server:
       reverse_penalty: 2.0
       change_penalty: 0.0
       non_straight_penalty: 1.20
-      cost_penalty: 2.0
+      cost_penalty: 3.0
       retrospective_penalty: 0.015
       analytic_expansion_ratio: 3.5
       analytic_expansion_max_length: 3.0
@@ -136,8 +136,8 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.0
-        inflation_radius: 0.55
+        cost_scaling_factor: 1.2
+        inflation_radius: 0.75
 
       always_send_full_costmap: true
 
@@ -219,5 +219,5 @@ local_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.40
-        cost_scaling_factor: 2.0
+        inflation_radius: 0.55
+        cost_scaling_factor: 1.2
