@@ -33,12 +33,13 @@ def test_mission_manager_launch_starts_one_supervisor_node(monkeypatch):
         if isinstance(entity, DeclareLaunchArgument)
     ]
 
-    assert declared_arguments == ["use_sim_time"]
+    assert declared_arguments == ["use_sim_time", "waypoints_file"]
     assert len(nodes) == 1
     assert nodes[0].node_executable == "mission_manager"
 
     context = LaunchContext()
     context.launch_configurations["use_sim_time"] = "false"
+    context.launch_configurations["waypoints_file"] = "/tmp/test_waypoints.yaml"
     monkeypatch.setattr(ExecuteProcess, "execute", lambda _self, _context: None)
     nodes[0].execute(context)
 

@@ -1,0 +1,30 @@
+# Arena waypoints for the UK Lunabotics competition.
+# All poses are in the map frame.  Adjust these for each arena setup.
+#
+# Sim coordinate system (from moon_yard_craters.sdf):
+#   Rover spawns at (0, 0) in the top-left of the arena.
+#   X increases rightward toward the excavation zone.
+#   Y decreases downward (the arena floor spans roughly y=1.1 to y=-3.3).
+#   Walls: west x=-1.0, east x=6.9, north y=1.1, south y=-3.3
+#
+#   [Start Zone x<1]  ->  [Obstacle Zone 1<x<5]  ->  [Excavation Zone x>5]
+#   Deposition / berm is at the bottom of the start zone (low Y).
+
+mission_manager:
+  ros__parameters:
+    # Waypoint in the middle of the obstacle zone, centred vertically.
+    # The planner routes around detected boulders and craters.
+    waypoint_mid_obstacle_x: 3.0
+    waypoint_mid_obstacle_y: -1.1
+    waypoint_mid_obstacle_yaw: 0.0
+
+    # Excavation zone target pose -- clear of rock_6 (6.15,-2.1).
+    waypoint_excavation_x: 6.0
+    waypoint_excavation_y: -1.5
+    waypoint_excavation_yaw: 0.0
+
+    # Deposition zone target pose -- near the berm at the bottom of the
+    # start zone.  Yaw faces -Y (toward the berm).
+    waypoint_deposition_x: 0.3
+    waypoint_deposition_y: -2.8
+    waypoint_deposition_yaw: -1.5708
