@@ -1,20 +1,18 @@
-"""Sabertooth 2x32 Packetized Serial protocol driver.
+# Copyright 2026 Leicester Lunabotics Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-Encodes throttle commands as Packetized Serial bytes for one Sabertooth
-controller.  Each controller drives two motors (M1 and M2).
-
-Packetized Serial format (per command):
-    [address, command, data, checksum]
-    checksum = (address + command + data) & 0x7F
-
-Command bytes (forward/reverse per motor):
-    0 = M1 forward  (data 0–127)
-    1 = M1 reverse   (data 0–127)
-    4 = M2 forward  (data 0–127)
-    5 = M2 reverse   (data 0–127)
-
-A data value of 0 with any direction command is a stop for that motor.
-"""
+"""Sabertooth 2x32 Packetized Serial protocol driver."""
 
 from __future__ import annotations
 
@@ -44,11 +42,7 @@ def _pack_command(address: int, command: int, data: int) -> bytes:
 def throttle_to_bytes(
     address: int, m1_throttle: float, m2_throttle: float
 ) -> bytes:
-    """Convert two throttle values [-1.0, 1.0] to serial bytes.
-
-    Returns the concatenated bytes for both motor commands (8 bytes total).
-    Clamps input to [-1.0, 1.0].
-    """
+    """Convert two throttle values [-1.0, 1.0] to serial bytes."""
     frames = bytearray()
     for throttle, fwd_cmd, rev_cmd in [
         (m1_throttle, _CMD_M1_FORWARD, _CMD_M1_REVERSE),

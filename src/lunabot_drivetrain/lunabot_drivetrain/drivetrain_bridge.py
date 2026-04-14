@@ -1,16 +1,18 @@
-"""Drivetrain bridge: converts cmd_vel to Sabertooth serial and publishes odometry.
+# Copyright 2026 Leicester Lunabotics Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-Subscribes to /cmd_vel_safe (output of the collision monitor) and converts
-Twist messages into per-wheel throttle commands for the two Sabertooth 2x32
-controllers via Packetized Serial.  Reads quadrature encoder feedback and
-publishes JointState, odometry, and DrivetrainTelemetry/Status.
-
-Safety:
-- Checks /safety/motion_inhibit before every command cycle.
-- Commands a full stop if no cmd_vel is received within command_timeout_s.
-- Detects encoder stall (commanded but no motion) and enters FAULT state.
-- All loops and waits are bounded per ROVER_CODING_STANDARD rule 2.
-"""
+"""Convert cmd_vel to Sabertooth serial and publish drivetrain telemetry."""
 
 from __future__ import annotations
 
@@ -189,7 +191,7 @@ class DrivetrainBridge(Node):
             self._transition_to(DrivetrainStatus.STATE_ESTOP)
 
     def _control_loop(self) -> None:
-        """Main control cycle: convert cmd_vel to motor commands."""
+        """Run one control cycle: convert cmd_vel to motor commands."""
         now = time.monotonic()
 
         if self._state == DrivetrainStatus.STATE_FAULT:
