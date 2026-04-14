@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import rclpy
 from geometry_msgs.msg import Twist
@@ -152,7 +152,7 @@ class DrivetrainBridge(Node):
         self._odom_x = 0.0
         self._odom_y = 0.0
         self._odom_yaw = 0.0
-        self._serial: object = None
+        self._serial: Any = None
 
     def _init_serial(self) -> None:
         """Open the UART serial port.  Logs a warning if unavailable."""
