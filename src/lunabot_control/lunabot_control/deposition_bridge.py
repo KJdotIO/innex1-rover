@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -131,51 +131,53 @@ class DepositionBridge(Node):
         self._estop_active = False
         self._motion_inhibited = False
         self._gpio_available = False
-        self._door_pwm: object = None
-        self._bed_l_pwm_obj: object = None
-        self._bed_r_pwm_obj: object = None
+        self._door_pwm: Any = None
+        self._bed_l_pwm_obj: Any = None
+        self._bed_r_pwm_obj: Any = None
 
     def _init_gpio(self) -> None:
         """Set up Jetson GPIO pins for Cytron PWM+DIR control."""
         try:
             import Jetson.GPIO as GPIO
-            GPIO.setmode(GPIO.BOARD)
-
-            for pin in (
-                self._door_dir_pin,
-                self._bed_l_dir,
-                self._bed_r_dir,
-            ):
-                GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
-
-            for pin in (
-                self._door_pwm_pin,
-                self._bed_l_pwm,
-                self._bed_r_pwm,
-            ):
-                GPIO.setup(pin, GPIO.OUT)
-
-            self._door_pwm = GPIO.PWM(
-                self._door_pwm_pin, self._pwm_freq
-            )
-            self._bed_l_pwm_obj = GPIO.PWM(
-                self._bed_l_pwm, self._pwm_freq
-            )
-            self._bed_r_pwm_obj = GPIO.PWM(
-                self._bed_r_pwm, self._pwm_freq
-            )
-            self._door_pwm.start(0)
-            self._bed_l_pwm_obj.start(0)
-            self._bed_r_pwm_obj.start(0)
-
-            self._gpio_available = True
-            self.get_logger().info("GPIO initialised for Cytron control")
-        except Exception as exc:
+        except (ImportError, RuntimeError) as exc:
             self.get_logger().warn(
                 f"GPIO unavailable: {exc}. "
                 f"Running in dry-run mode."
             )
             self._gpio_available = False
+            return
+
+        GPIO.setmode(GPIO.BOARD)
+
+        for pin in (
+            self._door_dir_pin,
+            self._bed_l_dir,
+            self._bed_r_dir,
+        ):
+            GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
+
+        for pin in (
+            self._door_pwm_pin,
+            self._bed_l_pwm,
+            self._bed_r_pwm,
+        ):
+            GPIO.setup(pin, GPIO.OUT)
+
+        self._door_pwm = GPIO.PWM(
+            self._door_pwm_pin, self._pwm_freq
+        )
+        self._bed_l_pwm_obj = GPIO.PWM(
+            self._bed_l_pwm, self._pwm_freq
+        )
+        self._bed_r_pwm_obj = GPIO.PWM(
+            self._bed_r_pwm, self._pwm_freq
+        )
+        self._door_pwm.start(0)
+        self._bed_l_pwm_obj.start(0)
+        self._bed_r_pwm_obj.start(0)
+
+        self._gpio_available = True
+        self.get_logger().info("GPIO initialised for Cytron control")
 
     def _init_ros(self) -> None:
         """Set up action server and safety subscriptions."""
@@ -237,7 +239,7 @@ class DepositionBridge(Node):
 
     def _set_actuator(
         self,
-        pwm_obj: object,
+        pwm_obj: Any,
         dir_pin: int,
         extend: bool,
         duty: float,
@@ -245,15 +247,10 @@ class DepositionBridge(Node):
         """Drive one actuator at given duty and direction."""
         if not self._gpio_available:
             return
-        try:
-            import Jetson.GPIO as GPIO
-            direction = GPIO.HIGH if extend else GPIO.LOW
-            GPIO.output(dir_pin, direction)
-            pwm_obj.ChangeDutyCycle(duty)
-        except Exception as exc:
-            self.get_logger().error(
-                f"Actuator GPIO error: {exc}"
-            )
+        import Jetson.GPIO as GPIO
+        direction = GPIO.HIGH if extend else GPIO.LOW
+        GPIO.output(dir_pin, direction)
+        pwm_obj.ChangeDutyCycle(duty)
 
     def _check_safety(self) -> Optional[str]:
         """Return a failure reason if unsafe, else None."""
@@ -437,11 +434,8 @@ class DepositionBridge(Node):
         """Stop actuators and clean up GPIO."""
         self._all_stop()
         if self._gpio_available:
-            try:
-                import Jetson.GPIO as GPIO
-                GPIO.cleanup()
-            except Exception:
-                pass
+            import Jetson.GPIO as GPIO
+            GPIO.cleanup()
         self._action_server.destroy()
         super().destroy_node()
 
