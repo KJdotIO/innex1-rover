@@ -5,7 +5,7 @@
 
 bt_navigator:
   ros__parameters:
-    default_bt_xml_filename: "/opt/ros/humble/share/nav2_bt_navigator/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    default_bt_xml_filename: "$(find-pkg-share lunabot_navigation)/behavior_trees/navigate_to_pose_bounded_recovery.xml"
 
 controller_server:
   ros__parameters:
