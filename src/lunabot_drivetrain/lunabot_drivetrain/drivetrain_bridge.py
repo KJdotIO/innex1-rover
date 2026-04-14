@@ -21,15 +21,19 @@ import time
 from typing import Optional
 
 import rclpy
-from geometry_msgs.msg import Twist, TransformStamped
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool
 
 from lunabot_interfaces.msg import (
-    DrivetrainCommand,
     DrivetrainStatus,
     DrivetrainTelemetry,
 )
@@ -85,12 +89,22 @@ class DrivetrainBridge(Node):
         )
         self._track_width = self.get_parameter("track_width_m").value
         self._wheel_radius = self.get_parameter("wheel_radius_m").value
-        self._encoder_cpr = self.get_parameter("encoder_counts_per_rev").value
-        self._cmd_timeout = self.get_parameter("command_timeout_s").value
+        self._encoder_cpr = self.get_parameter(
+            "encoder_counts_per_rev"
+        ).value
+        self._cmd_timeout = self.get_parameter(
+            "command_timeout_s"
+        ).value
         self._max_throttle = self.get_parameter("max_throttle").value
-        self._stall_thresh = self.get_parameter("stall_throttle_threshold").value
-        self._stall_min_vel = self.get_parameter("stall_min_velocity_rps").value
-        self._stall_timeout = self.get_parameter("stall_timeout_s").value
+        self._stall_thresh = self.get_parameter(
+            "stall_throttle_threshold"
+        ).value
+        self._stall_min_vel = self.get_parameter(
+            "stall_min_velocity_rps"
+        ).value
+        self._stall_timeout = self.get_parameter(
+            "stall_timeout_s"
+        ).value
         ctrl_hz = self.get_parameter("control_loop_hz").value
         self._telem_hz = self.get_parameter("telemetry_publish_hz").value
 
@@ -99,13 +113,25 @@ class DrivetrainBridge(Node):
                 f"Expected 2 Sabertooth addresses, got {len(self._addresses)}"
             )
         if self._track_width <= 0.0:
-            raise ValueError(f"track_width_m must be positive: {self._track_width}")
+            raise ValueError(
+                f"track_width_m must be positive: "
+                f"{self._track_width}"
+            )
         if self._wheel_radius <= 0.0:
-            raise ValueError(f"wheel_radius_m must be positive: {self._wheel_radius}")
+            raise ValueError(
+                f"wheel_radius_m must be positive: "
+                f"{self._wheel_radius}"
+            )
         if self._encoder_cpr <= 0:
-            raise ValueError(f"encoder_counts_per_rev must be positive: {self._encoder_cpr}")
+            raise ValueError(
+                f"encoder_counts_per_rev must be positive: "
+                f"{self._encoder_cpr}"
+            )
         if not 0.0 < self._max_throttle <= 1.0:
-            raise ValueError(f"max_throttle must be in (0, 1]: {self._max_throttle}")
+            raise ValueError(
+                f"max_throttle must be in (0, 1]: "
+                f"{self._max_throttle}"
+            )
 
         self._control_period = 1.0 / ctrl_hz
 
@@ -153,7 +179,10 @@ class DrivetrainBridge(Node):
             Twist, "/cmd_vel_safe", self._cmd_vel_callback, 10
         )
         self._inhibit_sub = self.create_subscription(
-            Bool, "/safety/motion_inhibit", self._inhibit_callback, _INHIBIT_QOS
+            Bool,
+            "/safety/motion_inhibit",
+            self._inhibit_callback,
+            _INHIBIT_QOS,
         )
         self._estop_sub = self.create_subscription(
             Bool, "/safety/estop", self._estop_callback, 10
@@ -164,14 +193,20 @@ class DrivetrainBridge(Node):
         self._telem_pub = self.create_publisher(
             DrivetrainTelemetry, "/drivetrain/telemetry", 10
         )
-        self._odom_pub = self.create_publisher(Odometry, "/odom_wheels", 10)
-        self._joint_pub = self.create_publisher(JointState, "/joint_states_wheels", 10)
+        self._odom_pub = self.create_publisher(
+            Odometry, "/odom_wheels", 10
+        )
+        self._joint_pub = self.create_publisher(
+            JointState, "/joint_states_wheels", 10
+        )
 
         self._control_timer = self.create_timer(
             self._control_period, self._control_loop
         )
         telem_period = 1.0 / self._telem_hz
-        self._telem_timer = self.create_timer(telem_period, self._publish_telemetry)
+        self._telem_timer = self.create_timer(
+            telem_period, self._publish_telemetry
+        )
 
     def _cmd_vel_callback(self, msg: Twist) -> None:
         """Store the latest velocity command and timestamp."""
@@ -203,7 +238,11 @@ class DrivetrainBridge(Node):
                 self._transition_to(DrivetrainStatus.STATE_ESTOP)
             return
 
-        if self._state == DrivetrainStatus.STATE_ESTOP and not self._estop_active:
+        estop_cleared = (
+            self._state == DrivetrainStatus.STATE_ESTOP
+            and not self._estop_active
+        )
+        if estop_cleared:
             self.get_logger().info("E-stop cleared — returning to READY")
             self._fault_code = DrivetrainStatus.FAULT_NONE
             self._transition_to(DrivetrainStatus.STATE_READY)
@@ -307,7 +346,10 @@ class DrivetrainBridge(Node):
         js = JointState()
         js.header.stamp = stamp
         js.name = list(_WHEEL_NAMES)
-        js.velocity = [float(v * 2.0 * math.pi) for v in self._wheel_velocity_rps]
+        js.velocity = [
+            float(v * 2.0 * math.pi)
+            for v in self._wheel_velocity_rps
+        ]
         js.position = [
             float(t / self._encoder_cpr * 2.0 * math.pi)
             for t in self._encoder_ticks
