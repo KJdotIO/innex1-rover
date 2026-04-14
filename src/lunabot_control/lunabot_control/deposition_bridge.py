@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Optional
+from typing import Any
 
 import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -211,7 +211,7 @@ class DepositionBridge(Node):
         if msg.data:
             self._all_stop()
 
-    def _goal_cb(self, goal_request) -> GoalResponse:
+    def _goal_cb(self, _goal_request) -> GoalResponse:
         """Accept goals only when safe."""
         if self._estop_active or self._motion_inhibited:
             self.get_logger().warn(
@@ -252,7 +252,7 @@ class DepositionBridge(Node):
         GPIO.output(dir_pin, direction)
         pwm_obj.ChangeDutyCycle(duty)
 
-    def _check_safety(self) -> Optional[str]:
+    def _check_safety(self) -> str | None:
         """Return a failure reason if unsafe, else None."""
         if self._estop_active:
             return "E-stop active during deposition"
@@ -268,7 +268,7 @@ class DepositionBridge(Node):
         door_open: bool,
         bed_raised: bool,
         start_time: float,
-    ) -> Optional[Deposit.Result]:
+    ) -> Deposit.Result | None:
         """Wait bounded duration, publishing feedback."""
         phase_start = time.monotonic()
         deadline = phase_start + min(
