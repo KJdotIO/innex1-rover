@@ -51,6 +51,7 @@ class VelocityGate(Node):
     })
 
     def __init__(self) -> None:
+        """Initialise subscriptions, publisher, and gate state."""
         super().__init__("velocity_gate")
         self._gate_open = False
         self._motion_inhibited = False

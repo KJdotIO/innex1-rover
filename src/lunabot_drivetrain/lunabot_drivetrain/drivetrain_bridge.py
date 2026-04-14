@@ -52,6 +52,7 @@ class DrivetrainBridge(Node):
     """Bridge between ROS cmd_vel and Sabertooth motor controllers."""
 
     def __init__(self) -> None:
+        """Initialise serial, parameters, and ROS interfaces."""
         super().__init__("drivetrain_bridge")
         self._declare_parameters()
         self._validate_parameters()
