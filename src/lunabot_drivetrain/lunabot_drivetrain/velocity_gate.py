@@ -38,12 +38,7 @@ _ZERO_TWIST = Twist()
 
 
 class VelocityGate(Node):
-    """Pass or zero cmd_vel based on drivetrain health.
-
-    Sits between the collision monitor output (/cmd_vel_safe) and the
-    drivetrain bridge input (/cmd_vel_gated).  Provides a second
-    layer of safety beyond the bridge's own inhibit checks.
-    """
+    """Pass or zero cmd_vel based on drivetrain health."""
 
     _ALLOWED_STATES = frozenset({
         DrivetrainStatus.STATE_READY,
