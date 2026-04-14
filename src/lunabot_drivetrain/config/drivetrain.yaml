@@ -1,0 +1,46 @@
+# Drivetrain bridge configuration for the INNEX-1 rover.
+#
+# Hardware: 4x GR-WM4-V4 brushed DC motors driven by 2x Sabertooth 2x32
+# motor controllers via Packetized Serial (one UART, addresses 128 and 129).
+# Feedback: Hall-sensor quadrature encoders on Jetson GPIO pins.
+#
+# Wheel order: [FL, FR, RL, RR]
+
+drivetrain_bridge:
+  ros__parameters:
+    # --- UART ---
+    serial_port: "/dev/ttyTHS1"
+    baud_rate: 9600
+
+    # Sabertooth Packetized Serial addresses (DIP-switch configured).
+    # Controller 0 drives FL + FR, controller 1 drives RL + RR.
+    sabertooth_addresses: [128, 129]
+
+    # --- Kinematics ---
+    # Track width (centre-to-centre of left and right wheels) in metres.
+    track_width_m: 0.44
+    # Wheel radius in metres.
+    wheel_radius_m: 0.065
+
+    # --- Encoders ---
+    # Counts per full revolution of the output shaft (after gearbox).
+    encoder_counts_per_rev: 720
+    # Jetson GPIO pin numbers for encoder channels [A, B] per wheel.
+    # [FL_A, FL_B, FR_A, FR_B, RL_A, RL_B, RR_A, RR_B]
+    # Placeholder pins — update to match the actual PCB wiring.
+    encoder_gpio_pins: [7, 11, 13, 15, 29, 31, 33, 35]
+
+    # --- Safety ---
+    # If no cmd_vel is received within this period, send a stop.
+    command_timeout_s: 0.5
+    # Maximum throttle (0.0–1.0) during first-motion bringup.
+    max_throttle: 1.0
+    # Encoder stall detection: if commanded throttle > threshold and
+    # measured velocity < min_velocity_rps for stall_timeout_s, fault.
+    stall_throttle_threshold: 0.15
+    stall_min_velocity_rps: 0.05
+    stall_timeout_s: 2.0
+
+    # --- Rates ---
+    control_loop_hz: 20.0
+    telemetry_publish_hz: 10.0
