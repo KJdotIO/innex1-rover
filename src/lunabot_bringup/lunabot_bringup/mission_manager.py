@@ -10,9 +10,23 @@ from action_msgs.msg import GoalStatus
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+)
+from std_msgs.msg import Bool
 
 from lunabot_bringup.mission_timer import MissionTimer
 from lunabot_interfaces.action import Deposit, Excavate
+
+_INHIBIT_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+)
 
 
 class MissionState(IntEnum):
@@ -67,6 +81,27 @@ class MissionManager(Node):
         self.declare_parameter("waypoint_deposition_yaw", 0.0)
         self.declare_parameter("nav_goal_timeout_s", 120.0)
 
+        self.declare_parameter("max_nav_retries", 2)
+        self.declare_parameter("max_excavation_retries", 1)
+        self.declare_parameter("max_deposition_retries", 1)
+        self.declare_parameter("max_shuttle_cycles", 10)
+
+        self._max_nav_retries = self.get_parameter(
+            "max_nav_retries"
+        ).value
+        self._max_exc_retries = self.get_parameter(
+            "max_excavation_retries"
+        ).value
+        self._max_dep_retries = self.get_parameter(
+            "max_deposition_retries"
+        ).value
+        self._max_cycles = self.get_parameter(
+            "max_shuttle_cycles"
+        ).value
+        self._cycle_count = 0
+        self._estop_active = False
+        self._motion_inhibited = False
+
         self._state: MissionState = MissionState.INITIALIZE_MISSION
         self._timer: MissionTimer | None = None
 
@@ -86,6 +121,47 @@ class MissionManager(Node):
             "/mission/deposit",
         )
 
+        self._inhibit_sub = self.create_subscription(
+            Bool,
+            "/safety/motion_inhibit",
+            self._inhibit_cb,
+            _INHIBIT_QOS,
+        )
+        self._estop_sub = self.create_subscription(
+            Bool, "/safety/estop", self._estop_cb, 10
+        )
+
+    def _inhibit_cb(self, msg: Bool) -> None:
+        """Track motion inhibit for safety gating."""
+        self._motion_inhibited = msg.data
+
+    def _estop_cb(self, msg: Bool) -> None:
+        """Track E-stop state."""
+        self._estop_active = msg.data
+
+    def _is_safe(self) -> bool:
+        """Return True if the rover is safe to operate."""
+        return not self._estop_active and not self._motion_inhibited
+
+    def _retry_action(
+        self,
+        action_fn,
+        label: str,
+        max_retries: int,
+    ) -> tuple[bool, str]:
+        """Call action_fn up to max_retries+1 times."""
+        for attempt in range(max_retries + 1):
+            if not self._is_safe():
+                return False, f"{label}: safety stop active"
+            success, detail = action_fn()
+            if success:
+                return True, detail
+            self.get_logger().warn(
+                f"{label} attempt {attempt + 1}/"
+                f"{max_retries + 1} failed: {detail}"
+            )
+        return False, f"{label}: exhausted {max_retries + 1} attempts"
+
     # ------------------------------------------------------------------
     # Public entry point
     # ------------------------------------------------------------------
@@ -93,9 +169,17 @@ class MissionManager(Node):
     def run_mission(self) -> None:
         """Advance the FSM until HALT_MISSION is reached."""
         while self._state != MissionState.HALT_MISSION:
+            if not self._is_safe():
+                self.get_logger().error(
+                    "Safety stop during mission — halting"
+                )
+                self._state = MissionState.HALT_MISSION
+                break
             self._step()
 
-        self.get_logger().info("Mission halted.")
+        self.get_logger().info(
+            f"Mission halted after {self._cycle_count} cycles."
+        )
 
     # ------------------------------------------------------------------
     # FSM dispatcher
@@ -244,20 +328,32 @@ class MissionManager(Node):
         return MissionState.NAV_TO_EXCAVATION
 
     def _handle_nav_to_excavation(self) -> MissionState:
-        """Navigate to the excavation zone."""
+        """Navigate to the excavation zone with bounded retries."""
         self.get_logger().info("Navigating to excavation zone.")
-        success, detail = self._send_navigate_to_excavation()
+        success, detail = self._retry_action(
+            self._send_navigate_to_excavation,
+            "nav_to_excavation",
+            self._max_nav_retries,
+        )
         if not success:
-            self.get_logger().error(f"Navigation to excavation failed: {detail}")
+            self.get_logger().error(
+                f"Navigation to excavation failed: {detail}"
+            )
             return MissionState.SAFE_FAIL
         return MissionState.EXCAVATE
 
     def _handle_excavate(self) -> MissionState:
-        """Execute the excavation action."""
+        """Execute the excavation action with bounded retries."""
         self.get_logger().info("Starting excavation.")
-        success, detail = self._send_excavate()
+        success, detail = self._retry_action(
+            self._send_excavate,
+            "excavation",
+            self._max_exc_retries,
+        )
         if not success:
-            self.get_logger().error(f"Excavation failed: {detail}")
+            self.get_logger().error(
+                f"Excavation failed: {detail}"
+            )
             return MissionState.SAFE_FAIL
         return MissionState.TURN_TO_DEPOSITION
 
@@ -267,20 +363,32 @@ class MissionManager(Node):
         return MissionState.NAV_TO_DEPOSITION
 
     def _handle_nav_to_deposition(self) -> MissionState:
-        """Navigate to the deposition zone."""
+        """Navigate to the deposition zone with bounded retries."""
         self.get_logger().info("Navigating to deposition zone.")
-        success, detail = self._send_navigate_to_deposition()
+        success, detail = self._retry_action(
+            self._send_navigate_to_deposition,
+            "nav_to_deposition",
+            self._max_nav_retries,
+        )
         if not success:
-            self.get_logger().error(f"Navigation to deposition failed: {detail}")
+            self.get_logger().error(
+                f"Navigation to deposition failed: {detail}"
+            )
             return MissionState.SAFE_FAIL
         return MissionState.DEPOSIT
 
     def _handle_deposit(self) -> MissionState:
-        """Execute the deposit action."""
+        """Execute the deposit action with bounded retries."""
         self.get_logger().info("Starting deposit.")
-        success, detail = self._send_deposit()
+        success, detail = self._retry_action(
+            self._send_deposit,
+            "deposition",
+            self._max_dep_retries,
+        )
         if not success:
-            self.get_logger().error(f"Deposit failed: {detail}")
+            self.get_logger().error(
+                f"Deposit failed: {detail}"
+            )
             return MissionState.SAFE_FAIL
         return MissionState.CHECK_NEXT_CYCLE_TIME
 
@@ -289,11 +397,27 @@ class MissionManager(Node):
         if self._timer is not None:
             self._timer.recordCycleTime()
 
+        self._cycle_count += 1
+        self.get_logger().info(
+            f"Completed cycle {self._cycle_count}/"
+            f"{self._max_cycles}"
+        )
+
+        if self._cycle_count >= self._max_cycles:
+            self.get_logger().info(
+                "Max shuttle cycles reached; halting."
+            )
+            return MissionState.HALT_MISSION
+
         if self._timer is not None and self._timer.canStartCycle():
-            self.get_logger().info("Time budget allows another cycle.")
+            self.get_logger().info(
+                "Time budget allows another cycle."
+            )
             return MissionState.ACQUIRE_TAG
 
-        self.get_logger().info("Time budget exhausted; halting mission.")
+        self.get_logger().info(
+            "Time budget exhausted; halting mission."
+        )
         return MissionState.HALT_MISSION
 
     def _handle_safe_fail(self) -> MissionState:
