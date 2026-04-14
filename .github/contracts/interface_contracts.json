@@ -46,6 +46,9 @@
     "/mission/autonomy_mode",
     "/mission/time_remaining_s",
     "/mission/cycle_count",
-    "/mission/last_failure_reason"
+    "/mission/last_failure_reason",
+    "/drivetrain/command",
+    "/drivetrain/telemetry",
+    "/drivetrain/status"
   ]
 }
