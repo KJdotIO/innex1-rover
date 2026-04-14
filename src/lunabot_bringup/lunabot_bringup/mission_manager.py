@@ -56,15 +56,15 @@ class MissionManager(Node):
         self.declare_parameter("prehoc_s_start_exc_m", 5.0)
         self.declare_parameter("prehoc_s_exc_dep_m", 5.0)
 
-        self.declare_parameter("waypoint_mid_obstacle_x", 3.5)
-        self.declare_parameter("waypoint_mid_obstacle_y", 0.0)
+        self.declare_parameter("waypoint_mid_obstacle_x", 3.0)
+        self.declare_parameter("waypoint_mid_obstacle_y", -1.1)
         self.declare_parameter("waypoint_mid_obstacle_yaw", 0.0)
-        self.declare_parameter("waypoint_excavation_x", 6.5)
-        self.declare_parameter("waypoint_excavation_y", 0.0)
+        self.declare_parameter("waypoint_excavation_x", 6.0)
+        self.declare_parameter("waypoint_excavation_y", -1.5)
         self.declare_parameter("waypoint_excavation_yaw", 0.0)
-        self.declare_parameter("waypoint_deposition_x", 0.8)
-        self.declare_parameter("waypoint_deposition_y", 0.0)
-        self.declare_parameter("waypoint_deposition_yaw", 3.14159)
+        self.declare_parameter("waypoint_deposition_x", 0.3)
+        self.declare_parameter("waypoint_deposition_y", -2.8)
+        self.declare_parameter("waypoint_deposition_yaw", -1.5708)
         self.declare_parameter("nav_goal_timeout_s", 120.0)
 
         self._state: MissionState = MissionState.INITIALIZE_MISSION
