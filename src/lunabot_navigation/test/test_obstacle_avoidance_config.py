@@ -66,23 +66,31 @@ class TestObstacleLayerConfig:
             if "obstacle_layer" in params:
                 self.layers.append((key, params["obstacle_layer"]))
 
-    def test_depth_camera_topic(self):
+    def test_front_depth_camera_topic(self):
         for costmap_key, layer in self.layers:
-            assert layer["camera_points"]["topic"] == "/camera_front/points", (
-                f"{costmap_key}: unexpected camera topic"
+            assert layer["camera_front_points"]["topic"] == "/camera_front/points", (
+                f"{costmap_key}: unexpected front camera topic"
+            )
+
+    def test_rear_depth_camera_topic(self):
+        for costmap_key, layer in self.layers:
+            assert layer["camera_rear_points"]["topic"] == "/camera_rear/points", (
+                f"{costmap_key}: unexpected rear camera topic"
             )
 
     def test_height_bounds_are_positive(self):
         for _key, layer in self.layers:
-            pts = layer["camera_points"]
-            assert pts["min_obstacle_height"] > 0.0
-            assert pts["max_obstacle_height"] > pts["min_obstacle_height"]
+            for source in ("camera_front_points", "camera_rear_points"):
+                pts = layer[source]
+                assert pts["min_obstacle_height"] > 0.0
+                assert pts["max_obstacle_height"] > pts["min_obstacle_height"]
 
     def test_marking_and_clearing_enabled(self):
         for _key, layer in self.layers:
-            pts = layer["camera_points"]
-            assert pts["marking"] is True
-            assert pts["clearing"] is True
+            for source in ("camera_front_points", "camera_rear_points"):
+                pts = layer[source]
+                assert pts["marking"] is True
+                assert pts["clearing"] is True
 
 
 class TestCraterLayerConfig:
