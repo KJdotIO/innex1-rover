@@ -37,6 +37,28 @@ This launch path only starts the supervisor node itself. Navigation, excavation,
 and deposition servers remain in their existing bringup paths and are not
 implicitly started here.
 
+### Bounded retries and cycle limits
+
+The mission manager wraps each action call in `_retry_action` with configurable
+retry counts:
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `max_nav_retries` | 2 | Extra attempts for each navigation goal |
+| `max_excavation_retries` | 1 | Extra attempts for excavation |
+| `max_deposition_retries` | 1 | Extra attempts for deposition |
+| `max_shuttle_cycles` | 10 | Total excavate→deposit round-trips before halt |
+
+If all retries are exhausted the manager transitions to a terminal failure state
+rather than looping indefinitely.
+
+### Safety gating
+
+The mission manager subscribes to `/safety/estop` and `/safety/motion_inhibit`
+(transient-local QoS). Before every action attempt, `_is_safe()` checks both
+signals — if either is active the attempt is short-circuited with a safety-stop
+failure, and no action goal is sent.
+
 ## Mission Dry Run
 
 Use the dry-run launch when you want one bounded operator-facing regression pass in sim:

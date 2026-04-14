@@ -146,15 +146,18 @@ pkill -9 -f "gz sim"
 
 ```text
 src/
-├── external/                # Vendored third-party packages
-├── lunabot_bringup/         # Integrated launch entrypoints
-├── lunabot_control/         # Motion/material action servers
-├── lunabot_description/     # Robot model and meshes
-├── lunabot_interfaces/      # Shared ROS action/message contracts
-├── lunabot_localisation/    # EKF + global correction path
-├── lunabot_navigation/      # Nav2 config + mission BT assets
-├── lunabot_perception/      # Reserved shell for future perception nodes
-├── lunabot_simulation/      # Gazebo world/bridge launch
+├── external/                # Vendored third-party packages (Leo Rover)
+├── lunabot_bringup/         # Top-level launch files and mission manager
+├── lunabot_control/         # Deposition bridge (Cytron linear actuators)
+├── lunabot_description/     # URDF/xacro robot model and sensor frames
+├── lunabot_drivetrain/      # Sabertooth motor bridge, velocity gate, stall detection
+├── lunabot_excavation/      # Excavation action server
+├── lunabot_interfaces/      # Custom ROS messages and actions
+├── lunabot_localisation/    # EKF + RTAB-Map SLAM + AprilTag localisation
+├── lunabot_navigation/      # Nav2 config, costmaps, collision monitor
+├── lunabot_perception/      # Crater and hazard detection (scaffolding)
+├── lunabot_safety/          # Safety node scaffolding
+├── lunabot_simulation/      # Gazebo Fortress worlds and ros_gz bridges
 └── lunabot_teleop/          # Manual control
 ```
 
