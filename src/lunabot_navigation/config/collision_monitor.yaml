@@ -9,7 +9,6 @@
 
 collision_monitor:
   ros__parameters:
-    use_sim_time: true
     enabled: true
     base_frame_id: "base_footprint"
     odom_frame_id: "odom"
@@ -41,11 +40,18 @@ collision_monitor:
       polygon_pub_topic: "polygon_slowdown"
       enabled: true
 
-    observation_sources: ["front_camera"]
+    observation_sources: ["front_camera", "lidar"]
 
     front_camera:
       type: "pointcloud"
       topic: "/camera_front/points"
+      min_height: 0.10
+      max_height: 0.60
+      enabled: true
+
+    lidar:
+      type: "pointcloud"
+      topic: "/ouster/points"
       min_height: 0.10
       max_height: 0.60
       enabled: true
