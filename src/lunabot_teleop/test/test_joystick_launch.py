@@ -56,3 +56,13 @@ def test_validate_launch_arguments_rejects_invalid_device_id():
 
     with pytest.raises(ValueError, match="joy_device_id"):
         launch_module._validate_launch_arguments(context)
+
+
+def test_validate_launch_arguments_accepts_invalid_id_when_name_is_set():
+    launch_module = _load_launch_module()
+    launch_context_module = pytest.importorskip("launch.launch_context")
+    context = launch_context_module.LaunchContext()
+    context.launch_configurations["joy_device_id"] = "not-an-int"
+    context.launch_configurations["joy_device_name"] = "Xbox Series X Controller"
+
+    launch_module._validate_launch_arguments(context)

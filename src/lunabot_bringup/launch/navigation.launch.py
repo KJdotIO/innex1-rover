@@ -247,7 +247,7 @@ def generate_launch_description():
         executable="twist_mux",
         name="twist_mux",
         output="screen",
-        remappings=[("cmd_vel_out", "cmd_vel")],
+        remappings=[("cmd_vel_out", "cmd_vel_safe")],
         parameters=[twist_mux_params_path, {"use_sim_time": use_sim_time}],
         condition=IfCondition(enable_teleop),
     )

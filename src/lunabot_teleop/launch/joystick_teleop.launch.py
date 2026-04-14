@@ -7,7 +7,6 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
 
 
 def _config_path(*parts: str) -> str:
@@ -32,11 +31,41 @@ def _validate_non_negative_int(value: str, argument_name: str) -> str:
 
 def _validate_launch_arguments(context):
     """Reject invalid launch arguments before any teleop nodes start."""
-    _validate_non_negative_int(
-        LaunchConfiguration("joy_device_id").perform(context),
-        argument_name="joy_device_id",
-    )
+    joy_device_name = LaunchConfiguration("joy_device_name").perform(context).strip()
+    if not joy_device_name:
+        _validate_non_negative_int(
+            LaunchConfiguration("joy_device_id").perform(context),
+            argument_name="joy_device_id",
+        )
     return []
+
+
+def _create_game_controller_node(context, use_sim_time):
+    """Create joy node with name-based selection fallback."""
+    joy_device_name = LaunchConfiguration("joy_device_name").perform(context).strip()
+    base_params = [
+        {"use_sim_time": use_sim_time},
+        {"deadzone": 0.08},
+        {"autorepeat_rate": 20.0},
+        {"coalesce_interval_ms": 1},
+    ]
+    if joy_device_name:
+        base_params.append({"device_name": joy_device_name})
+    else:
+        joy_device_id = _validate_non_negative_int(
+            LaunchConfiguration("joy_device_id").perform(context),
+            argument_name="joy_device_id",
+        )
+        base_params.append({"device_id": int(joy_device_id)})
+    return [
+        Node(
+            package="joy",
+            executable="game_controller_node",
+            name="game_controller_node",
+            output="screen",
+            parameters=base_params,
+        )
+    ]
 
 
 def generate_launch_description():
@@ -49,21 +78,6 @@ def generate_launch_description():
     """
     teleop_config = _config_path("config", "xbox_teleop.yaml")
     use_sim_time = LaunchConfiguration("use_sim_time")
-    joy_device_id = LaunchConfiguration("joy_device_id")
-
-    game_controller = Node(
-        package="joy",
-        executable="game_controller_node",
-        name="game_controller_node",
-        output="screen",
-        parameters=[
-            {"use_sim_time": use_sim_time},
-            {"device_id": ParameterValue(joy_device_id, value_type=int)},
-            {"deadzone": 0.08},
-            {"autorepeat_rate": 20.0},
-            {"coalesce_interval_ms": 1},
-        ],
-    )
 
     teleop_twist = Node(
         package="teleop_twist_joy",
@@ -88,8 +102,20 @@ def generate_launch_description():
                 default_value="0",
                 description=("SDL device index for the connected controller."),
             ),
+            DeclareLaunchArgument(
+                "joy_device_name",
+                default_value="",
+                description=(
+                    "Optional SDL controller name to match (takes precedence over "
+                    "joy_device_id when set)."
+                ),
+            ),
             OpaqueFunction(function=_validate_launch_arguments),
-            game_controller,
+            OpaqueFunction(
+                function=lambda context: _create_game_controller_node(
+                    context, use_sim_time
+                )
+            ),
             teleop_twist,
         ]
     )
