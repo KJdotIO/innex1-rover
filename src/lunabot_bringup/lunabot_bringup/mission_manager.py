@@ -56,6 +56,17 @@ class MissionManager(Node):
         self.declare_parameter("prehoc_s_start_exc_m", 5.0)
         self.declare_parameter("prehoc_s_exc_dep_m", 5.0)
 
+        self.declare_parameter("waypoint_mid_obstacle_x", 3.5)
+        self.declare_parameter("waypoint_mid_obstacle_y", 0.0)
+        self.declare_parameter("waypoint_mid_obstacle_yaw", 0.0)
+        self.declare_parameter("waypoint_excavation_x", 6.5)
+        self.declare_parameter("waypoint_excavation_y", 0.0)
+        self.declare_parameter("waypoint_excavation_yaw", 0.0)
+        self.declare_parameter("waypoint_deposition_x", 0.8)
+        self.declare_parameter("waypoint_deposition_y", 0.0)
+        self.declare_parameter("waypoint_deposition_yaw", 3.14159)
+        self.declare_parameter("nav_goal_timeout_s", 120.0)
+
         self._state: MissionState = MissionState.INITIALIZE_MISSION
         self._timer: MissionTimer | None = None
 
@@ -312,41 +323,60 @@ class MissionManager(Node):
             return True, f"{action_name} server available"
         return False, f"{action_name} server unavailable after {timeout_s}s"
 
-    def _send_navigate_to_excavation(self) -> tuple[bool, str]:
-        """Send a NavigateToPose goal toward the excavation zone."""
+    def _build_nav_goal(self, x: float, y: float, yaw: float) -> NavigateToPose.Goal:
+        """Build a NavigateToPose goal in the map frame."""
+        goal = NavigateToPose.Goal()
+        goal.pose.header.frame_id = "map"
+        goal.pose.header.stamp = self.get_clock().now().to_msg()
+        goal.pose.pose.position.x = x
+        goal.pose.pose.position.y = y
+        goal.pose.pose.orientation.z = math.sin(yaw / 2.0)
+        goal.pose.pose.orientation.w = math.cos(yaw / 2.0)
+        return goal
+
+    def _send_nav_goal(self, goal, label: str) -> tuple[bool, str]:
+        """Send a NavigateToPose goal and wait for the result."""
         available, detail = self._wait_for_server(
-            self._navigate_client, "/navigate_to_pose_gate"
+            self._navigate_client, "/navigate_to_pose"
         )
         if not available:
             return False, detail
 
-        goal = NavigateToPose.Goal()
-        goal.pose.header.frame_id = "map"
-        goal.pose.header.stamp = self.get_clock().now().to_msg()
+        timeout = self._safe_float_parameter("nav_goal_timeout_s")
+        if timeout is None:
+            return False, f"{label}: nav_goal_timeout_s parameter invalid"
 
+        self.get_logger().info(
+            f"{label}: goal at ({goal.pose.pose.position.x:.2f}, "
+            f"{goal.pose.pose.position.y:.2f})"
+        )
         send_future = self._navigate_client.send_goal_async(goal)
         goal_handle = self._wait_for_future(
-            send_future, 30.0, "navigate_to_excavation goal response timed out"
+            send_future, 30.0, f"{label} goal response timed out"
         )
-        return self._check_goal_result(goal_handle, "navigate_to_excavation", 60.0)
+        return self._check_goal_result(goal_handle, label, timeout)
+
+    def _send_navigate_to_excavation(self) -> tuple[bool, str]:
+        """Send a NavigateToPose goal toward the excavation zone."""
+        x = self._safe_float_parameter("waypoint_excavation_x")
+        y = self._safe_float_parameter("waypoint_excavation_y")
+        yaw = self._safe_float_parameter("waypoint_excavation_yaw")
+        if x is None or y is None or yaw is None:
+            return False, "excavation waypoint parameters invalid"
+
+        goal = self._build_nav_goal(x, y, yaw)
+        return self._send_nav_goal(goal, "navigate_to_excavation")
 
     def _send_navigate_to_deposition(self) -> tuple[bool, str]:
         """Send a NavigateToPose goal toward the deposition zone."""
-        available, detail = self._wait_for_server(
-            self._navigate_client, "/navigate_to_pose_gate"
-        )
-        if not available:
-            return False, detail
+        x = self._safe_float_parameter("waypoint_deposition_x")
+        y = self._safe_float_parameter("waypoint_deposition_y")
+        yaw = self._safe_float_parameter("waypoint_deposition_yaw")
+        if x is None or y is None or yaw is None:
+            return False, "deposition waypoint parameters invalid"
 
-        goal = NavigateToPose.Goal()
-        goal.pose.header.frame_id = "map"
-        goal.pose.header.stamp = self.get_clock().now().to_msg()
-
-        send_future = self._navigate_client.send_goal_async(goal)
-        goal_handle = self._wait_for_future(
-            send_future, 30.0, "navigate_to_deposition goal response timed out"
-        )
-        return self._check_goal_result(goal_handle, "navigate_to_deposition", 60.0)
+        goal = self._build_nav_goal(x, y, yaw)
+        return self._send_nav_goal(goal, "navigate_to_deposition")
 
     def _send_excavate(self) -> tuple[bool, str]:
         """Send an Excavate action goal."""

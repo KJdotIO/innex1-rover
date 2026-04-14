@@ -1,0 +1,26 @@
+# Arena waypoints for the UK Lunabotics competition.
+# All poses are in the map frame.  Adjust these for each arena setup.
+#
+# Arena layout (7.9 m x 4.4 m, origin at start-zone centre):
+#   [Start / Deposition Zone]  ->  [Obstacle Zone]  ->  [Excavation Zone]
+#
+# The rover starts facing +x.  Excavation is at the far +x end; deposition
+# is near the start zone at the -x end.
+
+mission_manager:
+  ros__parameters:
+    # Waypoint in the middle of the obstacle zone -- a safe intermediate
+    # target that avoids sending the planner a goal across the entire arena.
+    waypoint_mid_obstacle_x: 3.5
+    waypoint_mid_obstacle_y: 0.0
+    waypoint_mid_obstacle_yaw: 0.0
+
+    # Excavation zone target pose.
+    waypoint_excavation_x: 6.5
+    waypoint_excavation_y: 0.0
+    waypoint_excavation_yaw: 0.0
+
+    # Deposition zone target pose (near the berm in the start zone).
+    waypoint_deposition_x: 0.8
+    waypoint_deposition_y: 0.0
+    waypoint_deposition_yaw: 3.14159
