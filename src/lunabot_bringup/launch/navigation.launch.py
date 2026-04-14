@@ -175,6 +175,7 @@ def generate_launch_description():
     preflight_config = LaunchConfiguration("preflight_config")
     preflight_lidar_debug_config = LaunchConfiguration("preflight_lidar_debug_config")
     joy_device_id = LaunchConfiguration("joy_device_id")
+    disable_nav_gate = LaunchConfiguration("disable_nav_gate")
     localiser_cmd_vel_topic = _select_localiser_cmd_vel_topic(enable_teleop)
 
     localisation_launch = IncludeLaunchDescription(
@@ -208,6 +209,8 @@ def generate_launch_description():
                     [
                         "(",
                         _is_falsey(lidar_costmap_phase),
+                        ") and (",
+                        _is_falsey(disable_nav_gate),
                         ")",
                     ]
                 ),
@@ -404,6 +407,15 @@ def generate_launch_description():
                 "joy_device_id",
                 default_value="0",
                 description=("SDL device index for the connected controller."),
+            ),
+            DeclareLaunchArgument(
+                "disable_nav_gate",
+                default_value="false",
+                description=(
+                    "Bypass the navigate_to_pose_gate readiness check. "
+                    "Set to true for simulation or when AprilTag localisation "
+                    "is unavailable."
+                ),
             ),
             localisation_launch,
             crater_detection,
