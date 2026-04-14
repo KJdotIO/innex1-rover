@@ -2,7 +2,17 @@
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool
+
+# TRANSIENT_LOCAL so late subscribers (e.g. motor controllers) receive the current
+# inhibit state immediately on connect rather than waiting for the next e-stop event.
+_INHIBIT_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+)
 
 
 class EstopNode(Node):
@@ -17,7 +27,7 @@ class EstopNode(Node):
         self._motion_inhibit_pub = self.create_publisher(
             Bool,
             "/safety/motion_inhibit",
-            10,
+            _INHIBIT_QOS,
         )
 
         self._estop_sub = self.create_subscription(
@@ -27,7 +37,16 @@ class EstopNode(Node):
             10,
         )
 
+        # Publish initial state so subscribers joining before any e-stop event
+        # receive a well-defined value.
+        self._publish_inhibit()
         self.get_logger().info("estop_node started — waiting for /safety/estop")
+
+    def _publish_inhibit(self) -> None:
+        """Publish the current motion-inhibit state."""
+        out = Bool()
+        out.data = self._inhibited
+        self._motion_inhibit_pub.publish(out)
 
     def _estop_callback(self, msg: Bool) -> None:
         """Handle incoming e-stop signal and propagate motion-inhibit state."""
@@ -40,9 +59,7 @@ class EstopNode(Node):
                 self.get_logger().info("E-stop cleared — motion allowed")
             self._inhibited = new_state
 
-        out = Bool()
-        out.data = self._inhibited
-        self._motion_inhibit_pub.publish(out)
+        self._publish_inhibit()
 
     def destroy_node(self):
         """Clean up before shutdown."""
