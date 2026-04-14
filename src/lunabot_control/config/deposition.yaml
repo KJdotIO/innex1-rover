@@ -1,0 +1,43 @@
+# Deposition hardware bridge configuration.
+#
+# Hardware: 4x linear actuators driven by 2x Cytron MDD10A controllers
+# via Jetson GPIO PWM+DIR (sign-magnitude mode).
+#
+# Actuator mapping:
+#   Door actuator  → Cytron #1, channel 1
+#   Bed left       → Cytron #1, channel 2
+#   Bed right      → Cytron #2, channel 1
+#   (spare)        → Cytron #2, channel 2
+#
+# Pin numbers use Jetson BOARD numbering.
+# Update these to match the actual PCB wiring.
+
+deposition_bridge:
+  ros__parameters:
+    # Door actuator (open/close the hopper gate).
+    door_pwm_pin: 15
+    door_dir_pin: 16
+
+    # Bed left actuator (raise/lower the dump bed).
+    bed_left_pwm_pin: 32
+    bed_left_dir_pin: 36
+
+    # Bed right actuator (raise/lower the dump bed).
+    bed_right_pwm_pin: 33
+    bed_right_dir_pin: 37
+
+    # Cytron PWM frequency.
+    pwm_frequency_hz: 1000
+
+    # Duty cycle percentage for actuator motion.
+    actuator_duty_pct: 80.0
+
+    # Phase durations (seconds) — tune on real hardware.
+    door_open_duration_s: 3.0
+    door_close_duration_s: 3.0
+    bed_raise_duration_s: 5.0
+    bed_lower_duration_s: 5.0
+    dump_hold_duration_s: 3.0
+
+    # Feedback publishing rate.
+    feedback_hz: 5.0
