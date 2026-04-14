@@ -31,6 +31,13 @@ def _make_manager(monkeypatch):
     manager._navigate_client = MagicMock()
     manager._excavate_client = MagicMock()
     manager._deposit_client = MagicMock()
+    manager._max_nav_retries = 2
+    manager._max_exc_retries = 1
+    manager._max_dep_retries = 1
+    manager._max_cycles = 10
+    manager._cycle_count = 0
+    manager._estop_active = False
+    manager._motion_inhibited = False
     return manager
 
 
