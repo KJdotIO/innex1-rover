@@ -15,6 +15,7 @@ setup(
         ),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", ["launch/material_actions.launch.py"]),
+        ("share/" + package_name + "/config", ["config/deposition.yaml"]),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -31,6 +32,7 @@ setup(
         "console_scripts": [
             "material_action_server = lunabot_control.material_action_server:main",
             "material_action_client = lunabot_control.material_action_client:main",
+            "deposition_bridge = lunabot_control.deposition_bridge:main",
         ],
     },
 )
