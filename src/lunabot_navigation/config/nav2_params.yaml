@@ -16,6 +16,7 @@ controller_server:
       max_linear_vel: 0.3
       desired_linear_vel: 0.3
       max_angular_vel: 0.5
+      allow_reversing: true
       use_cost_regulated_linear_velocity_scaling: true
       cost_scaling_dist: 0.6
       cost_scaling_gain: 1.0
