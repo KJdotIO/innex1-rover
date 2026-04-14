@@ -9,6 +9,9 @@ find_package(std_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Excavate.action"
   "action/Deposit.action"
+  "msg/DrivetrainCommand.msg"
+  "msg/DrivetrainStatus.msg"
+  "msg/DrivetrainTelemetry.msg"
   "msg/ExcavationCommand.msg"
   "msg/ExcavationStatus.msg"
   "msg/ExcavationTelemetry.msg"
