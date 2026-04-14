@@ -147,6 +147,7 @@ class DrivetrainBridge(Node):
         self._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
         self._controller_online = [False, False]
         self._stall_start_time: Optional[float] = None
+        self._estop_clear_time: Optional[float] = None
         self._odom_x = 0.0
         self._odom_y = 0.0
         self._odom_yaw = 0.0
@@ -243,9 +244,21 @@ class DrivetrainBridge(Node):
             and not self._estop_active
         )
         if estop_cleared:
-            self.get_logger().info("E-stop cleared — returning to READY")
-            self._fault_code = DrivetrainStatus.FAULT_NONE
-            self._transition_to(DrivetrainStatus.STATE_READY)
+            if self._estop_clear_time is None:
+                self._estop_clear_time = now
+                self.get_logger().info(
+                    "E-stop cleared — waiting 2s for "
+                    "Sabertooth re-init"
+                )
+            elif (now - self._estop_clear_time) >= 2.0:
+                self._estop_clear_time = None
+                self._fault_code = DrivetrainStatus.FAULT_NONE
+                self._transition_to(DrivetrainStatus.STATE_READY)
+                self.get_logger().info(
+                    "Sabertooth re-init complete — READY"
+                )
+            self._send_stop()
+            return
 
         cmd_stale = (
             self._last_cmd_time is None
@@ -264,8 +277,10 @@ class DrivetrainBridge(Node):
 
         if abs(left) > 0.01 or abs(right) > 0.01:
             self._transition_to(DrivetrainStatus.STATE_DRIVING)
+            self._check_encoder_stall(now, left, right)
         else:
             self._transition_to(DrivetrainStatus.STATE_READY)
+            self._stall_start_time = None
 
     def _twist_to_wheel_speeds(
         self, linear_x: float, angular_z: float
@@ -286,6 +301,37 @@ class DrivetrainBridge(Node):
         left_throttle = max(-limit, min(limit, left_throttle))
         right_throttle = max(-limit, min(limit, right_throttle))
         return left_throttle, right_throttle
+
+    def _check_encoder_stall(
+        self, now: float, left: float, right: float
+    ) -> None:
+        """Detect encoder stall: throttle applied but no wheel motion."""
+        max_throttle = max(abs(left), abs(right))
+        if max_throttle < self._stall_thresh:
+            self._stall_start_time = None
+            return
+
+        max_vel = max(
+            abs(v) for v in self._wheel_velocity_rps
+        )
+        if max_vel >= self._stall_min_vel:
+            self._stall_start_time = None
+            return
+
+        if self._stall_start_time is None:
+            self._stall_start_time = now
+            return
+
+        elapsed = now - self._stall_start_time
+        if elapsed >= self._stall_timeout:
+            self.get_logger().error(
+                f"Encoder stall detected: throttle={max_throttle:.2f}"
+                f" but velocity={max_vel:.3f} rps for {elapsed:.1f}s"
+            )
+            self._fault_code = (
+                DrivetrainStatus.FAULT_ENCODER_STALL
+            )
+            self._transition_to(DrivetrainStatus.STATE_FAULT)
 
     def _send_wheel_throttles(self, left: float, right: float) -> None:
         """Send per-side throttles to both Sabertooth controllers."""
