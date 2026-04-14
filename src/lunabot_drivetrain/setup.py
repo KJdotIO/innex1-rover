@@ -33,6 +33,7 @@ setup(
     entry_points={
         "console_scripts": [
             "drivetrain_bridge = lunabot_drivetrain.drivetrain_bridge:main",
+            "velocity_gate = lunabot_drivetrain.velocity_gate:main",
         ],
     },
 )
