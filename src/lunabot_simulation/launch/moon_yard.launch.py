@@ -179,6 +179,28 @@ def generate_launch_description():
         output="screen",
     )
 
+    camera_rear_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_rear_bridge",
+        arguments=[
+            "/camera_rear/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
+            "/camera_rear/image@sensor_msgs/msg/Image[ignition.msgs.Image",
+            "/camera_rear/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
+        ],
+        output="screen",
+    )
+
+    camera_rear_points_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="camera_rear_points_bridge",
+        arguments=[
+            "/camera_rear/points@sensor_msgs/msg/PointCloud2[ignition.msgs.PointCloudPacked",
+        ],
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -196,5 +218,7 @@ def generate_launch_description():
             robot_bridge,
             camera_bridge,
             camera_points_bridge,
+            camera_rear_bridge,
+            camera_rear_points_bridge,
         ]
     )

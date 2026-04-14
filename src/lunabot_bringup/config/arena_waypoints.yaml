@@ -24,7 +24,9 @@ mission_manager:
     waypoint_excavation_yaw: 0.0
 
     # Deposition zone target pose -- near the berm at the bottom of the
-    # start zone.  Yaw faces -Y (toward the berm).
+    # start zone.  Yaw faces +X (toward excavation) so the rover can
+    # reverse here without turning; the shuttle strategy keeps the rover
+    # facing one direction for the entire mission.
     waypoint_deposition_x: 0.3
     waypoint_deposition_y: -2.8
-    waypoint_deposition_yaw: -1.5708
+    waypoint_deposition_yaw: 0.0

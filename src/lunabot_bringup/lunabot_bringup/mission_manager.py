@@ -64,7 +64,7 @@ class MissionManager(Node):
         self.declare_parameter("waypoint_excavation_yaw", 0.0)
         self.declare_parameter("waypoint_deposition_x", 0.3)
         self.declare_parameter("waypoint_deposition_y", -2.8)
-        self.declare_parameter("waypoint_deposition_yaw", -1.5708)
+        self.declare_parameter("waypoint_deposition_yaw", 0.0)
         self.declare_parameter("nav_goal_timeout_s", 120.0)
 
         self._state: MissionState = MissionState.INITIALIZE_MISSION
