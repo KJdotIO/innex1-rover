@@ -337,7 +337,7 @@ class MissionManager(Node):
     def _send_nav_goal(self, goal, label: str) -> tuple[bool, str]:
         """Send a NavigateToPose goal and wait for the result."""
         available, detail = self._wait_for_server(
-            self._navigate_client, "/navigate_to_pose"
+            self._navigate_client, "/navigate_to_pose_gate"
         )
         if not available:
             return False, detail
