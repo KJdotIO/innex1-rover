@@ -53,6 +53,7 @@ def test_validate_launch_arguments_rejects_invalid_device_id():
     launch_context_module = pytest.importorskip("launch.launch_context")
     context = launch_context_module.LaunchContext()
     context.launch_configurations["joy_device_id"] = "-1"
+    context.launch_configurations["joy_device_name"] = ""
 
     with pytest.raises(ValueError, match="joy_device_id"):
         launch_module._validate_launch_arguments(context)
