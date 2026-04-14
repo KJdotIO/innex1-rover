@@ -151,6 +151,59 @@ them real and necessary:
 If a posture or lift axis exists, treat it as a separate actuator contract instead of hiding it
 inside the ladder-motor contract.
 
+## Drivetrain Contract
+
+Added in PR [#248](https://github.com/KJdotIO/innex1-rover/pull/248).
+
+### Hardware-Facing Topics
+
+- `/drivetrain/command` uses `lunabot_interfaces/msg/DrivetrainCommand`
+- `/drivetrain/status` uses `lunabot_interfaces/msg/DrivetrainStatus`
+- `/drivetrain/telemetry` uses `lunabot_interfaces/msg/DrivetrainTelemetry`
+
+### DrivetrainCommand
+
+Per-wheel throttle command sent by the bridge to motor controllers.
+
+- `COMMAND_DRIVE=0` — drive at the given `wheel_throttle[4]` values (FL, FR, RL, RR), range [-1.0, 1.0].
+- `COMMAND_STOP=1` — immediate stop (throttle values ignored).
+- `COMMAND_CLEAR_FAULT=2` — clear a latched fault (throttle values ignored).
+
+### DrivetrainStatus
+
+Controller-facing status published by the drivetrain bridge. Consumed by the
+mission coordinator, velocity gate, and preflight checks.
+
+State table:
+
+- `STATE_UNINITIALISED=0`
+- `STATE_READY=1`
+- `STATE_DRIVING=2`
+- `STATE_STOPPING=3`
+- `STATE_FAULT=4`
+- `STATE_ESTOP=5`
+
+Fault codes:
+
+- `FAULT_NONE=0`
+- `FAULT_ESTOP=1`
+- `FAULT_ENCODER_STALL=2`
+- `FAULT_CONTROLLER_OFFLINE=3`
+- `FAULT_OVERCURRENT=4`
+- `FAULT_COMMAND_TIMEOUT=5`
+
+Additional fields: `estop_active`, `motion_inhibited`, `controller_online[2]`.
+
+### DrivetrainTelemetry
+
+Published at the control loop rate. Per-wheel encoder feedback ordered
+[FL, FR, RL, RR]:
+
+- `wheel_velocity_rps` — angular velocity in revolutions/sec.
+- `encoder_ticks` — raw cumulative tick count.
+- `controller_online[2]` — true if UART heartbeat received per Sabertooth.
+- `estop_active`, `motion_inhibited`, `fault_code` — mirrored safety state.
+
 ## Minimum Hardware Signals for Bridge Nodes
 
 - `estop_active` (latched)
