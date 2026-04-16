@@ -18,6 +18,11 @@ ROS_CI_PATH_PREFIXES = (
     ".github/actions/",
     ".github/scripts/",
     ".github/contracts/",
+    ".github/docker/",
+)
+FULL_ROS_CI_PATH_PREFIXES = (
+    ".github/actions/",
+    ".github/contracts/",
 )
 BROAD_PACKAGES = {
     "lunabot_bringup",
@@ -145,10 +150,16 @@ def _select(
         return Selection("full", (), (), "No reliable diff range available")
 
     if any(
+        any(path.startswith(prefix) for prefix in FULL_ROS_CI_PATH_PREFIXES)
+        for path in changed_files
+    ):
+        return Selection("full", (), (), "Shared interface or action files changed")
+
+    if all(
         any(path.startswith(prefix) for prefix in ROS_CI_PATH_PREFIXES)
         for path in changed_files
     ):
-        return Selection("full", (), (), "Shared CI or contract files changed")
+        return Selection("skip", (), (), "CI-only changes do not need rover build/test")
 
     changed_packages: set[str] = set()
     for path in changed_files:
