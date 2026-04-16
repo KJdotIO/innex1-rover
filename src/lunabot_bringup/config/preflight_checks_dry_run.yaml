@@ -54,7 +54,7 @@ preflight:
     - name: /localisation/start_zone_status
       type: lunabot_interfaces/msg/LocalisationStartZoneStatus
       min_messages: 1
-      critical: false
+      critical: true
     - name: /excavation/status
       type: lunabot_interfaces/msg/ExcavationStatus
       min_messages: 1
