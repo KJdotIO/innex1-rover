@@ -167,8 +167,8 @@ jobs:
           SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
           SELECTED_PACKAGE_ROOTS: ${{ needs.preflight.outputs.selection_package_roots }}
         run: |
+          apt-get update
           if [ "$USE_PREBUILT_IMAGE" != "true" ]; then
-            apt-get update
             apt-get install -y python3-colcon-common-extensions python3-rosdep
           fi
           if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
