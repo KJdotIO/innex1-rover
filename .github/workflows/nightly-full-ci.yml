@@ -5,6 +5,10 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: nightly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   decide:
     runs-on: ubuntu-22.04
@@ -145,15 +149,6 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
         shell: bash
 
-      - name: Cache colcon workspace
-        uses: actions/cache@v5
-        with:
-          path: |
-            build/
-            install/
-          key: nightly-colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
-          restore-keys: nightly-colcon-
-
       - name: Install dependencies
         env:
           USE_PREBUILT_IMAGE: ${{ needs.resolve-build-image.outputs.prebuilt }}
@@ -162,7 +157,7 @@ jobs:
           echo "Container reason: ${{ needs.resolve-build-image.outputs.image_reason }}"
           apt-get update
           if [ "$USE_PREBUILT_IMAGE" != "true" ]; then
-            apt-get install -y python3-colcon-common-extensions python3-rosdep python3-yaml
+            apt-get install -y python3-colcon-common-extensions python3-pip python3-rosdep python3-yaml
           fi
           if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
             rosdep init
