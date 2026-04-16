@@ -96,7 +96,7 @@ jobs:
 
   resolve-build-image:
     needs: preflight
-    if: needs.preflight.outputs.ros_ci == 'true'
+    if: needs.preflight.outputs.ros_ci == 'true' && needs.preflight.outputs.selection_mode != 'skip'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -139,7 +139,7 @@ jobs:
     needs:
       - preflight
       - resolve-build-image
-    if: needs.preflight.outputs.ros_ci == 'true'
+    if: needs.preflight.outputs.ros_ci == 'true' && needs.preflight.outputs.selection_mode != 'skip'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
