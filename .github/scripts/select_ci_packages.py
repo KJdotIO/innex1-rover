@@ -18,6 +18,11 @@ ROS_CI_PATH_PREFIXES = (
     ".github/actions/",
     ".github/scripts/",
     ".github/contracts/",
+    ".github/docker/",
+)
+FULL_ROS_CI_PATH_PREFIXES = (
+    ".github/actions/",
+    ".github/contracts/",
 )
 BROAD_PACKAGES = {
     "lunabot_bringup",
@@ -44,6 +49,7 @@ DEPENDENCY_TAGS = {
 class Selection:
     mode: str
     packages: tuple[str, ...]
+    package_roots: tuple[str, ...]
     reason: str
 
 
@@ -141,40 +147,50 @@ def _select(
     dependencies: dict[str, set[str]],
 ) -> Selection:
     if not changed_files:
-        return Selection("full", (), "No reliable diff range available")
+        return Selection("full", (), (), "No reliable diff range available")
 
     if any(
+        any(path.startswith(prefix) for prefix in FULL_ROS_CI_PATH_PREFIXES)
+        for path in changed_files
+    ):
+        return Selection("full", (), (), "Shared interface or action files changed")
+
+    if all(
         any(path.startswith(prefix) for prefix in ROS_CI_PATH_PREFIXES)
         for path in changed_files
     ):
-        return Selection("full", (), "Shared CI or contract files changed")
+        return Selection("skip", (), (), "CI-only changes do not need rover build/test")
 
     changed_packages: set[str] = set()
     for path in changed_files:
         if not path.startswith("src/"):
-            return Selection("full", (), f"Top-level repo file changed: {path}")
+            return Selection("full", (), (), f"Top-level repo file changed: {path}")
 
         package = _owning_package(path, package_roots)
         if package is None:
-            return Selection("full", (), f"Unowned source path changed: {path}")
+            return Selection("full", (), (), f"Unowned source path changed: {path}")
 
         if package.startswith("leo_"):
-            return Selection("full", (), f"External package changed: {package}")
+            return Selection("full", (), (), f"External package changed: {package}")
 
         if package in BROAD_PACKAGES:
-            return Selection("full", (), f"Broad package changed: {package}")
+            return Selection("full", (), (), f"Broad package changed: {package}")
 
         if package not in SAFE_SELECT_PACKAGES:
             return Selection(
-                "full", (), f"Package not whitelisted for selective CI: {package}"
+                "full", (), (), f"Package not whitelisted for selective CI: {package}"
             )
 
         changed_packages.add(package)
 
     selected = _reverse_dependencies(changed_packages, dependencies)
+    selected_roots = tuple(
+        sorted(root for root, package in package_roots.items() if package in selected)
+    )
     return Selection(
         "packages",
         tuple(sorted(selected)),
+        selected_roots,
         "Selective CI is safe for this package set",
     )
 
@@ -183,6 +199,7 @@ def _write_github_output(path: Path, selection: Selection) -> None:
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"mode={selection.mode}\n")
         handle.write(f"packages={' '.join(selection.packages)}\n")
+        handle.write(f"package_roots={' '.join(selection.package_roots)}\n")
         handle.write(f"reason={selection.reason}\n")
 
 
@@ -202,6 +219,7 @@ def main() -> int:
         else Selection(
             "skip",
             (),
+            (),
             "ROS build/test not needed for this change set",
         )
     )
@@ -209,6 +227,7 @@ def main() -> int:
     summary = {
         "mode": selection.mode,
         "packages": list(selection.packages),
+        "package_roots": list(selection.package_roots),
         "reason": selection.reason,
         "ros_ci": ros_ci,
         "changed_files": changed_files,
