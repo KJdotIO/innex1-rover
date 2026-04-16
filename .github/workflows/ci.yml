@@ -21,6 +21,7 @@ jobs:
       selection_mode: ${{ steps.selection.outputs.mode }}
       selection_packages: ${{ steps.selection.outputs.packages }}
       selection_reason: ${{ steps.selection.outputs.reason }}
+      selection_package_roots: ${{ steps.selection.outputs.package_roots }}
       ci_image: ${{ steps.image.outputs.image }}
     steps:
       - name: Checkout code
@@ -163,16 +164,23 @@ jobs:
       - name: Install dependencies
         env:
           USE_PREBUILT_IMAGE: ${{ needs.resolve-build-image.outputs.prebuilt }}
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGE_ROOTS: ${{ needs.preflight.outputs.selection_package_roots }}
         run: |
-          apt-get update
           if [ "$USE_PREBUILT_IMAGE" != "true" ]; then
+            apt-get update
             apt-get install -y python3-colcon-common-extensions python3-rosdep
           fi
           if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
             rosdep init
           fi
           rosdep update
-          rosdep install --from-paths src -y --ignore-src
+          if [ "$SELECTION_MODE" = "packages" ] && [ -n "${SELECTED_PACKAGE_ROOTS:-}" ]; then
+            read -r -a selected_package_roots <<<"$SELECTED_PACKAGE_ROOTS"
+            rosdep install --from-paths "${selected_package_roots[@]}" -y --ignore-src
+          else
+            rosdep install --from-paths src -y --ignore-src
+          fi
         shell: bash
 
       - name: Build
