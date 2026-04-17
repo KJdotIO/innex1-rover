@@ -1,0 +1,43 @@
+name: PR Agent Review
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  pr-agent-review:
+    name: Review on PR comment
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/review')
+      )
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Add eyes reaction to review request
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      - name: Run PR Agent review
+        uses: Codium-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ secrets.PR_AGENT_OPENAI_KEY }}
+          OPENAI__API_BASE: ${{ secrets.PR_AGENT_OPENAI_API_BASE }}
+          CONFIG__MODEL: ${{ vars.PR_AGENT_MODEL || 'gpt-5.3-codex' }}

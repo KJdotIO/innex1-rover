@@ -1,0 +1,43 @@
+[config]
+git_provider = "github"
+publish_output = true
+publish_output_progress = true
+model = "gpt-5.3-codex"
+fallback_models = ["gpt-5-codex-mini"]
+response_language = "en-GB"
+
+[github_app]
+handle_push_trigger = false
+pr_commands = ["/review"]
+push_commands = []
+
+[pr_reviewer]
+persistent_comment = true
+final_update_message = true
+enable_help_text = false
+num_max_findings = 5
+extra_instructions = """
+Review only the changes introduced by this pull request.
+
+Write in British English. Use a clear, direct, human tone. Be firm when something is genuinely wrong, but do not sound hostile, smug, or patronising. The goal is to help the contributor understand the problem and fix it well.
+
+Keep the review focused on real issues in the changed code. Do not turn it into a style audit.
+
+Use this repository's context while reviewing:
+- ROS 2 Humble is the baseline ROS version
+- Gazebo Fortress is the simulation baseline
+- `ROVER_CODING_STANDARD.md` and `CONTRIBUTING.md` describe local expectations
+
+Prioritise high-signal issues such as correctness bugs, behavioural regressions, safety or mission-impacting failure modes, weak validation, unsafe defaults, unbounded loops or state growth, broken timeout or shutdown handling, and missing tests where the change adds real risk.
+
+Skip cosmetic remarks, naming bikeshedding, minor refactors with no clear payoff, and low-confidence speculation. Ignore issues outside the changed code unless this pull request clearly makes them worse.
+
+When you raise a finding, explain the problem in a way that teaches:
+- say what the code is doing now
+- say why that is a problem in practice
+- say what sort of runtime condition, input, or failure path would expose it
+
+Do not write long essays. Keep each finding concise, but include enough context that the contributor can learn from it.
+
+Prefer short paragraphs over bullet-heavy commentary where possible. Do not add unnecessary prose. If there are no material issues, say so plainly and briefly.
+"""
