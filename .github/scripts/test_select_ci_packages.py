@@ -76,9 +76,9 @@ def main() -> int:
             ["src/lunabot_interfaces/msg/ExcavationStatus.msg"],
             ("full", ()),
         ),
-        "workflow_force_full": (
+        "workflow_only_skips_ros_build": (
             [".github/workflows/nightly-full-ci.yml"],
-            ("full", ()),
+            ("skip", ()),
         ),
         "external_force_full": (
             ["src/external/leo_common-ros2/leo_teleop/config/joy_config.yaml"],

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   preflight:
     runs-on: ubuntu-22.04
@@ -17,6 +21,7 @@ jobs:
       selection_mode: ${{ steps.selection.outputs.mode }}
       selection_packages: ${{ steps.selection.outputs.packages }}
       selection_reason: ${{ steps.selection.outputs.reason }}
+      selection_package_roots: ${{ steps.selection.outputs.package_roots }}
       ci_image: ${{ steps.image.outputs.image }}
     steps:
       - name: Checkout code
@@ -91,7 +96,7 @@ jobs:
 
   resolve-build-image:
     needs: preflight
-    if: needs.preflight.outputs.ros_ci == 'true'
+    if: needs.preflight.outputs.ros_ci == 'true' && needs.preflight.outputs.selection_mode != 'skip'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -134,7 +139,7 @@ jobs:
     needs:
       - preflight
       - resolve-build-image
-    if: needs.preflight.outputs.ros_ci == 'true'
+    if: needs.preflight.outputs.ros_ci == 'true' && needs.preflight.outputs.selection_mode != 'skip'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -156,18 +161,11 @@ jobs:
           echo "Container reason: ${{ needs.resolve-build-image.outputs.image_reason }}"
         shell: bash
 
-      - name: Cache colcon workspace
-        uses: actions/cache@v5
-        with:
-          path: |
-            build/
-            install/
-          key: ${{ runner.os }}-colcon-${{ hashFiles('src/**/package.xml', 'src/**/CMakeLists.txt', 'src/**/setup.py') }}
-          restore-keys: ${{ runner.os }}-colcon-
-
       - name: Install dependencies
         env:
           USE_PREBUILT_IMAGE: ${{ needs.resolve-build-image.outputs.prebuilt }}
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGE_ROOTS: ${{ needs.preflight.outputs.selection_package_roots }}
         run: |
           apt-get update
           if [ "$USE_PREBUILT_IMAGE" != "true" ]; then
@@ -177,7 +175,12 @@ jobs:
             rosdep init
           fi
           rosdep update
-          rosdep install --from-paths src -y --ignore-src
+          if [ "$SELECTION_MODE" = "packages" ] && [ -n "${SELECTED_PACKAGE_ROOTS:-}" ]; then
+            read -r -a selected_package_roots <<<"$SELECTED_PACKAGE_ROOTS"
+            rosdep install --from-paths "${selected_package_roots[@]}" -y --ignore-src
+          else
+            rosdep install --from-paths src -y --ignore-src
+          fi
         shell: bash
 
       - name: Build
