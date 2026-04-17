@@ -177,6 +177,16 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Operations: https://github.com/KJdotIO/innex1-rover/wiki/Operations
 - Contracts: https://github.com/KJdotIO/innex1-rover/wiki/Contracts
 
+## AI PR review
+
+A comment-triggered PR Agent skeleton is included for on-demand review workflows.
+
+- Trigger it from a pull request comment with `/review`
+- Configure GitHub Actions secrets `PR_AGENT_OPENAI_KEY` and `PR_AGENT_OPENAI_API_BASE` on the repository before use
+- Automatic PR review is intentionally disabled for now
+- This section exists mainly to give  something small and safe to test against
+- This section exists mainly to give `/review` something small and safe to test against
+
 ## Contributing and licence
 
 - Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
