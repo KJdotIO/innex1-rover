@@ -38,6 +38,6 @@ jobs:
         uses: Codium-ai/pr-agent@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_KEY: ${{ secrets.PR_AGENT_OPENAI_KEY }}
+          OPENAI_API_KEY: ${{ secrets.PR_AGENT_OPENAI_KEY }}
           OPENAI__API_BASE: ${{ secrets.PR_AGENT_OPENAI_API_BASE }}
           CONFIG__MODEL: ${{ vars.PR_AGENT_MODEL || 'gpt-5.3-codex' }}
