@@ -1,0 +1,64 @@
+# Nav2 Collision Monitor — wall-filtered point clouds (/perception/autonomy/*).
+#
+# Sits between the Nav2 velocity output and the robot/bridge. If obstacle
+# points from the front depth camera appear inside the stop or slowdown
+# polygons, the commanded velocity is reduced or zeroed.
+#
+# Polygon coordinates are in base_footprint frame (X forward, Y left).
+# Robot approximate envelope: ~0.40m long, ~0.36m wide (wheel-to-wheel).
+
+collision_monitor:
+  ros__parameters:
+    enabled: true
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel"
+    cmd_vel_out_topic: "cmd_vel_safe"
+    transform_tolerance: 0.5
+    source_timeout: 0.0
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+
+    polygons: ["PolygonStop", "PolygonSlow"]
+
+    PolygonStop:
+      type: "polygon"
+      points: [0.30, 0.22, 0.30, -0.22, -0.35, -0.22, -0.35, 0.22]
+      action_type: "stop"
+      max_points: 3
+      visualize: true
+      polygon_pub_topic: "polygon_stop"
+      enabled: true
+
+    PolygonSlow:
+      type: "polygon"
+      points: [0.50, 0.35, 0.50, -0.35, -0.50, -0.35, -0.50, 0.35]
+      action_type: "slowdown"
+      max_points: 6
+      slowdown_ratio: 0.3
+      visualize: true
+      polygon_pub_topic: "polygon_slowdown"
+      enabled: true
+
+    observation_sources: ["front_camera", "rear_camera", "lidar"]
+
+    front_camera:
+      type: "pointcloud"
+      topic: "/perception/autonomy/camera_front/points"
+      min_height: 0.10
+      max_height: 0.60
+      enabled: true
+
+    rear_camera:
+      type: "pointcloud"
+      topic: "/perception/autonomy/camera_rear/points"
+      min_height: 0.10
+      max_height: 0.60
+      enabled: true
+
+    lidar:
+      type: "pointcloud"
+      topic: "/perception/autonomy/ouster/points"
+      min_height: 0.10
+      max_height: 0.60
+      enabled: true

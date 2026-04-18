@@ -1,0 +1,19 @@
+/**:
+  ros__parameters:
+    map_frame: "map"
+    # Moon Yard sim bounds (see lunabot_bringup/config/arena_waypoints.yaml comments).
+    arena_min_x: -1.0
+    arena_max_x: 6.9
+    arena_min_y: -3.3
+    arena_max_y: 1.1
+    inset_margin_m: 0.2
+    max_points_per_cloud: 45000
+    transform_timeout_sec: 0.15
+    input_topics:
+      - "/ouster/points"
+      - "/camera_front/points"
+      - "/camera_rear/points"
+    output_topics:
+      - "/perception/autonomy/ouster/points"
+      - "/perception/autonomy/camera_front/points"
+      - "/perception/autonomy/camera_rear/points"

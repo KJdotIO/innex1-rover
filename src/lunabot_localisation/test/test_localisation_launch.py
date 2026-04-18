@@ -101,6 +101,7 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     launch_module = _load_launch_module()
     context = LaunchContext()
     context.launch_configurations["lidar_costmap_phase"] = "treu"
+    context.launch_configurations["competition_safe_localisation"] = "false"
     context.launch_configurations["use_sim_time"] = "true"
     context.launch_configurations["enable_apriltag_debug"] = "false"
 

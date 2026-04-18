@@ -6,7 +6,9 @@ import yaml
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 NAV2_PARAMS_PATH = CONFIG_DIR / "nav2_params.yaml"
+NAV2_PARAMS_COMPETITION_PATH = CONFIG_DIR / "nav2_params_competition.yaml"
 COLLISION_MONITOR_PATH = CONFIG_DIR / "collision_monitor.yaml"
+COLLISION_MONITOR_COMPETITION_PATH = CONFIG_DIR / "collision_monitor_competition.yaml"
 
 
 def _load_yaml(path: Path) -> dict:
@@ -184,3 +186,36 @@ class TestCollisionMonitorConfig:
         assert max(stop_x) <= max(slow_x), (
             "Stop polygon front edge should not exceed slow polygon"
         )
+
+
+class TestCompetitionCostmapUsesFilteredTopics:
+    """Wall-safe Nav2: costmaps consume /perception/autonomy/* only."""
+
+    def setup_method(self):
+        self.config = _load_yaml(NAV2_PARAMS_COMPETITION_PATH)
+
+    def test_obstacle_topics_use_perception_autonomy_prefix(self):
+        for key in ("global_costmap", "local_costmap"):
+            params = _costmap_params(self.config, key)
+            ol = params["obstacle_layer"]
+            assert ol["camera_front_points"]["topic"].startswith("/perception/autonomy/")
+            assert ol["camera_rear_points"]["topic"].startswith("/perception/autonomy/")
+
+    def test_voxel_lidar_topic_uses_perception_autonomy_prefix(self):
+        for key in ("global_costmap", "local_costmap"):
+            params = _costmap_params(self.config, key)
+            lid = params["voxel_layer"]["lidar_points"]
+            assert lid["topic"] == "/perception/autonomy/ouster/points"
+
+
+class TestCompetitionCollisionMonitorUsesFilteredTopics:
+    """Wall-safe collision_monitor YAML references filtered clouds."""
+
+    def setup_method(self):
+        config = _load_yaml(COLLISION_MONITOR_COMPETITION_PATH)
+        self.params = config["collision_monitor"]["ros__parameters"]
+
+    def test_all_sources_under_perception_autonomy(self):
+        for source_name in self.params["observation_sources"]:
+            topic = self.params[source_name]["topic"]
+            assert topic.startswith("/perception/autonomy/"), topic
