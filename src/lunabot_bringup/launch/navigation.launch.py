@@ -49,7 +49,11 @@ def _is_falsey(value):
 
 
 def _build_nav2_start_actions(
-    nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+    nav2_launch_path,
+    nav_params_path,
+    collision_monitor_params_path,
+    use_sim_time,
+    enable_teleop,
 ):
     """Return Nav2 start actions for direct or muxed operation."""
     nav2_launch = GroupAction(
@@ -59,6 +63,7 @@ def _build_nav2_start_actions(
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
+                    "collision_monitor_params_file": collision_monitor_params_path,
                     "autostart": "true",
                 }.items(),
             ),
@@ -75,6 +80,7 @@ def _build_nav2_start_actions(
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
+                    "collision_monitor_params_file": collision_monitor_params_path,
                     "autostart": "true",
                 }.items(),
             ),
@@ -101,13 +107,18 @@ def _handle_preflight_exit(
     _context,
     nav2_launch_path,
     nav_params_path,
+    collision_monitor_params_path,
     use_sim_time,
     enable_teleop,
 ):
     """Start Nav2 only when the launch-gate preflight passes."""
     if event.returncode == 0:
         return _build_nav2_start_actions(
-            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path,
+            nav_params_path,
+            collision_monitor_params_path,
+            use_sim_time,
+            enable_teleop,
         )
 
     return [
@@ -124,6 +135,58 @@ def _handle_preflight_exit(
 def _raise_preflight_launch_failure(_context):
     """Abort launch with a non-zero exit when the preflight gate fails."""
     raise RuntimeError("Navigation preflight launch gate failed")
+
+
+def _wall_safe_perception_stack(context):
+    """Start optional wall filter and crater_detection with the correct point-cloud topic."""
+    comp_raw = (
+        LaunchConfiguration("competition_safe_localisation")
+        .perform(context)
+        .strip()
+        .lower()
+    )
+    competition_on = comp_raw in ("1", "true", "yes", "on")
+    use_sim_time = LaunchConfiguration("use_sim_time")
+    crater_topic = (
+        "/perception/autonomy/camera_front/points"
+        if competition_on
+        else "/camera_front/points"
+    )
+    actions = []
+    if competition_on:
+        wall_params = str(
+            Path(get_package_share_directory("lunabot_perception")).joinpath(
+                "config",
+                "wall_exclusion.yaml",
+            ),
+        )
+        actions.append(
+            Node(
+                package="lunabot_perception",
+                executable="wall_exclusion_filter",
+                name="wall_exclusion_filter",
+                output="screen",
+                parameters=[
+                    wall_params,
+                    {"use_sim_time": use_sim_time},
+                ],
+            ),
+        )
+    actions.append(
+        Node(
+            package="lunabot_perception",
+            executable="crater_detection",
+            name="crater_detection",
+            output="screen",
+            parameters=[
+                {
+                    "use_sim_time": use_sim_time,
+                    "points_topic": crater_topic,
+                },
+            ],
+        ),
+    )
+    return actions
 
 
 def generate_launch_description():
@@ -146,7 +209,6 @@ def generate_launch_description():
     teleop_launch_path = _share_path(
         "lunabot_teleop", "launch", "joystick_teleop.launch.py"
     )
-    nav_params_path = _share_path("lunabot_navigation", "config", "nav2_params.yaml")
     rviz_config_path = _share_path("lunabot_bringup", "rviz", "navigation.rviz")
     twist_mux_params_path = _share_path("lunabot_bringup", "config", "twist_mux.yaml")
     preflight_config_path = _share_path(
@@ -165,6 +227,7 @@ def generate_launch_description():
         preflight_config_path,
         preflight_lidar_debug_config_path,
     )
+    competition_safe_localisation = LaunchConfiguration("competition_safe_localisation")
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     launch_rviz = LaunchConfiguration("launch_rviz")
@@ -182,6 +245,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(localisation_launch_path),
         launch_arguments={
             "lidar_costmap_phase": lidar_costmap_phase,
+            "competition_safe_localisation": competition_safe_localisation,
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
@@ -189,13 +253,7 @@ def generate_launch_description():
         }.items(),
     )
 
-    crater_detection = Node(
-        package="lunabot_perception",
-        executable="crater_detection",
-        name="crater_detection",
-        output="screen",
-        parameters=[{"use_sim_time": use_sim_time}],
-    )
+    perception_stack = OpaqueFunction(function=_wall_safe_perception_stack)
 
     navigate_to_pose_gate = Node(
         package="lunabot_bringup",
@@ -304,42 +362,65 @@ def generate_launch_description():
         ),
     )
 
-    preflight_gate_handler = RegisterEventHandler(
-        OnProcessExit(
-            target_action=preflight_gate,
-            on_exit=lambda event, context: _handle_preflight_exit(
-                event,
-                context,
-                nav2_launch_path,
-                nav_params_path,
-                use_sim_time,
-                enable_teleop,
-            ),
-        ),
-        condition=IfCondition(_is_truthy(enforce_preflight)),
-    )
+    def _nav_resolution_stack(context):
+        """Resolve Nav2 YAML paths from competition_safe_localisation and wire Nav2."""
+        comp_raw = (
+            LaunchConfiguration("competition_safe_localisation")
+            .perform(context)
+            .strip()
+            .lower()
+        )
+        competition_on = comp_raw in ("1", "true", "yes", "on")
+        nav_pkg = Path(get_package_share_directory("lunabot_navigation"))
+        if competition_on:
+            nav_params = str(nav_pkg / "config" / "nav2_params_competition.yaml")
+            coll_params = str(nav_pkg / "config" / "collision_monitor_competition.yaml")
+        else:
+            nav_params = str(nav_pkg / "config" / "nav2_params.yaml")
+            coll_params = str(nav_pkg / "config" / "collision_monitor.yaml")
+        use_sim_time_lc = LaunchConfiguration("use_sim_time")
+        enable_teleop_lc = LaunchConfiguration("enable_teleop")
+        enforce_preflight_lc = LaunchConfiguration("enforce_preflight")
 
-    preflight_gate_lidar_debug_handler = RegisterEventHandler(
-        OnProcessExit(
-            target_action=preflight_gate_lidar_debug,
-            on_exit=lambda event, context: _handle_preflight_exit(
+        def _on_preflight_exit(event, ctx, np=nav_params, cp=coll_params):
+            return _handle_preflight_exit(
                 event,
-                context,
+                ctx,
                 nav2_launch_path,
-                nav_params_path,
-                use_sim_time,
-                enable_teleop,
-            ),
-        ),
-        condition=IfCondition(_is_truthy(enforce_preflight)),
-    )
+                np,
+                cp,
+                use_sim_time_lc,
+                enable_teleop_lc,
+            )
 
-    direct_nav2_start = GroupAction(
-        _build_nav2_start_actions(
-            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
-        ),
-        condition=IfCondition(_is_falsey(enforce_preflight)),
-    )
+        return [
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=preflight_gate,
+                    on_exit=_on_preflight_exit,
+                ),
+                condition=IfCondition(_is_truthy(enforce_preflight_lc)),
+            ),
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=preflight_gate_lidar_debug,
+                    on_exit=_on_preflight_exit,
+                ),
+                condition=IfCondition(_is_truthy(enforce_preflight_lc)),
+            ),
+            GroupAction(
+                _build_nav2_start_actions(
+                    nav2_launch_path,
+                    nav_params,
+                    coll_params,
+                    use_sim_time_lc,
+                    enable_teleop_lc,
+                ),
+                condition=IfCondition(_is_falsey(enforce_preflight_lc)),
+            ),
+        ]
+
+    nav_resolution_stack = OpaqueFunction(function=_nav_resolution_stack)
 
     return LaunchDescription(
         [
@@ -417,16 +498,23 @@ def generate_launch_description():
                     "is unavailable."
                 ),
             ),
+            DeclareLaunchArgument(
+                "competition_safe_localisation",
+                default_value="false",
+                description=(
+                    "UK wall-safe mode: no RTAB-Map SLAM, identity map->odom, "
+                    "AprilTag + EKF; wall_exclusion_filter + Nav2/collision on "
+                    "/perception/autonomy/*. Set true for rule-compliant runs."
+                ),
+            ),
             localisation_launch,
-            crater_detection,
+            perception_stack,
             navigate_to_pose_gate,
             teleop_launch,
             twist_mux,
             preflight_gate,
             preflight_gate_lidar_debug,
-            preflight_gate_handler,
-            preflight_gate_lidar_debug_handler,
-            direct_nav2_start,
+            nav_resolution_stack,
             rviz,
         ]
     )

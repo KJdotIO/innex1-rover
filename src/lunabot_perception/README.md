@@ -1,9 +1,21 @@
 # lunabot_perception
 
-Perception nodes for the innex1 rover, currently providing crater
-(negative obstacle) detection for Nav2 costmap integration.
+Perception nodes for the innex1 rover: crater (negative obstacle) detection
+and optional **wall exclusion** republishers for UK wall-safe autonomy.
 
 ## Nodes
+
+### `wall_exclusion_filter`
+
+Subscribes to raw LiDAR and depth `PointCloud2` topics, transforms each cloud
+into `map`, and republishes only points inside an axis-aligned **inset interior**
+of the arena (drops perimeter wall returns). Used when
+`competition_safe_localisation:=true` in `navigation.launch.py`; Nav2 and
+collision monitor then consume `/perception/autonomy/*` topics.
+
+Parameters are loaded from `config/wall_exclusion.yaml` (arena bounds match the
+Moon Yard sim comments in `lunabot_bringup/config/arena_waypoints.yaml`; tune
+for the real UK arena).
 
 ### `crater_detection`
 
@@ -22,7 +34,7 @@ ros2 run lunabot_perception crater_detection --ros-args -p use_sim_time:=true
 
 | Topic | Type | Purpose |
 |-------|------|---------|
-| `/camera_front/points` | `sensor_msgs/PointCloud2` | Depth camera point cloud |
+| `points_topic` param (default `/camera_front/points`) | `sensor_msgs/PointCloud2` | Depth camera point cloud; use `/perception/autonomy/camera_front/points` in wall-safe mode |
 
 **Publications:**
 
@@ -35,6 +47,7 @@ ros2 run lunabot_perception crater_detection --ros-args -p use_sim_time:=true
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `points_topic` | `/camera_front/points` | Input cloud; wall-safe launches use `/perception/autonomy/camera_front/points` |
 | `grid_resolution` | `0.05` | Cell size in metres |
 | `grid_width` / `grid_height` | `8.0` / `5.0` | Grid extent in metres |
 | `depth_threshold` | `0.08` | Depth below ground to flag as crater |
