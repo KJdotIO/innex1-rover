@@ -9,11 +9,13 @@ on:
     paths:
       - '.github/docker/ros-ci/**'
       - '.github/workflows/build-ros-ci-image.yml'
+      - 'src/**/package.xml'
   push:
     branches: [main]
     paths:
       - '.github/docker/ros-ci/**'
       - '.github/workflows/build-ros-ci-image.yml'
+      - 'src/**/package.xml'
   workflow_dispatch:
 
 concurrency:

@@ -1,0 +1,221 @@
+name: CI (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      force_full_ros:
+        type: boolean
+        description: If true, always run full colcon build/test (nightly). Otherwise use package selection.
+        default: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      ros_ci: ${{ steps.selection.outputs.ros_ci }}
+      selection_mode: ${{ steps.selection.outputs.mode }}
+      selection_packages: ${{ steps.selection.outputs.packages }}
+      selection_reason: ${{ steps.selection.outputs.reason }}
+      selection_package_roots: ${{ steps.selection.outputs.package_roots }}
+      ci_image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        shell: bash
+
+      - name: Derive ROS CI image reference
+        id: image
+        run: |
+          owner_lower=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner_lower}/innex1-rover-ci:humble" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Set up Python for preflight
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: .github/requirements-preflight.txt
+
+      - name: Install preflight dependencies
+        run: python -m pip install --disable-pip-version-check -r .github/requirements-preflight.txt
+        shell: bash
+
+      - name: Run preflight checks
+        run: |
+          python .github/scripts/run_preflight_checks.py
+          python .github/scripts/check_interface_contracts.py
+          python .github/scripts/test_select_ci_packages.py
+        shell: bash
+
+      - name: Run blocking repository quality checks
+        run: python .github/scripts/run_quality_checks.py --mode blocking
+        shell: bash
+
+      - name: Lint GitHub Actions workflows
+        uses: devops-actions/actionlint@v0.1.10
+
+      - name: Run advisory repository quality checks
+        continue-on-error: true
+        run: python .github/scripts/run_quality_checks.py --mode advisory
+        shell: bash
+
+      - name: Determine comparison range
+        id: range
+        if: ${{ !inputs.force_full_ros }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            base_sha="$(git merge-base HEAD "origin/${{ github.base_ref }}")"
+          else
+            base_sha="${{ github.event.before }}"
+          fi
+          {
+            echo "base_sha=${base_sha}"
+            echo "head_sha=${{ github.sha }}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Select ROS package scope
+        id: selection
+        run: |
+          if [ "${{ inputs.force_full_ros }}" = "true" ]; then
+            {
+              echo "ros_ci=true"
+              echo "mode=full"
+              echo "packages="
+              echo "package_roots="
+              echo "reason=Nightly full CI (forced)"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python .github/scripts/select_ci_packages.py \
+            --base-sha "${{ steps.range.outputs.base_sha }}" \
+            --head-sha "${{ steps.range.outputs.head_sha }}" \
+            --github-output "$GITHUB_OUTPUT"
+        shell: bash
+
+  resolve-build-image:
+    needs: preflight
+    if: needs.preflight.outputs.ros_ci == 'true' && needs.preflight.outputs.selection_mode != 'skip'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+      image_reason: ${{ steps.resolve.outputs.image_reason }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Resolve published ROS CI image (required)
+        id: resolve
+        env:
+          CI_IMAGE: ${{ needs.preflight.outputs.ci_image }}
+        run: |
+          set -euo pipefail
+          if ! docker buildx imagetools inspect "$CI_IMAGE" >/tmp/ci-image-inspect.txt 2>/tmp/ci-image-inspect.err; then
+            echo "::error::Published ROS CI image not found or not readable: ${CI_IMAGE}"
+            cat /tmp/ci-image-inspect.err || true
+            exit 1
+          fi
+          digest=$(awk '/^Digest:/ {print $2}' /tmp/ci-image-inspect.txt)
+          if [ -z "${digest}" ]; then
+            echo "::error::Could not read digest for ${CI_IMAGE}"
+            cat /tmp/ci-image-inspect.txt
+            exit 1
+          fi
+          {
+            echo "image=${CI_IMAGE%@*}@${digest}"
+            echo "image_reason=Using published ROS CI image (pinned by digest)"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  build-and-test:
+    needs:
+      - preflight
+      - resolve-build-image
+    if: needs.preflight.outputs.ros_ci == 'true' && needs.preflight.outputs.selection_mode != 'skip'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
+      packages: read
+    container:
+      image: ${{ needs.resolve-build-image.outputs.image }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Explain selected ROS scope
+        run: |
+          echo "Selection mode: ${{ needs.preflight.outputs.selection_mode }}"
+          echo "Selection reason: ${{ needs.preflight.outputs.selection_reason }}"
+          echo "Selected packages: ${{ needs.preflight.outputs.selection_packages }}"
+          echo "Container image: ${{ needs.resolve-build-image.outputs.image }}"
+          echo "Container reason: ${{ needs.resolve-build-image.outputs.image_reason }}"
+        shell: bash
+
+      - name: Sync ROS dependencies
+        env:
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGE_ROOTS: ${{ needs.preflight.outputs.selection_package_roots }}
+        run: |
+          set -euo pipefail
+          if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+            rosdep init
+          fi
+          rosdep update --rosdistro humble
+          if [ "$SELECTION_MODE" = "packages" ] && [ -n "${SELECTED_PACKAGE_ROOTS:-}" ]; then
+            read -r -a selected_package_roots <<<"$SELECTED_PACKAGE_ROOTS"
+            rosdep install --from-paths "${selected_package_roots[@]}" -y --ignore-src
+          else
+            rosdep install --from-paths src -y --ignore-src
+          fi
+        shell: bash
+
+      - name: Build
+        env:
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGES: ${{ needs.preflight.outputs.selection_packages }}
+        run: |
+          source /opt/ros/humble/setup.bash
+          selected_packages_input="${SELECTED_PACKAGES:-}"
+          if [ "$SELECTION_MODE" = "packages" ]; then
+            read -r -a selected_packages <<<"$selected_packages_input"
+            colcon build --packages-up-to "${selected_packages[@]}"
+          else
+            colcon build
+          fi
+        shell: bash
+
+      - name: Run tests
+        env:
+          SELECTION_MODE: ${{ needs.preflight.outputs.selection_mode }}
+          SELECTED_PACKAGES: ${{ needs.preflight.outputs.selection_packages }}
+        run: |
+          source /opt/ros/humble/setup.bash
+          selected_packages_input="${SELECTED_PACKAGES:-}"
+          if [ "$SELECTION_MODE" = "packages" ]; then
+            read -r -a selected_packages <<<"$selected_packages_input"
+            colcon test --packages-select "${selected_packages[@]}"
+          else
+            colcon test
+          fi
+        shell: bash
+
+      - name: Check test results
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test-result --verbose
+        shell: bash
