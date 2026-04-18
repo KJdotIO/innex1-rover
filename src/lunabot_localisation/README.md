@@ -13,8 +13,15 @@ The localisation pipeline has two layers:
   correction via visual loop closure and AprilTag landmark constraints.
 
 The global EKF has been removed. RTAB-Map handles drift correction directly
-through its pose graph optimiser, which is the same pattern used by multiple
-Lunabotics teams (College of DuPage, Chicago Robotics/EDT).
+through its pose graph optimiser when **not** in UK wall-safe mode.
+
+## UK wall-safe localisation (`competition_safe_localisation:=true`)
+
+For UK Lunabotics compliance (no arena walls in SLAM / autonomy sensing), launch
+with `competition_safe_localisation:=true`: RTAB-Map is **not** started,
+`map`→`odom` is a static identity transform, and AprilTag + wheel/IMU EKF
+remain for start-zone readiness. Pair with `navigation.launch.py` wall filtering
+and `nav2_params_competition.yaml` (see `docs/wall_safe_autonomy_research.md`).
 
 ## Start-zone localisation
 
