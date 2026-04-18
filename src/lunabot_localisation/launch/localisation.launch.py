@@ -81,6 +81,7 @@ def _validate_boolean_launch_arguments(context):
     """Reject invalid boolean-style launch argument values early."""
     for argument_name in (
         "lidar_costmap_phase",
+        "competition_safe_localisation",
         "use_sim_time",
         "enable_apriltag_debug",
     ):
@@ -110,6 +111,7 @@ def generate_launch_description():
         "start_zone_localisation.yaml",
     )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
+    competition_safe_localisation = LaunchConfiguration("competition_safe_localisation")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
@@ -119,6 +121,30 @@ def generate_launch_description():
     tag_map_yaw = LaunchConfiguration("tag_map_yaw")
 
     normal_mode = IfCondition(_is_falsey(lidar_costmap_phase))
+    # RTAB-Map uses RGB-D structure for map->odom; disable in competition-safe mode.
+    use_rtabmap = IfCondition(
+        PythonExpression(
+            [
+                "(",
+                _is_falsey(lidar_costmap_phase),
+                ") and (",
+                _is_falsey(competition_safe_localisation),
+                ")",
+            ]
+        )
+    )
+    # Identity map->odom: debug odom-only mode or UK wall-safe mode (no SLAM drift).
+    use_identity_map_odom = IfCondition(
+        PythonExpression(
+            [
+                "(",
+                _is_truthy(lidar_costmap_phase),
+                ") or (",
+                _is_truthy(competition_safe_localisation),
+                ")",
+            ]
+        )
+    )
     apriltag_debug_condition = IfCondition(
         PythonExpression(
             [
@@ -142,6 +168,15 @@ def generate_launch_description():
                 default_value="false",
                 description=(
                     "Use odom-only debug localisation with an identity map->odom TF."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "competition_safe_localisation",
+                default_value="false",
+                description=(
+                    "UK wall-safe mode: no RTAB-Map (no wall structure in SLAM); "
+                    "identity map->odom; keep AprilTag + EKF. "
+                    "Use true for competition inspection; false preserves legacy SLAM."
                 ),
             ),
             DeclareLaunchArgument(
@@ -222,7 +257,7 @@ def generate_launch_description():
                     "--child-frame-id",
                     "odom",
                 ],
-                condition=IfCondition(_is_truthy(lidar_costmap_phase)),
+                condition=use_identity_map_odom,
             ),
             # --- RTAB-Map SLAM: map -> odom via loop closure ---
             Node(
@@ -240,7 +275,7 @@ def generate_launch_description():
                     ("tag_detections", "/camera_front/tags"),
                 ],
                 arguments=["-d"],
-                condition=normal_mode,
+                condition=use_rtabmap,
             ),
             # --- AprilTag detector ---
             Node(
