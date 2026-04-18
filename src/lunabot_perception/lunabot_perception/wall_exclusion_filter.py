@@ -28,7 +28,7 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import PointCloud2
-from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points_numpy
+from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points
 from tf2_ros import Buffer, TransformException, TransformListener
 
 
@@ -127,13 +127,15 @@ class WallExclusionFilter(Node):
             )
             return
 
-        points = read_points_numpy(msg, field_names=("x", "y", "z"), skip_nans=True)
-        if points.size == 0:
+        xyz_points = list(read_points(msg, field_names=("x", "y", "z"), skip_nans=True))
+        if len(xyz_points) == 0:
             out = PointCloud2()
             out.header = msg.header
             out.header.frame_id = self._map_frame
             self._publishers[stream_index].publish(out)
             return
+
+        points = np.asarray(xyz_points, dtype=np.float64)
 
         translation = transform.transform.translation
         rotation = transform.transform.rotation
