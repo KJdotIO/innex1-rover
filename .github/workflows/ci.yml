@@ -20,3 +20,19 @@ jobs:
     with:
       force_full_ros: false
     secrets: inherit
+
+  build-and-test:
+    needs: ci
+    runs-on: ubuntu-22.04
+    if: always()
+    steps:
+      - name: Verify reusable CI result
+        env:
+          CI_RESULT: ${{ needs.ci.result }}
+        run: |
+          if [ "$CI_RESULT" != "success" ]; then
+            echo "::error::Reusable CI completed with result: ${CI_RESULT}"
+            exit 1
+          fi
+          echo "Reusable CI completed successfully."
+        shell: bash

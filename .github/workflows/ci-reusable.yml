@@ -141,7 +141,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
-  build-and-test:
+  ros-build-and-test:
     needs:
       - preflight
       - resolve-build-image
