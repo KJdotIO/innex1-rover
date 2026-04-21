@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -24,6 +25,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFLIGHT_CONFIG_PATH = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
+CONTRACT_PATH = ROOT / ".github/contracts/interface_contracts.json"
 _PREFLIGHT_CACHE = None
 _PREFLIGHT_ERROR = None
 
@@ -58,7 +60,7 @@ def _load_preflight_config():
         data = yaml.safe_load(PREFLIGHT_CONFIG_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or not isinstance(data.get("preflight"), dict):
             raise ValueError("missing top-level 'preflight' mapping")
-        preflight = data["preflight"]
+        preflight = _merge_contract_requirements(data["preflight"])
         _validate_preflight_config(preflight)
         _PREFLIGHT_CACHE = preflight
 
@@ -69,12 +71,107 @@ def _load_preflight_config():
         return None, _PREFLIGHT_ERROR
 
 
+def _load_interface_contract() -> dict:
+    if not CONTRACT_PATH.exists():
+        raise ValueError(f"missing interface contract: {CONTRACT_PATH}")
+
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    if not isinstance(contract, dict):
+        raise ValueError("interface contract must be a JSON object")
+    return contract
+
+
+def _append_unique(items: list, entry: dict, keys: tuple[str, ...]) -> None:
+    entry_key = tuple(entry.get(key) for key in keys)
+    for existing in items:
+        if not isinstance(existing, dict):
+            continue
+        if tuple(existing.get(key) for key in keys) == entry_key:
+            return
+    items.append(entry)
+
+
+def _merge_contract_requirements(preflight: dict) -> dict:
+    """Merge canonical contract entries into doctor-facing runtime checks."""
+    merged = dict(preflight)
+    if not bool(merged.get("use_interface_contracts", True)):
+        return merged
+
+    contract = _load_interface_contract()
+    topics = list(merged.setdefault("required_topics", []))
+    actions = list(merged.setdefault("required_actions", []))
+    services = list(merged.setdefault("required_services", []))
+    tf_links = list(merged.setdefault("required_tf_links", []))
+
+    for item in contract.get("topics", []):
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("kind")
+        if kind in {"publisher", "subscription"}:
+            _append_unique(
+                topics,
+                {
+                    "name": item.get("name"),
+                    "type": item.get("type"),
+                    "critical": True,
+                    "phases": item.get("phases"),
+                },
+                ("name", "type"),
+            )
+        elif kind in {"action_server", "action_client"}:
+            _append_unique(
+                actions,
+                {
+                    "name": item.get("name"),
+                    "type": item.get("type"),
+                    "critical": True,
+                    "phases": item.get("phases"),
+                },
+                ("name", "type"),
+            )
+
+    for item in contract.get("services", []):
+        if not isinstance(item, dict):
+            continue
+        _append_unique(
+            services,
+            {
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "critical": True,
+                "phases": item.get("phases"),
+            },
+            ("name", "type"),
+        )
+
+    for item in contract.get("tf_links", []):
+        if not isinstance(item, dict):
+            continue
+        _append_unique(
+            tf_links,
+            {
+                "parent": item.get("parent"),
+                "child": item.get("child"),
+                "critical": True,
+                "phases": item.get("phases"),
+            },
+            ("parent", "child"),
+        )
+
+    merged["required_topics"] = topics
+    merged["required_actions"] = actions
+    merged["required_services"] = services
+    merged["required_tf_links"] = tf_links
+    return merged
+
+
 def _validate_preflight_config(config: dict) -> None:
     """Validate the doctor-facing preflight config shape."""
     required_sections = {
         "required_topics": {"name"},
         "required_nodes": {"name"},
         "required_actions": {"name"},
+        "required_services": {"name"},
         "required_tf_links": {"parent", "child"},
     }
     for section, required_keys in required_sections.items():
@@ -125,6 +222,33 @@ def _configured_required_names(section: str, field: str = "name") -> set[str] | 
     return names
 
 
+def _configured_required_mapping(
+    section: str,
+    *,
+    key_field: str = "name",
+    value_field: str = "type",
+) -> dict[str, str] | None:
+    config, error = _load_preflight_config()
+    if error is not None or config is None:
+        return None
+
+    section_items = config.get(section, [])
+    if not isinstance(section_items, list):
+        return None
+
+    values = {}
+    for item in section_items:
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get("critical", True)):
+            continue
+        key = item.get(key_field)
+        value = item.get(value_field)
+        if key and value:
+            values[str(key)] = str(value)
+    return values
+
+
 def _configured_required_tf_links() -> list[tuple[str, str]] | None:
     config, error = _load_preflight_config()
     if error is not None or config is None:
@@ -150,6 +274,21 @@ def _configured_required_tf_links() -> list[tuple[str, str]] | None:
 def _normalize_ros_name(name: str) -> str:
     """Normalize ROS graph names so config and CLI output compare consistently."""
     return name.strip().lstrip("/")
+
+
+def _parse_typed_ros_names(output: str) -> dict[str, str]:
+    """Parse `ros2 ... list -t` output into normalized name -> type."""
+    typed_names = {}
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.endswith("]") and "[" in line:
+            name, type_text = line.rsplit("[", 1)
+            typed_names[_normalize_ros_name(name)] = type_text.rstrip("]").strip()
+        else:
+            typed_names[_normalize_ros_name(line)] = ""
+    return typed_names
 
 
 def run_cmd(cmd: list[str], timeout: int = 8) -> subprocess.CompletedProcess:
@@ -212,7 +351,9 @@ def check_path_exists(path: Path, label: str) -> CheckResult:
 
 def check_open3d_available() -> CheckResult:
     if importlib.util.find_spec("open3d"):
-        return CheckResult("PASS", "Python dependency: open3d", "Module import available")
+        return CheckResult(
+            "PASS", "Python dependency: open3d", "Module import available"
+        )
     return CheckResult(
         "WARN",
         "Python dependency: open3d",
@@ -227,7 +368,9 @@ def check_preflight_config_load() -> CheckResult:
     """
     _, error = _load_preflight_config()
     if error is None:
-        return CheckResult("PASS", "Preflight config load", f"Loaded {PREFLIGHT_CONFIG_PATH.name}")
+        return CheckResult(
+            "PASS", "Preflight config load", f"Loaded {PREFLIGHT_CONFIG_PATH.name}"
+        )
     return CheckResult(
         "FAIL",
         "Preflight config load",
@@ -313,8 +456,6 @@ def check_nav2_lifecycle() -> CheckResult:
     )
 
 
-
-
 def check_required_nodes() -> CheckResult:
     """Check required nodes.
 
@@ -377,6 +518,50 @@ def check_required_actions() -> CheckResult:
     )
 
 
+def check_required_services() -> CheckResult:
+    """Check required services.
+
+    Verify that all critical configured service servers are currently available.
+    """
+    proc = run_cmd(["ros2", "service", "list", "-t"], timeout=8)
+    if proc.returncode != 0:
+        return CheckResult(
+            "WARN",
+            "Required services",
+            "Skipped: unable to query ROS services",
+            "Run after launching navigation stack.",
+        )
+
+    required_services = _configured_required_mapping("required_services")
+    if required_services is None:
+        return _preflight_error_result("Required services")
+    required_services = {
+        _normalize_ros_name(name): service_type
+        for name, service_type in required_services.items()
+    }
+
+    seen = _parse_typed_ros_names(proc.stdout)
+    missing = sorted(set(required_services) - set(seen))
+    mismatched = sorted(
+        f"{name} expected={expected_type} got={seen[name]}"
+        for name, expected_type in required_services.items()
+        if name in seen and seen[name] and seen[name] != expected_type
+    )
+    if not missing and not mismatched:
+        return CheckResult("PASS", "Required services", "All required services found")
+    details = []
+    if missing:
+        details.append(f"Missing services: {', '.join(missing)}")
+    if mismatched:
+        details.append(f"Type mismatches: {', '.join(mismatched)}")
+    return CheckResult(
+        "WARN",
+        "Required services",
+        "; ".join(details),
+        "Check controller service startup before mission run.",
+    )
+
+
 def check_required_tf_links() -> CheckResult:
     """Check required TF links.
 
@@ -390,11 +575,15 @@ def check_required_tf_links() -> CheckResult:
     for parent, child in required_links:
         proc = run_cmd(["ros2", "run", "tf2_ros", "tf2_echo", parent, child], timeout=4)
         output = f"{proc.stdout}\n{proc.stderr}".lower()
-        if not any(token in output for token in ["translation:", "rotation:", "at time"]):
+        if not any(
+            token in output for token in ["translation:", "rotation:", "at time"]
+        ):
             missing.append(f"{parent}->{child}")
 
     if not missing:
-        return CheckResult("PASS", "Required TF links", "All required TF links resolved")
+        return CheckResult(
+            "PASS", "Required TF links", "All required TF links resolved"
+        )
     return CheckResult(
         "WARN",
         "Required TF links",
@@ -476,7 +665,8 @@ def main() -> int:
             "Nav2 config",
         ),
         lambda: check_path_exists(
-            ROOT / "src/lunabot_navigation/behavior_trees/mission_navigate_to_pose_bt.xml",
+            ROOT
+            / "src/lunabot_navigation/behavior_trees/mission_navigate_to_pose_bt.xml",
             "Mission BT XML",
         ),
         lambda: check_path_exists(
@@ -497,6 +687,7 @@ def main() -> int:
         check_required_topics,
         check_required_nodes,
         check_required_actions,
+        check_required_services,
         check_required_tf_links,
         check_nav2_lifecycle,
     ]

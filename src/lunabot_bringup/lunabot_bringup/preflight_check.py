@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -26,6 +27,7 @@ from rclpy.qos import (
 from rclpy.time import Time
 from rclpy.utilities import remove_ros_args
 from rosidl_runtime_py.utilities import get_message
+from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformListener
 
 from lunabot_bringup.preflight_profiles import (
@@ -44,9 +46,14 @@ ACTION_TYPE_MAP: dict[str, type] = {
     "lunabot_interfaces/action/Excavate": Excavate,
     "nav2_msgs/action/NavigateToPose": NavigateToPose,
 }
+SERVICE_TYPE_MAP: dict[str, type] = {
+    "std_srvs/srv/Trigger": Trigger,
+}
 
 TRUE_STRINGS = {"1", "true", "yes", "on"}
 FALSE_STRINGS = {"0", "false", "no", "off"}
+CONTRACT_ENV_VAR = "LUNABOT_INTERFACE_CONTRACT_PATH"
+CONTRACT_RELATIVE_PATH = Path(".github/contracts/interface_contracts.json")
 RELIABILITY_MAP = {
     "best_effort": QoSReliabilityPolicy.BEST_EFFORT,
     "reliable": QoSReliabilityPolicy.RELIABLE,
@@ -76,9 +83,42 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def _repo_contract_path() -> Path:
-    """Locate interface contract file when run from repo root."""
-    return Path.cwd() / ".github" / "contracts" / "interface_contracts.json"
+def _find_repo_contract(start: Path) -> Path | None:
+    """Walk up from one path and return the repository contract when present."""
+    search_root = start if start.is_dir() else start.parent
+    for parent in (search_root, *search_root.parents):
+        candidate = parent / CONTRACT_RELATIVE_PATH
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _package_contract_path() -> Path | None:
+    """Return the installed package copy of the contract when available."""
+    try:
+        share_dir = Path(get_package_share_directory("lunabot_bringup"))
+    except Exception:  # pragma: no cover - depends on sourced ROS install
+        return None
+
+    candidate = share_dir / "contracts" / "interface_contracts.json"
+    return candidate if candidate.exists() else None
+
+
+def _repo_contract_path() -> Path | None:
+    """Locate the canonical interface contract without depending on shell cwd."""
+    env_path = os.environ.get(CONTRACT_ENV_VAR, "").strip()
+    if env_path:
+        return Path(env_path).expanduser()
+
+    source_contract = _find_repo_contract(Path(__file__).resolve())
+    if source_contract is not None:
+        return source_contract
+
+    package_contract = _package_contract_path()
+    if package_contract is not None:
+        return package_contract
+
+    return _find_repo_contract(Path.cwd().resolve())
 
 
 def _parse_qos_policy(
@@ -108,15 +148,15 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         return config
 
     contract_path = _repo_contract_path()
+    if contract_path is None:
+        raise ValueError("No canonical interface contract file found")
     if not contract_path.exists():
-        logger.info("No local interface contract file found")
-        return config
+        raise ValueError(f"Interface contract file not found: {contract_path}")
 
     try:
         contract = json.loads(contract_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        logger.warning(f"Could not parse {contract_path}: {exc}")
-        return config
+        raise ValueError(f"Could not parse {contract_path}: {exc}") from exc
 
     topics = preflight.setdefault("required_topics", [])
     topic_keys = dict.fromkeys(
@@ -127,22 +167,70 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
     for item in contract.get("topics", []):
         if not isinstance(item, dict):
             continue
-        if item.get("kind") != "publisher":
+        kind = item.get("kind")
+        if kind in {"publisher", "subscription"}:
+            key = (item.get("name"), item.get("type"))
+            if key in topic_keys:
+                continue
+            topics.append(
+                {
+                    "name": item.get("name"),
+                    "type": item.get("type"),
+                    "min_messages": 1,
+                    "critical": True,
+                    "phases": item.get("phases"),
+                }
+            )
+            logger.info(f"Added contract topic check: {item.get('name')}")
+            topic_keys[key] = None
+
+    actions = preflight.setdefault("required_actions", [])
+    action_keys = dict.fromkeys(
+        (item.get("name"), item.get("type"))
+        for item in actions
+        if isinstance(item, dict)
+    )
+    for item in contract.get("topics", []):
+        if not isinstance(item, dict):
+            continue
+        if item.get("kind") not in {"action_server", "action_client"}:
             continue
         key = (item.get("name"), item.get("type"))
-        if key in topic_keys:
+        if key in action_keys:
             continue
-        topics.append(
+        actions.append(
             {
                 "name": item.get("name"),
                 "type": item.get("type"),
-                "min_messages": 1,
                 "critical": True,
                 "phases": item.get("phases"),
             }
         )
-        logger.info(f"Added contract topic check: {item.get('name')}")
-        topic_keys[key] = None
+        logger.info(f"Added contract action check: {item.get('name')}")
+        action_keys[key] = None
+
+    services = preflight.setdefault("required_services", [])
+    service_keys = dict.fromkeys(
+        (item.get("name"), item.get("type"))
+        for item in services
+        if isinstance(item, dict)
+    )
+    for item in contract.get("services", []):
+        if not isinstance(item, dict):
+            continue
+        key = (item.get("name"), item.get("type"))
+        if key in service_keys:
+            continue
+        services.append(
+            {
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "critical": True,
+                "phases": item.get("phases"),
+            }
+        )
+        logger.info(f"Added contract service check: {item.get('name')}")
+        service_keys[key] = None
 
     tf_links = preflight.setdefault("required_tf_links", [])
     tf_keys = dict.fromkeys(
@@ -455,6 +543,53 @@ class PreflightChecker(Node):
         finally:
             del listener
 
+    def _check_services(self) -> None:
+        """Check required service servers are available."""
+        preflight = self._config["preflight"]
+        required = preflight.get("required_services", [])
+        timeout_s = float(preflight.get("service_timeout_s", 5.0))
+
+        for service_cfg in required:
+            service_name = service_cfg["name"]
+            service_type_name = service_cfg["type"]
+            critical = bool(service_cfg.get("critical", True))
+            started = time.monotonic()
+
+            service_type = SERVICE_TYPE_MAP.get(service_type_name)
+            if service_type is None:
+                self._record(
+                    f"service:{service_name}",
+                    critical,
+                    False,
+                    f"unsupported service type mapping: {service_type_name}",
+                    started,
+                )
+                continue
+
+            client = self.create_client(service_type, service_name)
+            try:
+                available = client.wait_for_service(timeout_sec=timeout_s)
+            finally:
+                self.destroy_client(client)
+
+            if available:
+                self._record(
+                    f"service:{service_name}",
+                    critical,
+                    True,
+                    "server available",
+                    started,
+                )
+                continue
+
+            self._record(
+                f"service:{service_name}",
+                critical,
+                False,
+                "server unavailable within timeout",
+                started,
+            )
+
     def _check_actions(self) -> None:
         """Check required action servers are available."""
         preflight = self._config["preflight"]
@@ -543,6 +678,7 @@ class PreflightChecker(Node):
         self._check_sim_time()
         self._check_required_topics()
         self._check_tf_links()
+        self._check_services()
         self._check_actions()
         self._check_nodes()
         return self._results
@@ -632,9 +768,7 @@ def _parse_bool_text(value: str) -> bool:
         return True
     if normalised in FALSE_STRINGS:
         return False
-    raise argparse.ArgumentTypeError(
-        f"Expected a boolean value, got: {value}"
-    )
+    raise argparse.ArgumentTypeError(f"Expected a boolean value, got: {value}")
 
 
 def _strip_ros_cli_args(args: list[str] | None) -> list[str]:
