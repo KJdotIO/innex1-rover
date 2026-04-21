@@ -13,7 +13,10 @@ from typing import Any
 
 import rclpy
 import yaml
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import (
+    PackageNotFoundError,
+    get_package_share_directory,
+)
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
@@ -97,7 +100,7 @@ def _package_contract_path() -> Path | None:
     """Return the installed package copy of the contract when available."""
     try:
         share_dir = Path(get_package_share_directory("lunabot_bringup"))
-    except Exception:  # pragma: no cover - depends on sourced ROS install
+    except PackageNotFoundError:  # pragma: no cover - depends on sourced ROS install
         return None
 
     candidate = share_dir / "contracts" / "interface_contracts.json"
@@ -139,58 +142,55 @@ def _parse_qos_policy(
         ) from exc
 
 
-def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, Any]:
-    """Merge contract-defined topics and TF checks into preflight config."""
-    preflight = config.setdefault("preflight", {})
-    use_contracts = bool(preflight.get("use_interface_contracts", True))
-    if not use_contracts:
-        logger.info("Interface contract merge disabled by config")
-        return config
-
-    contract_path = _repo_contract_path()
-    if contract_path is None:
-        raise ValueError("No canonical interface contract file found")
-    if not contract_path.exists():
-        raise ValueError(f"Interface contract file not found: {contract_path}")
-
-    try:
-        contract = json.loads(contract_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"Could not parse {contract_path}: {exc}") from exc
-
-    topics = preflight.setdefault("required_topics", [])
-    topic_keys = dict.fromkeys(
-        (item.get("name"), item.get("type"))
-        for item in topics
+def _existing_keys(
+    items: list[Any],
+    fields: tuple[str, ...],
+) -> dict[tuple[Any, ...], None]:
+    """Return existing check keys for duplicate suppression."""
+    return dict.fromkeys(
+        tuple(item.get(field) for field in fields)
+        for item in items
         if isinstance(item, dict)
     )
-    for item in contract.get("topics", []):
+
+
+def _merge_contract_topics(
+    preflight: dict[str, Any],
+    contract_topics: list[Any],
+    logger,
+) -> None:
+    topics = preflight.setdefault("required_topics", [])
+    topic_keys = _existing_keys(topics, ("name", "type"))
+    for item in contract_topics:
         if not isinstance(item, dict):
             continue
         kind = item.get("kind")
-        if kind in {"publisher", "subscription"}:
-            key = (item.get("name"), item.get("type"))
-            if key in topic_keys:
-                continue
-            topics.append(
-                {
-                    "name": item.get("name"),
-                    "type": item.get("type"),
-                    "min_messages": 1,
-                    "critical": True,
-                    "phases": item.get("phases"),
-                }
-            )
-            logger.info(f"Added contract topic check: {item.get('name')}")
-            topic_keys[key] = None
+        if kind not in {"publisher", "subscription"}:
+            continue
+        key = (item.get("name"), item.get("type"))
+        if key in topic_keys:
+            continue
+        topics.append(
+            {
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "min_messages": 1,
+                "critical": True,
+                "phases": item.get("phases"),
+            }
+        )
+        logger.info(f"Added contract topic check: {item.get('name')}")
+        topic_keys[key] = None
 
+
+def _merge_contract_actions(
+    preflight: dict[str, Any],
+    contract_topics: list[Any],
+    logger,
+) -> None:
     actions = preflight.setdefault("required_actions", [])
-    action_keys = dict.fromkeys(
-        (item.get("name"), item.get("type"))
-        for item in actions
-        if isinstance(item, dict)
-    )
-    for item in contract.get("topics", []):
+    action_keys = _existing_keys(actions, ("name", "type"))
+    for item in contract_topics:
         if not isinstance(item, dict):
             continue
         if item.get("kind") not in {"action_server", "action_client"}:
@@ -209,13 +209,15 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         logger.info(f"Added contract action check: {item.get('name')}")
         action_keys[key] = None
 
+
+def _merge_contract_services(
+    preflight: dict[str, Any],
+    contract_services: list[Any],
+    logger,
+) -> None:
     services = preflight.setdefault("required_services", [])
-    service_keys = dict.fromkeys(
-        (item.get("name"), item.get("type"))
-        for item in services
-        if isinstance(item, dict)
-    )
-    for item in contract.get("services", []):
+    service_keys = _existing_keys(services, ("name", "type"))
+    for item in contract_services:
         if not isinstance(item, dict):
             continue
         key = (item.get("name"), item.get("type"))
@@ -232,13 +234,15 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         logger.info(f"Added contract service check: {item.get('name')}")
         service_keys[key] = None
 
+
+def _merge_contract_tf_links(
+    preflight: dict[str, Any],
+    contract_tf_links: list[Any],
+    logger,
+) -> None:
     tf_links = preflight.setdefault("required_tf_links", [])
-    tf_keys = dict.fromkeys(
-        (item.get("parent"), item.get("child"))
-        for item in tf_links
-        if isinstance(item, dict)
-    )
-    for item in contract.get("tf_links", []):
+    tf_keys = _existing_keys(tf_links, ("parent", "child"))
+    for item in contract_tf_links:
         if not isinstance(item, dict):
             continue
         key = (item.get("parent"), item.get("child"))
@@ -257,6 +261,40 @@ def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, An
         logger.info(f"Added contract TF check: {parent}->{child}")
         tf_keys[key] = None
 
+
+def _load_interface_contract() -> dict[str, Any]:
+    """Load the canonical interface contract JSON."""
+    contract_path = _repo_contract_path()
+    if contract_path is None:
+        raise ValueError("No canonical interface contract file found")
+    if not contract_path.exists():
+        raise ValueError(f"Interface contract file not found: {contract_path}")
+
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Could not parse {contract_path}: {exc}") from exc
+    if not isinstance(contract, dict):
+        raise ValueError(f"Invalid interface contract in {contract_path}")
+    return contract
+
+
+def _merge_contract_requirements(config: dict[str, Any], logger) -> dict[str, Any]:
+    """Merge contract-defined runtime checks into preflight config."""
+    preflight = config.setdefault("preflight", {})
+    if not bool(preflight.get("use_interface_contracts", True)):
+        logger.info("Interface contract merge disabled by config")
+        return config
+
+    contract = _load_interface_contract()
+    contract_topics = contract.get("topics", [])
+    contract_services = contract.get("services", [])
+    contract_tf_links = contract.get("tf_links", [])
+
+    _merge_contract_topics(preflight, contract_topics, logger)
+    _merge_contract_actions(preflight, contract_topics, logger)
+    _merge_contract_services(preflight, contract_services, logger)
+    _merge_contract_tf_links(preflight, contract_tf_links, logger)
     return config
 
 
