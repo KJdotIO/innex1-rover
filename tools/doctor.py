@@ -25,7 +25,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFLIGHT_CONFIG_PATH = ROOT / "src/lunabot_bringup/config/preflight_checks.yaml"
-CONTRACT_PATH = ROOT / ".github/contracts/interface_contracts.json"
+CONTRACT_ENV_VAR = "LUNABOT_INTERFACE_CONTRACT_PATH"
+CONTRACT_RELATIVE_PATH = Path(".github/contracts/interface_contracts.json")
 _PREFLIGHT_CACHE = None
 _PREFLIGHT_ERROR = None
 
@@ -71,11 +72,60 @@ def _load_preflight_config():
         return None, _PREFLIGHT_ERROR
 
 
-def _load_interface_contract() -> dict:
-    if not CONTRACT_PATH.exists():
-        raise ValueError(f"missing interface contract: {CONTRACT_PATH}")
+def _find_repo_contract(start: Path) -> Path | None:
+    search_root = start if start.is_dir() else start.parent
+    for parent in (search_root, *search_root.parents):
+        candidate = parent / CONTRACT_RELATIVE_PATH
+        if candidate.exists():
+            return candidate
+    return None
 
-    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+
+def _package_contract_path() -> Path | None:
+    try:
+        from ament_index_python.packages import (  # type: ignore[import-not-found]
+            PackageNotFoundError,
+            get_package_share_directory,
+        )
+    except ImportError:
+        return None
+
+    try:
+        share_dir = Path(get_package_share_directory("lunabot_bringup"))
+    except PackageNotFoundError:
+        return None
+
+    candidate = share_dir / "contracts" / "interface_contracts.json"
+    return candidate if candidate.exists() else None
+
+
+def _interface_contract_path() -> Path | None:
+    env_path = os.environ.get(CONTRACT_ENV_VAR, "").strip()
+    if env_path:
+        return Path(env_path).expanduser()
+
+    source_contract = _find_repo_contract(Path(__file__).resolve())
+    if source_contract is not None:
+        return source_contract
+
+    package_contract = _package_contract_path()
+    if package_contract is not None:
+        return package_contract
+
+    return _find_repo_contract(Path.cwd().resolve())
+
+
+def _load_interface_contract() -> dict:
+    contract_path = _interface_contract_path()
+    if contract_path is None:
+        raise ValueError("missing interface contract")
+    if not contract_path.is_file():
+        raise ValueError(f"interface contract is not a file: {contract_path}")
+
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"could not read interface contract: {contract_path}") from exc
     if not isinstance(contract, dict):
         raise ValueError("interface contract must be a JSON object")
     return contract
@@ -379,6 +429,27 @@ def check_preflight_config_load() -> CheckResult:
     )
 
 
+def check_interface_contract_available() -> CheckResult:
+    contract_path = _interface_contract_path()
+    try:
+        _load_interface_contract()
+    except ValueError as exc:
+        return CheckResult(
+            "FAIL",
+            "Interface contracts JSON",
+            str(exc),
+            "Set LUNABOT_INTERFACE_CONTRACT_PATH or install/source lunabot_bringup.",
+        )
+    if contract_path is not None:
+        return CheckResult("PASS", "Interface contracts JSON", str(contract_path))
+    return CheckResult(
+        "FAIL",
+        "Interface contracts JSON",
+        "No interface contract found",
+        "Set LUNABOT_INTERFACE_CONTRACT_PATH or install/source lunabot_bringup.",
+    )
+
+
 def check_ros_graph_available() -> CheckResult:
     proc = run_cmd(["ros2", "topic", "list"], timeout=8)
     if proc.returncode == 0:
@@ -674,10 +745,7 @@ def main() -> int:
             "Preflight config",
         ),
         check_preflight_config_load,
-        lambda: check_path_exists(
-            ROOT / ".github/contracts/interface_contracts.json",
-            "Interface contracts JSON",
-        ),
+        check_interface_contract_available,
         check_open3d_available,
     ]
 
