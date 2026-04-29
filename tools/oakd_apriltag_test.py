@@ -311,6 +311,7 @@ def _base_row(
 def _run_loop(queues: Queues, camera: CameraModel, args: argparse.Namespace) -> None:
     if cv2 is None and args.display:
         raise RuntimeError("--display requires opencv-python")
+    cv = cv2
 
     detector = Detector(
         families=args.tag_family,
@@ -437,29 +438,34 @@ def _run_loop(queues: Queues, camera: CameraModel, args: argparse.Namespace) -> 
                     last_print = now
 
                 if args.display:
+                    if cv is None:
+                        raise RuntimeError("--display requires opencv-python")
                     corners = detection.corners.astype(int)
                     for index in range(4):
-                        cv2.line(frame, tuple(corners[index]), tuple(corners[(index + 1) % 4]), (0, 255, 0), 2)
+                        cv.line(frame, tuple(corners[index]), tuple(corners[(index + 1) % 4]), (0, 255, 0), 2)
                     center = tuple(detection.center.astype(int))
-                    cv2.circle(frame, center, 5, (0, 255, 0), 2)
-                    cv2.putText(frame, str(detection.tag_id), center, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    cv.circle(frame, center, 5, (0, 255, 0), 2)
+                    cv.putText(frame, str(detection.tag_id), center, cv.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
             if csv_writer is not None:
                 for row in rows:
                     csv_writer.writerow(row)
-                csv_handle.flush()
+                if csv_handle is not None:
+                    csv_handle.flush()
                 state.event = ""
 
             if args.display:
+                if cv is None:
+                    raise RuntimeError("--display requires opencv-python")
                 _draw_text_panel(frame, panel)
                 display = frame
                 if show_depth and last_depth is not None:
-                    norm = cv2.normalize(last_depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-                    depth_color = cv2.applyColorMap(norm, cv2.COLORMAP_TURBO)
-                    depth_color = cv2.resize(depth_color, (frame.shape[1], frame.shape[0]))
+                    norm = cv.normalize(last_depth, None, 0, 255, cv.NORM_MINMAX).astype(np.uint8)
+                    depth_color = cv.applyColorMap(norm, cv.COLORMAP_TURBO)
+                    depth_color = cv.resize(depth_color, (frame.shape[1], frame.shape[0]))
                     display = np.hstack([frame, depth_color])
-                cv2.imshow("OAK-D AprilTag telemetry", display)
-                key = cv2.waitKey(1) & 0xFF
+                cv.imshow("OAK-D AprilTag telemetry", display)
+                key = cv.waitKey(1) & 0xFF
                 if key in (27, ord("q")):
                     return
                 if key == ord("d"):
