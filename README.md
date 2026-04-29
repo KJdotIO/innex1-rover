@@ -168,7 +168,11 @@ Interface contract checks run in CI via `.github/scripts/check_interface_contrac
 Contract source of truth:
 - `.github/contracts/interface_contracts.json`
 
-If you rename a topic, action, or TF link, update the contract JSON in the same PR.
+The contract is versioned in that JSON file and installed with `lunabot_bringup`
+so runtime preflight can load the same definition from any shell cwd. Entries in
+`source_policies` with `strict_interfaces: true` are allowlisted: adding,
+removing, renaming, or retyping a mission-critical topic, action, service, or TF
+link in those sources requires updating the contract JSON in the same PR.
 
 ## Deeper docs
 

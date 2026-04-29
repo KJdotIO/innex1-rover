@@ -9,6 +9,7 @@ CHECK_SECTIONS = (
     "required_topics",
     "required_tf_links",
     "required_actions",
+    "required_services",
     "required_nodes",
 )
 PHASE_FULL = "full"
@@ -55,7 +56,5 @@ def filter_preflight_config(config: dict[str, Any], phase: str) -> dict[str, Any
         entries = preflight.get(section, [])
         if not isinstance(entries, list):
             continue
-        preflight[section] = [
-            entry for entry in entries if phase_matches(entry, phase)
-        ]
+        preflight[section] = [entry for entry in entries if phase_matches(entry, phase)]
     return filtered

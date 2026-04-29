@@ -9,6 +9,7 @@ preflight:
   topic_message_timeout_s: 5.0
   tf_timeout_s: 5.0
   action_timeout_s: 5.0
+  service_timeout_s: 5.0
   node_timeout_s: 5.0
 
   required_topics:
@@ -78,6 +79,8 @@ preflight:
       type: nav2_msgs/action/NavigateToPose
       critical: true
       phases: [runtime]
+
+  required_services: []
 
   required_nodes:
     - name: apriltag

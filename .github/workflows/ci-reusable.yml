@@ -53,6 +53,7 @@ jobs:
         run: |
           python .github/scripts/run_preflight_checks.py
           python .github/scripts/check_interface_contracts.py
+          python .github/scripts/test_check_interface_contracts.py
           python .github/scripts/test_select_ci_packages.py
         shell: bash
 
@@ -140,7 +141,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
-  build-and-test:
+  ros-build-and-test:
     needs:
       - preflight
       - resolve-build-image

@@ -6,6 +6,7 @@ from setuptools import find_packages, setup
 
 package_name = "lunabot_bringup"
 package_root = Path(__file__).resolve().parent
+interface_contract_path = Path("contracts") / "interface_contracts.json"
 
 setup(
     name=package_name,
@@ -30,6 +31,10 @@ setup(
                 str(path.relative_to(package_root))
                 for path in package_root.joinpath("config").glob("*.yaml")
             ],
+        ),
+        (
+            f"share/{package_name}/contracts",
+            [str(interface_contract_path)],
         ),
         (
             f"share/{package_name}/rviz",

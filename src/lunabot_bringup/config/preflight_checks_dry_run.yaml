@@ -10,6 +10,7 @@ preflight:
   topic_discovery_timeout_s: 30.0
   tf_timeout_s: 10.0
   action_timeout_s: 30.0
+  service_timeout_s: 30.0
   node_timeout_s: 30.0
 
   required_topics:
@@ -97,6 +98,8 @@ preflight:
       type: lunabot_interfaces/action/Deposit
       critical: true
       phases: [runtime]
+
+  required_services: []
 
   required_nodes:
     - name: apriltag
