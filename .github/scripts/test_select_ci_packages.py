@@ -20,14 +20,8 @@ class SelectionLike(Protocol):
 
 
 class SelectorModule(Protocol):
-    def _discover_packages(self) -> tuple[dict[str, str], dict[str, set[str]]]: ...
     def requires_ros_ci(self, changed_files: list[str]) -> bool: ...
-    def _select(
-        self,
-        changed_files: list[str],
-        package_roots: dict[str, str],
-        dependencies: dict[str, set[str]],
-    ) -> SelectionLike: ...
+    def _select(self, changed_files: list[str]) -> SelectionLike: ...
     def _git_changed_files(self, base_sha: str, head_sha: str) -> list[str]: ...
     def main(self) -> int: ...
 
@@ -44,7 +38,6 @@ def _load_selector_module() -> SelectorModule:
 
 def main() -> int:
     selector = _load_selector_module()
-    package_roots, dependencies = selector._discover_packages()
 
     ros_ci_scenarios = {
         "docs_only_skips_ros_ci": (["README.md"], False),
@@ -52,7 +45,7 @@ def main() -> int:
             ["src/lunabot_teleop/config/xbox_teleop.yaml"],
             True,
         ),
-        "workflow_change_needs_ros_ci": ([".github/workflows/ci.yml"], True),
+        "workflow_change_skips_ros_ci": ([".github/workflows/ci.yml"], False),
         "empty_diff_forces_ros_ci": ([], True),
     }
 
@@ -61,16 +54,13 @@ def main() -> int:
             [],
             ("full", ()),
         ),
-        "excavation_safe_leaf": (
+        "excavation_change_forces_full": (
             ["src/lunabot_excavation/lunabot_excavation/excavation_controller.py"],
-            (
-                "packages",
-                ("lunabot_bringup", "lunabot_control", "lunabot_excavation"),
-            ),
+            ("full", ()),
         ),
-        "leaf_package": (
+        "leaf_package_forces_full": (
             ["src/lunabot_teleop/config/xbox_teleop.yaml"],
-            ("packages", ("lunabot_bringup", "lunabot_teleop")),
+            ("full", ()),
         ),
         "interfaces_force_full": (
             ["src/lunabot_interfaces/msg/ExcavationStatus.msg"],
@@ -84,13 +74,9 @@ def main() -> int:
             ["src/external/leo_common-ros2/leo_teleop/config/joy_config.yaml"],
             ("full", ()),
         ),
-        "localisation_force_full": (
-            ["src/lunabot_localisation/launch/localisation.launch.py"],
-            ("full", ()),
-        ),
-        "description_force_full": (
-            ["src/lunabot_description/urdf/lunabot.urdf.xacro"],
-            ("full", ()),
+        "top_level_file_skips_ros_build": (
+            ["pyproject.toml"],
+            ("skip", ()),
         ),
     }
 
@@ -101,7 +87,7 @@ def main() -> int:
             failures.append(f"{name}: expected {expected}, got {actual}")
 
     for name, (changed_files, expected) in scenarios.items():
-        selection = selector._select(changed_files, package_roots, dependencies)
+        selection = selector._select(changed_files)
         actual = (selection.mode, selection.packages)
         if actual != expected:
             failures.append(
