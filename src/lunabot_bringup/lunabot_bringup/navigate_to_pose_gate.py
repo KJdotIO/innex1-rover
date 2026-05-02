@@ -11,8 +11,14 @@ from rclpy.action import ActionClient, ActionServer, CancelResponse, GoalRespons
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
+from std_msgs.msg import String
 
-from lunabot_bringup.localisation_readiness import is_localisation_ready
+from lunabot_bringup.localisation_readiness import (
+    GATE_NO_STATUS,
+    get_readiness_failure_reason,
+    is_localisation_ready,
+)
 from lunabot_interfaces.msg import LocalisationStartZoneStatus
 
 
@@ -51,6 +57,16 @@ class NavigateToPoseGate(Node):
 
         self._latest_status = None
         self._callback_group = ReentrantCallbackGroup()
+
+        latched_qos = QoSProfile(
+            depth=1,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self._failure_reason_pub = self.create_publisher(
+            String,
+            "/mission/last_failure_reason",
+            latched_qos,
+        )
 
         self.create_subscription(
             LocalisationStartZoneStatus,
@@ -103,10 +119,20 @@ class NavigateToPoseGate(Node):
     def _on_goal(self, _goal) -> GoalResponse:
         """Accept travel goals only when localisation is ready and Nav2 is up."""
         if not self._ready_for_travel():
+            reason = GATE_NO_STATUS
+            if self.gate_enabled:
+                now_ns = self.get_clock().now().nanoseconds
+                failure = get_readiness_failure_reason(
+                    self._latest_status,
+                    now_ns,
+                    self.readiness_timeout_ns,
+                )
+                if failure is not None:
+                    reason = failure
             self.get_logger().warn(
-                "Rejecting NavigateToPose goal because start-zone localisation "
-                "is not ready."
+                f"Rejecting NavigateToPose goal: {reason}"
             )
+            self._failure_reason_pub.publish(String(data=reason))
             return GoalResponse.REJECT
 
         return GoalResponse.ACCEPT
