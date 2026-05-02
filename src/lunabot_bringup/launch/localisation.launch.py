@@ -22,6 +22,7 @@ def generate_launch_description():
     Includes the master localisation launch from lunabot_localisation.
     """
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
+    competition_safe_localisation = LaunchConfiguration("competition_safe_localisation")
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
@@ -32,6 +33,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             "lidar_costmap_phase": lidar_costmap_phase,
+            "competition_safe_localisation": competition_safe_localisation,
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
@@ -44,6 +46,13 @@ def generate_launch_description():
                 "lidar_costmap_phase",
                 default_value="false",
                 description="Use odom-only debug localisation with an identity map->odom TF.",
+            ),
+            DeclareLaunchArgument(
+                "competition_safe_localisation",
+                default_value="false",
+                description=(
+                    "Forward to lunabot_localisation: UK wall-safe stack (no RTAB-Map)."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_visual_slam",

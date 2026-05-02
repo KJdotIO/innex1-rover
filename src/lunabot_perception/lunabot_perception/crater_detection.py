@@ -59,6 +59,7 @@ class CraterDetectionNode(Node):
         # Fixed ground Z for competition arenas with known flat floor
         # Set to NaN to use automatic percentile-based estimation
         self.declare_parameter("fixed_ground_z", float("nan"))
+        self.declare_parameter("points_topic", "/camera_front/points")
 
         # --- Read parameters ---
         self.resolution = self.get_parameter("grid_resolution").value
@@ -73,6 +74,9 @@ class CraterDetectionNode(Node):
         self.inflation_cells = self.get_parameter("inflation_cells").value
         self.decay = self.get_parameter("accumulator_decay").value
         self.fixed_ground_z = self.get_parameter("fixed_ground_z").value
+        self.points_topic = str(self.get_parameter("points_topic").value)
+        if not self.points_topic.startswith("/"):
+            raise ValueError("points_topic must be an absolute topic name")
 
         if self.resolution <= 0.0:
             raise ValueError("grid_resolution must be > 0")
@@ -105,7 +109,7 @@ class CraterDetectionNode(Node):
         # --- Subscriber ---
         self.create_subscription(
             PointCloud2,
-            "/camera_front/points",
+            self.points_topic,
             self._cloud_callback,
             qos_profile_sensor_data,
         )
