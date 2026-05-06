@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Sabertooth 2x32 Packetized Serial protocol driver."""
+"""Sabertooth 2x32 serial protocol helpers."""
 
 from __future__ import annotations
 
@@ -27,6 +27,16 @@ _CMD_M1_FORWARD = 0
 _CMD_M1_REVERSE = 1
 _CMD_M2_FORWARD = 4
 _CMD_M2_REVERSE = 5
+
+
+def _throttle_to_simplified_byte(
+    throttle: float, reverse: int, stop: int, forward: int
+) -> int:
+    """Convert a throttle value to one Legacy Simplified Serial byte."""
+    clamped = max(-1.0, min(1.0, throttle))
+    if clamped >= 0.0:
+        return int(round(stop + clamped * (forward - stop)))
+    return int(round(stop + abs(clamped) * (reverse - stop)))
 
 
 def _pack_command(address: int, command: int, data: int) -> bytes:
@@ -54,6 +64,32 @@ def throttle_to_bytes(
         cmd = fwd_cmd if clamped >= 0.0 else rev_cmd
         frames.extend(_pack_command(address, cmd, data))
     return bytes(frames)
+
+
+def simplified_throttle_to_bytes(
+    m1_throttle: float, m2_throttle: float
+) -> bytes:
+    """Convert two throttles to Sabertooth Legacy Simplified Serial bytes."""
+    return bytes(
+        [
+            _throttle_to_simplified_byte(m1_throttle, 1, 64, 127),
+            _throttle_to_simplified_byte(m2_throttle, 128, 192, 255),
+        ]
+    )
+
+
+def send_simplified_stop(port: serial.Serial) -> None:
+    """Send a full stop using Legacy Simplified Serial."""
+    port.write(simplified_throttle_to_bytes(0.0, 0.0))
+
+
+def send_simplified_throttle(
+    port: serial.Serial,
+    m1_throttle: float,
+    m2_throttle: float,
+) -> None:
+    """Send two motor throttles using Legacy Simplified Serial."""
+    port.write(simplified_throttle_to_bytes(m1_throttle, m2_throttle))
 
 
 def send_stop(port: serial.Serial, address: int) -> None:

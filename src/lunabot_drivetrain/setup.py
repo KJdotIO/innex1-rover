@@ -1,8 +1,11 @@
 """Package configuration for lunabot_drivetrain."""
 
+from pathlib import Path
+
 from setuptools import find_packages, setup
 
 package_name = "lunabot_drivetrain"
+package_root = Path(__file__).resolve().parent
 
 setup(
     name=package_name,
@@ -16,7 +19,17 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         (
             "share/" + package_name + "/config",
-            ["config/drivetrain.yaml"],
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("config").glob("*.yaml")
+            ],
+        ),
+        (
+            "share/" + package_name + "/launch",
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("launch").glob("*.launch.py")
+            ],
         ),
     ],
     install_requires=["setuptools"],

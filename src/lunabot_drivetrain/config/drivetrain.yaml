@@ -1,7 +1,7 @@
 # Drivetrain bridge configuration for the INNEX-1 rover.
 #
 # Hardware: 4x GR-WM4-V4 brushed DC motors driven by 2x Sabertooth 2x32
-# motor controllers via Packetized Serial (one UART, addresses 128 and 129).
+# motor controllers via Legacy Simplified Serial at 9600 baud.
 # Feedback: Hall-sensor quadrature encoders on Jetson GPIO pins.
 #
 # Wheel order: [FL, FR, RL, RR]
@@ -12,8 +12,13 @@ drivetrain_bridge:
     serial_port: "/dev/ttyTHS1"
     baud_rate: 9600
 
-    # Sabertooth Packetized Serial addresses (DIP-switch configured).
-    # Controller 0 drives FL + FR, controller 1 drives RL + RR.
+    # The CDR calls this Simplified Serial. In the Sabertooth 2x32 manual this
+    # byte protocol is Legacy Simplified Serial: Jetson UART TX to S1, with
+    # Jetson and Sabertooth sharing a logic ground.
+    # Use "packetized" only if the Sabertooths are set for Packet Serial.
+    serial_protocol: "legacy_simplified"
+
+    # Packet Serial addresses. Used only when serial_protocol is "packetized".
     sabertooth_addresses: [128, 129]
 
     # --- Kinematics ---
@@ -27,7 +32,7 @@ drivetrain_bridge:
     encoder_counts_per_rev: 720
     # Jetson GPIO pin numbers for encoder channels [A, B] per wheel.
     # [FL_A, FL_B, FR_A, FR_B, RL_A, RL_B, RR_A, RR_B]
-    # Placeholder pins — update to match the actual PCB wiring.
+    # Placeholder pins. Update to match the actual PCB wiring.
     encoder_gpio_pins: [7, 11, 13, 15, 29, 31, 33, 35]
 
     # --- Safety ---

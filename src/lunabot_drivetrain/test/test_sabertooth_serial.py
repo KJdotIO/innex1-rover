@@ -12,15 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the Sabertooth Packetized Serial encoder."""
+"""Unit tests for the Sabertooth serial encoders."""
+
+import sys
+import types
 
 import pytest
 
-from lunabot_drivetrain.sabertooth_serial import _pack_command, throttle_to_bytes
+import lunabot_drivetrain.sabertooth_serial as sabertooth_serial
+from lunabot_drivetrain.sabertooth_serial import (
+    _pack_command,
+    simplified_throttle_to_bytes,
+    throttle_to_bytes,
+)
+
+try:
+    from lunabot_interfaces.msg import DrivetrainStatus, DrivetrainTelemetry
+except ModuleNotFoundError:
+    fake_msg = types.ModuleType("lunabot_interfaces.msg")
+
+    class DrivetrainStatus:
+        STATE_UNINITIALISED = 0
+        STATE_READY = 1
+        STATE_DRIVING = 2
+        STATE_FAULT = 3
+        STATE_ESTOP = 4
+        FAULT_NONE = 0
+        FAULT_CONTROLLER_OFFLINE = 2
+        FAULT_ENCODER_STALL = 3
+
+    class DrivetrainTelemetry:
+        pass
+
+    fake_msg.DrivetrainStatus = DrivetrainStatus
+    fake_msg.DrivetrainTelemetry = DrivetrainTelemetry
+    sys.modules.setdefault("lunabot_interfaces", types.ModuleType("lunabot_interfaces"))
+    sys.modules["lunabot_interfaces.msg"] = fake_msg
 
 
 class TestPackCommand:
-    """Verify the four-byte Packetized Serial frame encoding."""
+    """Verify the four-byte Packet Serial frame encoding."""
 
     def test_checksum_calculation(self):
         frame = _pack_command(128, 0, 64)
@@ -92,6 +123,22 @@ class TestThrottleToBytes:
             assert cksum == (addr + cmd + data) & 0x7F
 
 
+class TestSimplifiedThrottleToBytes:
+    """Verify Sabertooth Legacy Simplified Serial byte encoding."""
+
+    def test_stop(self):
+        assert simplified_throttle_to_bytes(0.0, 0.0) == bytes([64, 192])
+
+    def test_full_forward_both_motors(self):
+        assert simplified_throttle_to_bytes(1.0, 1.0) == bytes([127, 255])
+
+    def test_full_reverse_both_motors(self):
+        assert simplified_throttle_to_bytes(-1.0, -1.0) == bytes([1, 128])
+
+    def test_half_throttle(self):
+        assert simplified_throttle_to_bytes(0.5, -0.5) == bytes([96, 160])
+
+
 class TestDrivetrainBridgeTwistConversion:
     """Verify the differential drive kinematics (twist → wheel throttles)."""
 
@@ -127,3 +174,97 @@ class TestDrivetrainBridgeTwistConversion:
         left, right = bridge._twist_to_wheel_speeds(10.0, 0.0)
         assert abs(left) <= 0.5
         assert abs(right) <= 0.5
+
+
+class TestDrivetrainBridgeSerialDispatch:
+    """Verify the bridge chooses the configured Sabertooth protocol."""
+
+    def _make_bridge(self, protocol):
+        from lunabot_drivetrain.drivetrain_bridge import DrivetrainBridge
+
+        bridge = object.__new__(DrivetrainBridge)
+        bridge._serial = object()
+        bridge._serial_protocol = protocol
+        bridge._addresses = [128, 129]
+        return bridge
+
+    def test_legacy_simplified_throttle_path(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_throttle",
+            lambda port, left, right: calls.append((port, left, right)),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_throttle",
+            lambda *args: pytest.fail(f"unexpected packet call: {args}"),
+        )
+
+        bridge = self._make_bridge("legacy_simplified")
+        bridge._send_wheel_throttles(0.2, -0.1)
+
+        assert calls == [(bridge._serial, 0.2, -0.1)]
+
+    def test_packetized_throttle_path(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_throttle",
+            lambda *args: pytest.fail(f"unexpected simplified call: {args}"),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_throttle",
+            lambda port, address, left, right: calls.append(
+                (port, address, left, right)
+            ),
+        )
+
+        bridge = self._make_bridge("packetized")
+        bridge._send_wheel_throttles(0.2, -0.1)
+
+        assert calls == [
+            (bridge._serial, 128, 0.2, -0.1),
+            (bridge._serial, 129, 0.2, -0.1),
+        ]
+
+    def test_legacy_simplified_stop_path(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_stop",
+            lambda port: calls.append(port),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_stop",
+            lambda *args: pytest.fail(f"unexpected packet stop: {args}"),
+        )
+
+        bridge = self._make_bridge("simplified")
+        bridge._send_stop()
+
+        assert calls == [bridge._serial]
+
+    def test_packetized_stop_path(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_stop",
+            lambda *args: pytest.fail(f"unexpected simplified stop: {args}"),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_stop",
+            lambda port, address: calls.append((port, address)),
+        )
+
+        bridge = self._make_bridge("packet_serial")
+        bridge._send_stop()
+
+        assert calls == [(bridge._serial, 128), (bridge._serial, 129)]
