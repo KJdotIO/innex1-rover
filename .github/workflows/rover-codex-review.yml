@@ -122,7 +122,10 @@ jobs:
           output-schema-file: .github/codex/schemas/rover-review.schema.json
           codex-home: ${{ runner.temp }}/rover-codex-home
           sandbox: read-only
-          safety-strategy: drop-sudo
+          # This job runs only on our trusted self-hosted runner. `drop-sudo`
+          # prompts for an admin password on macOS runners, which makes the job
+          # hang, so we rely on Codex's read-only sandbox instead.
+          safety-strategy: unsafe
           model: rover-review
           effort: high
 
