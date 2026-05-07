@@ -176,6 +176,7 @@ jobs:
             rosdep init
           fi
           rosdep update --rosdistro humble
+          apt-get update
           if [ "$SELECTION_MODE" = "packages" ] && [ -n "${SELECTED_PACKAGE_ROOTS:-}" ]; then
             read -r -a selected_package_roots <<<"$SELECTED_PACKAGE_ROOTS"
             rosdep install --from-paths "${selected_package_roots[@]}" -y --ignore-src

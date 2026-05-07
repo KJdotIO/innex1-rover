@@ -46,6 +46,9 @@ _INHIBIT_QOS = QoSProfile(
 )
 
 _WHEEL_NAMES = ["wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]
+_LEGACY_SIMPLIFIED_PROTOCOLS = {"simplified", "legacy_simplified"}
+_PACKETIZED_PROTOCOLS = {"packetized", "packet_serial"}
+_SUPPORTED_PROTOCOLS = _LEGACY_SIMPLIFIED_PROTOCOLS | _PACKETIZED_PROTOCOLS
 
 
 class DrivetrainBridge(Node):
@@ -62,6 +65,7 @@ class DrivetrainBridge(Node):
         self.get_logger().info(
             f"Drivetrain bridge started — "
             f"port={self._serial_port}, "
+            f"protocol={self._serial_protocol}, "
             f"addresses={self._addresses}"
         )
 
@@ -69,6 +73,7 @@ class DrivetrainBridge(Node):
         """Declare all node parameters with defaults."""
         self.declare_parameter("serial_port", "/dev/ttyTHS1")
         self.declare_parameter("baud_rate", 9600)
+        self.declare_parameter("serial_protocol", "legacy_simplified")
         self.declare_parameter("sabertooth_addresses", [128, 129])
         self.declare_parameter("track_width_m", 0.44)
         self.declare_parameter("wheel_radius_m", 0.065)
@@ -85,6 +90,9 @@ class DrivetrainBridge(Node):
         """Read and validate all parameters.  Fail fast on invalid config."""
         self._serial_port = self.get_parameter("serial_port").value
         self._baud_rate = self.get_parameter("baud_rate").value
+        self._serial_protocol = str(
+            self.get_parameter("serial_protocol").value
+        ).strip().lower()
         self._addresses = list(
             self.get_parameter("sabertooth_addresses").value
         )
@@ -109,9 +117,19 @@ class DrivetrainBridge(Node):
         ctrl_hz = self.get_parameter("control_loop_hz").value
         self._telem_hz = self.get_parameter("telemetry_publish_hz").value
 
+        if not str(self._serial_port).strip():
+            raise ValueError("serial_port must not be empty")
+        if self._baud_rate <= 0:
+            raise ValueError(f"baud_rate must be positive: {self._baud_rate}")
         if len(self._addresses) != 2:
             raise ValueError(
                 f"Expected 2 Sabertooth addresses, got {len(self._addresses)}"
+            )
+        if self._serial_protocol not in _SUPPORTED_PROTOCOLS:
+            raise ValueError(
+                "serial_protocol must be one of "
+                f"{sorted(_SUPPORTED_PROTOCOLS)}, "
+                f"got {self._serial_protocol!r}"
             )
         if self._track_width <= 0.0:
             raise ValueError(
@@ -132,6 +150,30 @@ class DrivetrainBridge(Node):
             raise ValueError(
                 f"max_throttle must be in (0, 1]: "
                 f"{self._max_throttle}"
+            )
+        if self._cmd_timeout <= 0.0:
+            raise ValueError(
+                f"command_timeout_s must be positive: {self._cmd_timeout}"
+            )
+        if self._stall_thresh < 0.0:
+            raise ValueError(
+                "stall_throttle_threshold must be zero or positive: "
+                f"{self._stall_thresh}"
+            )
+        if self._stall_min_vel < 0.0:
+            raise ValueError(
+                "stall_min_velocity_rps must be zero or positive: "
+                f"{self._stall_min_vel}"
+            )
+        if self._stall_timeout <= 0.0:
+            raise ValueError(
+                f"stall_timeout_s must be positive: {self._stall_timeout}"
+            )
+        if ctrl_hz <= 0.0:
+            raise ValueError(f"control_loop_hz must be positive: {ctrl_hz}")
+        if self._telem_hz <= 0.0:
+            raise ValueError(
+                f"telemetry_publish_hz must be positive: {self._telem_hz}"
             )
 
         self._control_period = 1.0 / ctrl_hz
@@ -339,7 +381,13 @@ class DrivetrainBridge(Node):
         if self._serial is None:
             return
         try:
-            from lunabot_drivetrain.sabertooth_serial import send_throttle
+            from lunabot_drivetrain.sabertooth_serial import (
+                send_simplified_throttle,
+                send_throttle,
+            )
+            if self._serial_protocol in _LEGACY_SIMPLIFIED_PROTOCOLS:
+                send_simplified_throttle(self._serial, left, right)
+                return
             send_throttle(self._serial, self._addresses[0], left, right)
             send_throttle(self._serial, self._addresses[1], left, right)
         except Exception as exc:
@@ -352,7 +400,13 @@ class DrivetrainBridge(Node):
         if self._serial is None:
             return
         try:
-            from lunabot_drivetrain.sabertooth_serial import send_stop
+            from lunabot_drivetrain.sabertooth_serial import (
+                send_simplified_stop,
+                send_stop,
+            )
+            if self._serial_protocol in _LEGACY_SIMPLIFIED_PROTOCOLS:
+                send_simplified_stop(self._serial)
+                return
             for addr in self._addresses:
                 send_stop(self._serial, addr)
         except Exception as exc:

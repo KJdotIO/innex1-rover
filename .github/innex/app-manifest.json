@@ -1,0 +1,20 @@
+{
+  "name": "Innex1 Reviewer",
+  "description": "Nexy reviews INNEX1 rover pull requests. Trigger with /innex, check state with /innex status, see commands with /innex help, and force a fresh same-commit pass with /innex force review.",
+  "url": "https://github.com/KJdotIO/innex1-rover",
+  "redirect_url": "https://github.com/KJdotIO/innex1-rover",
+  "hook_attributes": {
+    "url": "https://github.com/KJdotIO/innex1-rover",
+    "active": false
+  },
+  "public": false,
+  "default_permissions": {
+    "contents": "read",
+    "issues": "write",
+    "pull_requests": "write"
+  },
+  "default_events": [
+    "issue_comment",
+    "pull_request"
+  ]
+}

@@ -1,0 +1,315 @@
+name: Nexy Review
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+      dry_run:
+        description: Print the GitHub review payload instead of posting it
+        required: false
+        default: "false"
+
+concurrency:
+  group: innex-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: >-
+    ${{
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.actor != 'innex1-reviewer[bot]' &&
+        contains(github.event.comment.body, '/innex status') == false &&
+        contains(github.event.comment.body, '/innex help') == false
+      )
+    }}
+
+jobs:
+  review:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '/innex') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      )
+    runs-on: [self-hosted]
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    env:
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
+      INNEX_APP_CONFIGURED: ${{ secrets.INNEX_APP_ID != '' && secrets.INNEX_APP_PRIVATE_KEY != '' }}
+
+    steps:
+      - name: Resolve pull request
+        id: pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            pr_number="${{ inputs.pr_number }}"
+          else
+            pr_number="${{ github.event.issue.number }}"
+          fi
+
+          echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout trusted automation
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: automation
+          persist-credentials: false
+
+      - name: Checkout pull request merge
+        uses: actions/checkout@v6
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.number }}/merge
+          path: review-target
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mark workspace as safe
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/automation"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/review-target"
+
+      - name: Checkout project wiki
+        uses: actions/checkout@v6
+        continue-on-error: true
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: review-target/wiki
+          token: ${{ github.token }}
+          persist-credentials: false
+
+      - name: Prepare review context
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" > review-target/codex-pr.json
+          gh pr diff "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" > review-target/codex-pr.diff
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}/reviews?per_page=100" > review-target/codex-pr-reviews.json
+          python3 - <<'PY'
+          import json
+          import os
+          import secrets
+          from pathlib import Path
+
+          pr = json.load(open("review-target/codex-pr.json", encoding="utf-8"))
+
+          def write_env(name: str, value: str) -> None:
+              marker = f"EOF_{secrets.token_hex(8)}"
+              with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+                  handle.write(f"{name}<<{marker}\n{value}\n{marker}\n")
+
+          write_env("PR_NUMBER", str(pr["number"]))
+          write_env("PR_TITLE", pr.get("title") or "")
+          write_env("PR_BODY", pr.get("body") or "")
+          write_env("PR_BASE_REF", pr["base"]["ref"])
+          write_env("PR_HEAD_REF", pr["head"]["ref"])
+          write_env("PR_BASE_SHA", pr["base"]["sha"])
+          write_env("PR_HEAD_SHA", pr["head"]["sha"])
+          write_env("PR_DIFF_FILE", "codex-pr.diff")
+          write_env("REVIEW_REQUEST_BODY", os.environ.get("REVIEW_REQUEST_BODY", ""))
+
+          reviews = json.load(open("review-target/codex-pr-reviews.json", encoding="utf-8"))
+          innex_reviews = [
+              review for review in reviews
+              if "<!-- codex-rover-review -->" in (review.get("body") or "")
+          ][-8:]
+          lines = [
+              "# Previous Nexy Reviews",
+              "",
+              "Use this to avoid drip-feed re-reviews. Verify previous blockers first; do not re-report addressed findings.",
+          ]
+          if not innex_reviews:
+              lines.append("\nNo previous Nexy reviews were found for this PR.")
+          for review in innex_reviews:
+              lines.extend([
+                  "",
+                  f"## Review {review.get('id')} - {review.get('state')} - {review.get('submitted_at')}",
+                  (review.get("body") or "").strip(),
+              ])
+          Path("review-target/codex-review-history.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Detect Nexy request intent
+        id: intent
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 automation/scripts/detect_innex_review_intent.py \
+            --reviews review-target/codex-pr-reviews.json \
+            --head-sha "${PR_HEAD_SHA}" \
+            --comment "${REVIEW_REQUEST_BODY}"
+
+      - name: Create Nexy app token
+        id: app-token
+        if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.INNEX_APP_ID }}
+          private-key: ${{ secrets.INNEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: innex1-rover
+
+      - name: React to Nexy request
+        if: ${{ github.event_name == 'issue_comment' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+            --method POST \
+            --field content=eyes >/dev/null || true
+
+      - name: Post Nexy status
+        if: ${{ steps.intent.outputs.status == 'true' || steps.intent.outputs.help == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          LATEST_REVIEW_STATE: ${{ steps.intent.outputs.latest_review_state }}
+          LATEST_REVIEW_AUTHOR: ${{ steps.intent.outputs.latest_review_author }}
+          LATEST_REVIEW_SUBMITTED_AT: ${{ steps.intent.outputs.latest_review_submitted_at }}
+          LATEST_REVIEW_COMMIT_SHORT: ${{ steps.intent.outputs.latest_review_commit_short }}
+          HEAD_SHA_SHORT: ${{ steps.intent.outputs.head_sha_short }}
+        run: |
+          set -euo pipefail
+          mode="status"
+          if [ "${{ steps.intent.outputs.help }}" = "true" ]; then
+            mode="help"
+          fi
+          python3 automation/scripts/post_innex_review_status.py --mode "${mode}"
+
+      - name: Skip duplicate Nexy review
+        if: ${{ steps.intent.outputs.already_reviewed == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA_SHORT: ${{ steps.intent.outputs.head_sha_short }}
+        run: |
+          set -euo pipefail
+          python3 automation/scripts/post_innex_review_status.py --mode already-reviewed
+
+      - name: Prepare Codex home
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.help != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
+        shell: bash
+        run: |
+          rm -rf "${RUNNER_TEMP}/rover-codex-home"
+          mkdir -p "${RUNNER_TEMP}/rover-codex-home"
+          cp automation/.github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
+
+      - name: Run Codex rover review
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.help != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
+        shell: bash
+        env:
+          LITELLM_REVIEW_KEY: ${{ secrets.LITELLM_REVIEW_KEY }}
+          CODEX_RESPONSES_API_ENDPOINT: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
+        run: |
+          set -euo pipefail
+
+          command -v codex >/dev/null
+
+          server_info="${RUNNER_TEMP}/rover-codex-proxy.json"
+          rm -f "${server_info}"
+
+          cleanup_proxy() {
+            if [ -n "${proxy_pid:-}" ]; then
+              kill "${proxy_pid}" >/dev/null 2>&1 || true
+            fi
+            rm -f "${server_info}"
+          }
+          trap cleanup_proxy EXIT
+
+          (
+            printf '%s' "${LITELLM_REVIEW_KEY}" |
+              npx -y @openai/codex-responses-api-proxy \
+                --http-shutdown \
+                --server-info "${server_info}" \
+                --upstream-url "${CODEX_RESPONSES_API_ENDPOINT}"
+          ) &
+          proxy_pid=$!
+          unset LITELLM_REVIEW_KEY CODEX_RESPONSES_API_ENDPOINT
+
+          for _ in {1..30}; do
+            if [ -s "${server_info}" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [ ! -s "${server_info}" ]; then
+            echo "Codex Responses API proxy did not start." >&2
+            exit 1
+          fi
+
+          proxy_port="$(python3 - "${server_info}" <<'PY'
+          import json
+          import sys
+
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          print(data["port"])
+          PY
+          )"
+
+          {
+            echo
+            echo '[model_providers.codex-action-responses-proxy]'
+            echo 'name = "Codex Action Responses Proxy"'
+            echo "base_url = \"http://127.0.0.1:${proxy_port}/v1\""
+            echo 'wire_api = "responses"'
+          } >> "${RUNNER_TEMP}/rover-codex-home/config.toml"
+
+          CODEX_HOME="${RUNNER_TEMP}/rover-codex-home" codex exec \
+            --cd "$GITHUB_WORKSPACE/review-target" \
+            --sandbox read-only \
+            --output-schema "$GITHUB_WORKSPACE/automation/.github/codex/schemas/rover-review.schema.json" \
+            --output-last-message "$GITHUB_WORKSPACE/codex-review.json" \
+            -c 'model="rover-review"' \
+            -c 'model_provider="codex-action-responses-proxy"' \
+            -c 'model_reasoning_effort="high"' \
+            -c 'shell_environment_policy.inherit="none"' \
+            - < "$GITHUB_WORKSPACE/automation/.github/codex/prompts/rover-review.md"
+
+      - name: Post GitHub review
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.help != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${DRY_RUN}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          python3 automation/scripts/post_codex_review.py codex-review.json "${args[@]}"
+
+      - name: Clean review workspace artefacts
+        if: always()
+        shell: bash
+        run: |
+          rm -rf automation review-target
+          rm -rf "${RUNNER_TEMP}/rover-codex-home"
+          rm -rf .firecrawl research/.firecrawl wiki
+          rm -f codex-review.json codex-pr.diff codex-pr.json codex-pr-reviews.json codex-review-history.md

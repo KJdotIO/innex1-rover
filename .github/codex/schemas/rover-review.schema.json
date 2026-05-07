@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "INNEX1 Rover Codex PR Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "review_mode",
+    "summary",
+    "merge_assessment",
+    "decision",
+    "findings",
+    "checks_run",
+    "docs_consulted",
+    "risks_not_checked"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_mode": {
+      "type": "string",
+      "enum": ["initial", "recheck", "full"]
+    },
+    "merge_assessment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["comment", "request_changes", "approve"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+          "required": [
+            "severity",
+            "category",
+            "effort",
+            "confidence",
+            "title",
+            "file",
+            "line",
+            "body",
+            "evidence",
+            "suggested_fix",
+            "suggestion",
+            "references"
+          ],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2"]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "safety",
+              "security",
+              "build",
+              "runtime",
+              "ros_contract",
+              "launch_config",
+              "deployment",
+              "tests",
+              "docs_contract"
+            ]
+          },
+          "effort": {
+            "type": "string",
+            "enum": ["quick_win", "moderate", "heavy_lift"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggested_fix": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggestion": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "checks_run": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "docs_consulted": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risks_not_checked": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

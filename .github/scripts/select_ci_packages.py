@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select a conservative ROS package set for CI."""
+"""Select whether PR CI needs a ROS workspace build."""
 
 from __future__ import annotations
 
@@ -7,42 +7,10 @@ import argparse
 import json
 import subprocess
 import sys
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = REPO_ROOT / "src"
-ROS_CI_PATH_PREFIXES = (
-    ".github/workflows/",
-    ".github/actions/",
-    ".github/scripts/",
-    ".github/contracts/",
-    ".github/docker/",
-)
-FULL_ROS_CI_PATH_PREFIXES = (
-    ".github/actions/",
-    ".github/contracts/",
-)
-BROAD_PACKAGES = {
-    "lunabot_bringup",
-    "lunabot_control",
-    "lunabot_interfaces",
-    "lunabot_navigation",
-    "lunabot_simulation",
-}
-SAFE_SELECT_PACKAGES = {
-    "lunabot_excavation",
-    "lunabot_perception",
-    "lunabot_teleop",
-}
-DEPENDENCY_TAGS = {
-    "depend",
-    "build_depend",
-    "build_export_depend",
-    "exec_depend",
-    "test_depend",
-}
 
 
 @dataclass(frozen=True)
@@ -54,14 +22,11 @@ class Selection:
 
 
 def requires_ros_ci(changed_files: list[str]) -> bool:
+    """Return true when a change touches the ROS workspace."""
     if not changed_files:
         return True
 
-    return any(
-        path.startswith("src/")
-        or any(path.startswith(prefix) for prefix in ROS_CI_PATH_PREFIXES)
-        for path in changed_files
-    )
+    return any(path.startswith("src/") for path in changed_files)
 
 
 def _git_changed_files(base_sha: str, head_sha: str) -> list[str]:
@@ -87,112 +52,15 @@ def _git_changed_files(base_sha: str, head_sha: str) -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def _discover_packages() -> tuple[dict[str, str], dict[str, set[str]]]:
-    package_roots: dict[str, str] = {}
-    dependencies: dict[str, set[str]] = {}
-
-    for package_xml in sorted(SRC_ROOT.rglob("package.xml")):
-        root = package_xml.parent
-        tree = ET.parse(package_xml)
-        package = tree.getroot()
-        name = package.findtext("name")
-        if not name:
-            continue
-
-        root_rel = root.relative_to(REPO_ROOT).as_posix()
-        package_roots[root_rel] = name
-        dependencies[name] = {
-            element.text.strip()
-            for element in package
-            if element.tag in DEPENDENCY_TAGS and element.text
-        }
-
-    return package_roots, dependencies
-
-
-def _owning_package(changed_file: str, package_roots: dict[str, str]) -> str | None:
-    matching_root = None
-    for root in package_roots:
-        prefix = f"{root}/"
-        if (changed_file == root or changed_file.startswith(prefix)) and (
-            matching_root is None or len(root) > len(matching_root)
-        ):
-            matching_root = root
-
-    if matching_root is None:
-        return None
-    return package_roots[matching_root]
-
-
-def _reverse_dependencies(
-    changed_packages: set[str],
-    dependencies: dict[str, set[str]],
-) -> set[str]:
-    selected = set(changed_packages)
-    added = True
-    while added:
-        added = False
-        for package, package_deps in dependencies.items():
-            if package in selected:
-                continue
-            if package_deps & selected:
-                selected.add(package)
-                added = True
-    return selected
-
-
-def _select(
-    changed_files: list[str],
-    package_roots: dict[str, str],
-    dependencies: dict[str, set[str]],
-) -> Selection:
+def _select(changed_files: list[str]) -> Selection:
+    """Select the ROS CI mode for the changed file set."""
     if not changed_files:
         return Selection("full", (), (), "No reliable diff range available")
 
-    if any(
-        any(path.startswith(prefix) for prefix in FULL_ROS_CI_PATH_PREFIXES)
-        for path in changed_files
-    ):
-        return Selection("full", (), (), "Shared interface or action files changed")
+    if requires_ros_ci(changed_files):
+        return Selection("full", (), (), "ROS workspace files changed")
 
-    if all(
-        any(path.startswith(prefix) for prefix in ROS_CI_PATH_PREFIXES)
-        for path in changed_files
-    ):
-        return Selection("skip", (), (), "CI-only changes do not need rover build/test")
-
-    changed_packages: set[str] = set()
-    for path in changed_files:
-        if not path.startswith("src/"):
-            return Selection("full", (), (), f"Top-level repo file changed: {path}")
-
-        package = _owning_package(path, package_roots)
-        if package is None:
-            return Selection("full", (), (), f"Unowned source path changed: {path}")
-
-        if package.startswith("leo_"):
-            return Selection("full", (), (), f"External package changed: {package}")
-
-        if package in BROAD_PACKAGES:
-            return Selection("full", (), (), f"Broad package changed: {package}")
-
-        if package not in SAFE_SELECT_PACKAGES:
-            return Selection(
-                "full", (), (), f"Package not whitelisted for selective CI: {package}"
-            )
-
-        changed_packages.add(package)
-
-    selected = _reverse_dependencies(changed_packages, dependencies)
-    selected_roots = tuple(
-        sorted(root for root, package in package_roots.items() if package in selected)
-    )
-    return Selection(
-        "packages",
-        tuple(sorted(selected)),
-        selected_roots,
-        "Selective CI is safe for this package set",
-    )
+    return Selection("skip", (), (), "ROS build/test not needed for this change set")
 
 
 def _write_github_output(path: Path, selection: Selection) -> None:
@@ -210,11 +78,10 @@ def main() -> int:
     parser.add_argument("--github-output")
     args = parser.parse_args()
 
-    package_roots, dependencies = _discover_packages()
     changed_files = _git_changed_files(args.base_sha, args.head_sha)
     ros_ci = requires_ros_ci(changed_files)
     selection = (
-        _select(changed_files, package_roots, dependencies)
+        _select(changed_files)
         if ros_ci
         else Selection(
             "skip",

@@ -20,3 +20,18 @@ jobs:
     with:
       force_full_ros: false
     secrets: inherit
+
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-22.04
+    needs: ci
+    if: ${{ always() }}
+    steps:
+      - name: Mirror reusable CI result for branch protection
+        run: |
+          if [ "${{ needs.ci.result }}" != "success" ]; then
+            echo "Reusable CI result: ${{ needs.ci.result }}"
+            exit 1
+          fi
+          echo "Reusable CI passed."
+        shell: bash
