@@ -1,0 +1,24 @@
+web_search = "live"
+
+[features]
+multi_agent = true
+
+[sandbox_workspace_write]
+network_access = true
+
+[mcp_servers.firecrawl]
+command = "npx"
+args = ["-y", "firecrawl-mcp"]
+env_vars = ["FIRECRAWL_API_KEY"]
+startup_timeout_sec = 60.0
+required = true
+
+[mcp_servers.grep_app]
+url = "https://mcp.grep.app"
+required = false
+
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env_vars = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+required = false

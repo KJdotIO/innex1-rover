@@ -1,0 +1,149 @@
+name: Rover Codex Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+      dry_run:
+        description: Print the GitHub review payload instead of posting it
+        required: false
+        default: "false"
+
+concurrency:
+  group: rover-codex-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '@rover-review')
+      )
+    runs-on: [self-hosted]
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${{ github.token }}
+      FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+
+    steps:
+      - name: Resolve pull request
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pr_number="${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            pr_number="${{ inputs.pr_number }}"
+          else
+            pr_number="${{ github.event.issue.number }}"
+          fi
+
+          echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout pull request merge
+        uses: actions/checkout@v6
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.number }}/merge
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mark workspace as safe
+        shell: bash
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Checkout project wiki
+        uses: actions/checkout@v6
+        continue-on-error: true
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+          token: ${{ github.token }}
+          persist-credentials: false
+
+      - name: Prepare review context
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" > codex-pr.json
+          gh pr diff "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" > codex-pr.diff
+          python3 - <<'PY'
+          import json
+          import os
+          import secrets
+
+          pr = json.load(open("codex-pr.json", encoding="utf-8"))
+
+          def write_env(name: str, value: str) -> None:
+              marker = f"EOF_{secrets.token_hex(8)}"
+              with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+                  handle.write(f"{name}<<{marker}\n{value}\n{marker}\n")
+
+          write_env("PR_NUMBER", str(pr["number"]))
+          write_env("PR_TITLE", pr.get("title") or "")
+          write_env("PR_BODY", pr.get("body") or "")
+          write_env("PR_BASE_REF", pr["base"]["ref"])
+          write_env("PR_HEAD_REF", pr["head"]["ref"])
+          write_env("PR_BASE_SHA", pr["base"]["sha"])
+          write_env("PR_HEAD_SHA", pr["head"]["sha"])
+          write_env("PR_DIFF_FILE", "codex-pr.diff")
+          write_env("REVIEW_REQUEST_BODY", os.environ.get("REVIEW_REQUEST_BODY", ""))
+          PY
+
+      - name: Prepare Codex home
+        shell: bash
+        run: |
+          rm -rf "${RUNNER_TEMP}/rover-codex-home"
+          mkdir -p "${RUNNER_TEMP}/rover-codex-home"
+          cp .github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
+
+      - name: Run Codex rover review
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.LITELLM_REVIEW_KEY }}
+          responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
+          prompt-file: .github/codex/prompts/rover-review.md
+          output-file: codex-review.json
+          output-schema-file: .github/codex/schemas/rover-review.schema.json
+          codex-home: ${{ runner.temp }}/rover-codex-home
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          model: rover-review
+          effort: high
+
+      - name: Post GitHub review
+        shell: bash
+        env:
+          REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "${DRY_RUN}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          python3 scripts/post_codex_review.py codex-review.json "${args[@]}"
+
+      - name: Clean review workspace artefacts
+        if: always()
+        shell: bash
+        run: |
+          rm -rf wiki
+          rm -rf "${RUNNER_TEMP}/rover-codex-home"
+          rm -f codex-pr.diff codex-pr.json codex-review.json

@@ -12,3 +12,7 @@ __pycache__/
 *.pyc
 research/
 .firecrawl/
+wiki/
+codex-pr.diff
+codex-pr.json
+codex-review.json
