@@ -41,6 +41,10 @@ def short_sha(value: str) -> str:
     return value[:7] if value else ""
 
 
+def has_command(comment: str, suffix: str) -> bool:
+    return f"/innex {suffix}" in comment or f"/nexy {suffix}" in comment
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reviews", type=Path, required=True)
@@ -50,8 +54,8 @@ def main() -> int:
 
     comment = args.comment or ""
     lower_comment = comment.lower()
-    status_requested = "/innex status" in lower_comment
-    help_requested = "/innex help" in lower_comment
+    status_requested = has_command(lower_comment, "status")
+    help_requested = has_command(lower_comment, "help")
     force_requested = bool(FORCE_RE.search(comment))
 
     reviews = innex_reviews(load_reviews(args.reviews))

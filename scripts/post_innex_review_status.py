@@ -34,11 +34,11 @@ def help_body() -> str:
             "",
             "| Command | What it does | Starts the model? |",
             "| --- | --- | --- |",
-            "| `/innex` | Reviews the PR, unless this commit has already been reviewed. | Sometimes |",
-            "| `/innex please focus on launch files` | Reviews the PR and treats the extra text as guidance. | Sometimes |",
-            "| `/innex status` | Shows the latest Nexy review state and reviewed commit. | No |",
-            "| `/innex force review` | Runs a fresh review even if this commit was already reviewed. | Yes |",
-            "| `/innex help` | Shows this help message. | No |",
+            "| `/nexy` or `/innex` | Reviews the PR, unless this commit has already been reviewed. | Sometimes |",
+            "| `/nexy please focus on launch files` | Reviews the PR and treats the extra text as guidance. | Sometimes |",
+            "| `/nexy status` or `/innex status` | Shows the latest Nexy review state and reviewed commit. | No |",
+            "| `/nexy force review` or `/innex force review` | Runs a fresh review even if this commit was already reviewed. | Yes |",
+            "| `/nexy help` or `/innex help` | Shows this help message. | No |",
             "",
             "I only request changes for high-confidence P0/P1 blockers. Smaller notes stay non-blocking.",
         ]
@@ -61,7 +61,7 @@ def build_body(mode: str) -> str:
             [
                 f"Already reviewed this head commit (`{head_sha}`). No model run was started.",
                 "",
-                "Use `/innex force review` if you want a fresh review anyway.",
+                "Use `/nexy force review` or `/innex force review` if you want a fresh review anyway.",
             ]
         )
         return "\n".join(lines).strip() + "\n"

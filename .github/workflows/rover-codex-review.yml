@@ -22,7 +22,9 @@ concurrency:
         github.event_name == 'issue_comment' &&
         github.actor != 'innex1-reviewer[bot]' &&
         contains(github.event.comment.body, '/innex status') == false &&
-        contains(github.event.comment.body, '/innex help') == false
+        contains(github.event.comment.body, '/innex help') == false &&
+        contains(github.event.comment.body, '/nexy status') == false &&
+        contains(github.event.comment.body, '/nexy help') == false
       )
     }}
 
@@ -33,7 +35,7 @@ jobs:
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        contains(github.event.comment.body, '/innex') &&
+        (contains(github.event.comment.body, '/innex') || contains(github.event.comment.body, '/nexy')) &&
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       )
     runs-on: [self-hosted]
@@ -69,12 +71,12 @@ jobs:
         run: |
           set -euo pipefail
           body="${REVIEW_REQUEST_BODY,,}"
-          if [[ "${body}" == *"/innex help"* ]]; then
+          if [[ "${body}" == *"/innex help"* || "${body}" == *"/nexy help"* ]]; then
             echo "help=true" >> "$GITHUB_OUTPUT"
           else
             echo "help=false" >> "$GITHUB_OUTPUT"
           fi
-          if [[ "${body}" == *"/innex status"* ]]; then
+          if [[ "${body}" == *"/innex status"* || "${body}" == *"/nexy status"* ]]; then
             echo "status=true" >> "$GITHUB_OUTPUT"
           else
             echo "status=false" >> "$GITHUB_OUTPUT"
@@ -118,11 +120,11 @@ jobs:
 
           | Command | What it does | Starts the model? |
           | --- | --- | --- |
-          | `/innex` | Reviews the PR, unless this commit has already been reviewed. | Sometimes |
-          | `/innex please focus on launch files` | Reviews the PR and treats the extra text as guidance. | Sometimes |
-          | `/innex status` | Shows the latest Nexy review state and reviewed commit. | No |
-          | `/innex force review` | Runs a fresh review even if this commit was already reviewed. | Yes |
-          | `/innex help` | Shows this help message. | No |
+          | `/nexy` or `/innex` | Reviews the PR, unless this commit has already been reviewed. | Sometimes |
+          | `/nexy please focus on launch files` | Reviews the PR and treats the extra text as guidance. | Sometimes |
+          | `/nexy status` or `/innex status` | Shows the latest Nexy review state and reviewed commit. | No |
+          | `/nexy force review` or `/innex force review` | Runs a fresh review even if this commit was already reviewed. | Yes |
+          | `/nexy help` or `/innex help` | Shows this help message. | No |
 
           I only request changes for high-confidence P0/P1 blockers. Smaller notes stay non-blocking.
           MD

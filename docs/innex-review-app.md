@@ -1,6 +1,6 @@
 # Nexy Review App
 
-Nexy is the rover review agent triggered from PR comments with `/innex`. The GitHub App is named `Innex1 Reviewer`, but the review voice and status comments use Nexy.
+Nexy is the rover review agent triggered from PR comments with `/nexy` or `/innex`. The GitHub App is named `Innex1 Reviewer`, but the review voice and status comments use Nexy.
 
 The workflow still runs in GitHub Actions, but it can post reviews as a GitHub App when these repository secrets are set:
 
@@ -25,7 +25,7 @@ scripts/convert_innex_github_app_manifest.sh 'PASTE_REDIRECT_URL_OR_CODE_HERE'
 
 The conversion output contains the private key. Do not commit it.
 
-The app manifest includes an inactive webhook URL because GitHub requires `hook_attributes.url` during manifest creation. Nexy does not use webhooks; GitHub Actions handles the `/innex` trigger.
+The app manifest includes an inactive webhook URL because GitHub requires `hook_attributes.url` during manifest creation. Nexy does not use webhooks; GitHub Actions handles the `/nexy` and `/innex` triggers.
 
 Set the returned app id and PEM as repository secrets, then install the app on `KJdotIO/innex1-rover`.
 
@@ -35,18 +35,18 @@ Use `docs/assets/innex-app-avatar.png` as the app avatar. It uses the Innova mar
 
 | Command | What it does | Starts the model? |
 | --- | --- | --- |
-| `/innex` | Reviews the PR, unless the current head SHA was already reviewed. | Sometimes |
-| `/innex please review this PR` | Same as `/innex`; extra text is treated as review guidance. | Sometimes |
-| `/innex status` | Posts the latest Nexy review state and reviewed commit. | No |
-| `/innex force review` | Runs a fresh review even if the current head SHA was already reviewed. | Yes |
-| `/innex help` | Posts the command table without running a review. | No |
+| `/nexy` or `/innex` | Reviews the PR, unless the current head SHA was already reviewed. | Sometimes |
+| `/nexy please review this PR` | Same as `/nexy`; extra text is treated as review guidance. | Sometimes |
+| `/nexy status` or `/innex status` | Posts the latest Nexy review state and reviewed commit. | No |
+| `/nexy force review` or `/innex force review` | Runs a fresh review even if the current head SHA was already reviewed. | Yes |
+| `/nexy help` or `/innex help` | Posts the command table without running a review. | No |
 
 ## Review Behaviour
 
 One command is enough:
 
 ```text
-/innex please review this PR
+/nexy please review this PR
 ```
 
 The reviewer reads the PR title, body, diff, relevant docs, wiki pages and previous Nexy reviews. On a re-review it verifies previous findings first and avoids drip-feeding new blockers unless a newly introduced or clearly missed issue is genuinely merge-blocking.
@@ -55,9 +55,9 @@ Blocking reviews should be rare. Nexy requests changes only for high-confidence 
 
 The review output is decision-first. Supporting detail such as checks, docs and unposted findings is tucked into collapsible sections so the top of the review stays easy to scan.
 
-`/innex status` posts the latest Nexy review state without starting a model run.
+`/nexy status` or `/innex status` posts the latest Nexy review state without starting a model run.
 
-If the latest Nexy review already covers the current PR head commit, a plain `/innex` request is skipped and Nexy posts a short status comment instead. Use `/innex force review` when you deliberately want another pass on the same commit.
+If the latest Nexy review already covers the current PR head commit, a plain `/nexy` or `/innex` request is skipped and Nexy posts a short status comment instead. Use `/nexy force review` or `/innex force review` when you deliberately want another pass on the same commit.
 
 ## Model
 
