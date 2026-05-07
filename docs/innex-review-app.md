@@ -1,6 +1,6 @@
 # INX One Review App
 
-INX One is the rover review agent triggered from PR comments with `@innex`.
+INX One is the rover review agent triggered from PR comments with `/innex`.
 
 The workflow still runs in GitHub Actions, but it can post reviews as a GitHub App when these repository secrets are set:
 
@@ -34,7 +34,7 @@ Use `docs/assets/innex-app-avatar.png` as the app avatar. It uses the Innova mar
 One command is enough:
 
 ```text
-@innex please review this PR
+/innex please review this PR
 ```
 
 The reviewer reads the PR title, body, diff, relevant docs, wiki pages and previous INX One reviews. On a re-review it verifies previous findings first and avoids drip-feeding new blockers unless a newly introduced or clearly missed issue is genuinely merge-blocking.
