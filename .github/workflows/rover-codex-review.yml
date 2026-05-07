@@ -1,4 +1,4 @@
-name: Innex Review
+name: Nexy Review
 
 on:
   issue_comment:
@@ -130,12 +130,12 @@ jobs:
               if "<!-- codex-rover-review -->" in (review.get("body") or "")
           ][-8:]
           lines = [
-              "# Previous Innex Reviews",
+              "# Previous Nexy Reviews",
               "",
               "Use this to avoid drip-feed re-reviews. Verify previous blockers first; do not re-report addressed findings.",
           ]
           if not innex_reviews:
-              lines.append("\nNo previous Innex reviews were found for this PR.")
+              lines.append("\nNo previous Nexy reviews were found for this PR.")
           for review in innex_reviews:
               lines.extend([
                   "",
@@ -145,7 +145,7 @@ jobs:
           Path("review-target/codex-review-history.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
 
-      - name: Detect Innex request intent
+      - name: Detect Nexy request intent
         id: intent
         shell: bash
         run: |
@@ -155,7 +155,7 @@ jobs:
             --head-sha "${PR_HEAD_SHA}" \
             --comment "${REVIEW_REQUEST_BODY}"
 
-      - name: Create Innex app token
+      - name: Create Nexy app token
         id: app-token
         if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
         uses: actions/create-github-app-token@v2
@@ -165,7 +165,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: innex1-rover
 
-      - name: Post Innex status
+      - name: Post Nexy status
         if: ${{ steps.intent.outputs.status == 'true' }}
         shell: bash
         env:
@@ -180,7 +180,7 @@ jobs:
           set -euo pipefail
           python3 automation/scripts/post_innex_review_status.py --mode status
 
-      - name: Skip duplicate Innex review
+      - name: Skip duplicate Nexy review
         if: ${{ steps.intent.outputs.already_reviewed == 'true' }}
         shell: bash
         env:

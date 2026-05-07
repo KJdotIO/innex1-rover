@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post lightweight Innex status comments without starting a model review."""
+"""Post lightweight Nexy status comments without starting a model review."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def build_body(mode: str) -> str:
     latest_commit = env("LATEST_REVIEW_COMMIT_SHORT")
     head_sha = env("HEAD_SHA_SHORT")
 
-    lines = [STATUS_MARKER, "## Innex Status", ""]
+    lines = [STATUS_MARKER, "## Nexy Status", ""]
     if mode == "already-reviewed":
         lines.extend(
             [
@@ -43,11 +43,11 @@ def build_body(mode: str) -> str:
         return "\n".join(lines).strip() + "\n"
 
     if latest_state == "none":
-        lines.append("No previous Innex review was found for this PR.")
+        lines.append("No previous Nexy review was found for this PR.")
     else:
         lines.extend(
             [
-                f"Latest Innex review: **{latest_state.lower()}** by `{latest_author}`.",
+                f"Latest Nexy review: **{latest_state.lower()}** by `{latest_author}`.",
                 f"Reviewed commit: `{latest_commit or 'unknown'}`.",
             ]
         )
@@ -58,7 +58,7 @@ def build_body(mode: str) -> str:
             lines.append("Current head is already covered by that review.")
         else:
             lines.append("")
-            lines.append(f"Current head is `{head_sha}` and has not been reviewed by Innex yet.")
+            lines.append(f"Current head is `{head_sha}` and has not been reviewed by Nexy yet.")
     return "\n".join(lines).strip() + "\n"
 
 

@@ -191,7 +191,7 @@ def build_review_body(
 
     lines = [
         "<!-- codex-rover-review -->",
-        "## Innex Review",
+        "## Nexy Review",
         "",
         review["summary"].strip(),
         "",
@@ -215,7 +215,7 @@ def build_review_body(
         lines.extend(
             [
                 "> [!NOTE]",
-                "> **Mergeable from Innex's review standpoint.** The notes below are non-blocking.",
+                "> **Mergeable from Nexy's review standpoint.** The notes below are non-blocking.",
                 "",
             ]
         )
@@ -223,7 +223,7 @@ def build_review_body(
         lines.extend(
             [
                 "> [!TIP]",
-                "> ✅ **LGTM from Innex. No blocking issues found; mergeable from review standpoint.** 🎉",
+                "> ✅ **LGTM from Nexy. No blocking issues found; mergeable from review standpoint.** 🎉",
                 "",
             ]
         )

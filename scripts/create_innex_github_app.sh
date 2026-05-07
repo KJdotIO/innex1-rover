@@ -31,12 +31,12 @@ Path(tmp_html).write_text(
         [
             "<!doctype html>",
             "<meta charset='utf-8'>",
-            "<title>Create INX One GitHub App</title>",
+            "<title>Create Nexy GitHub App</title>",
             "<form id='manifest' method='post' action='" + html.escape(action) + "'>",
             "<input type='hidden' name='manifest' value='" + html.escape(manifest, quote=True) + "'>",
             "</form>",
             "<script>document.getElementById('manifest').submit()</script>",
-            "<p>Submitting INX One GitHub App manifest to GitHub...</p>",
+            "<p>Submitting Nexy GitHub App manifest to GitHub...</p>",
         ]
     ),
     encoding="utf-8",

@@ -1,6 +1,6 @@
-# Innex Review App
+# Nexy Review App
 
-Innex is the rover review agent triggered from PR comments with `/innex`. Internally we may call it Nexy, but GitHub-facing comments should use Innex.
+Nexy is the rover review agent triggered from PR comments with `/innex`. The GitHub App is named `Innex1 Reviewer`, but the review voice and status comments use Nexy.
 
 The workflow still runs in GitHub Actions, but it can post reviews as a GitHub App when these repository secrets are set:
 
@@ -25,11 +25,20 @@ scripts/convert_innex_github_app_manifest.sh 'PASTE_REDIRECT_URL_OR_CODE_HERE'
 
 The conversion output contains the private key. Do not commit it.
 
-The app manifest includes an inactive webhook URL because GitHub requires `hook_attributes.url` during manifest creation. Innex does not use webhooks; GitHub Actions handles the `/innex` trigger.
+The app manifest includes an inactive webhook URL because GitHub requires `hook_attributes.url` during manifest creation. Nexy does not use webhooks; GitHub Actions handles the `/innex` trigger.
 
 Set the returned app id and PEM as repository secrets, then install the app on `KJdotIO/innex1-rover`.
 
 Use `docs/assets/innex-app-avatar.png` as the app avatar. It uses the Innova mark on a dark background so it remains visible on GitHub's light theme.
+
+## Commands
+
+| Command | What it does | Starts the model? |
+| --- | --- | --- |
+| `/innex` | Reviews the PR, unless the current head SHA was already reviewed. | Sometimes |
+| `/innex please review this PR` | Same as `/innex`; extra text is treated as review guidance. | Sometimes |
+| `/innex status` | Posts the latest Nexy review state and reviewed commit. | No |
+| `/innex force review` | Runs a fresh review even if the current head SHA was already reviewed. | Yes |
 
 ## Review Behaviour
 
@@ -39,17 +48,17 @@ One command is enough:
 /innex please review this PR
 ```
 
-The reviewer reads the PR title, body, diff, relevant docs, wiki pages and previous Innex reviews. On a re-review it verifies previous findings first and avoids drip-feeding new blockers unless a newly introduced or clearly missed issue is genuinely merge-blocking.
+The reviewer reads the PR title, body, diff, relevant docs, wiki pages and previous Nexy reviews. On a re-review it verifies previous findings first and avoids drip-feeding new blockers unless a newly introduced or clearly missed issue is genuinely merge-blocking.
 
-Blocking reviews should be rare. Innex requests changes only for high-confidence P0/P1 issues. If there are no blockers, it posts a prominent LGTM note and says the PR is mergeable from the review standpoint.
+Blocking reviews should be rare. Nexy requests changes only for high-confidence P0/P1 issues. If there are no blockers, it posts a prominent LGTM note and says the PR is mergeable from the review standpoint.
 
-`/innex status` posts the latest Innex review state without starting a model run.
+`/innex status` posts the latest Nexy review state without starting a model run.
 
-If the latest Innex review already covers the current PR head commit, a plain `/innex` request is skipped and Innex posts a short status comment instead. Use `/innex force review` when you deliberately want another pass on the same commit.
+If the latest Nexy review already covers the current PR head commit, a plain `/innex` request is skipped and Nexy posts a short status comment instead. Use `/innex force review` when you deliberately want another pass on the same commit.
 
 ## Model
 
-Innex routes through LiteLLM using the `rover-review` alias. The default backing model is:
+Nexy routes through LiteLLM using the `rover-review` alias. The default backing model is:
 
 ```yaml
 model: openai/gpt-5.2
