@@ -1,8 +1,6 @@
 name: Rover Codex Review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created]
   workflow_dispatch:
@@ -22,7 +20,6 @@ concurrency:
 jobs:
   review:
     if: >-
-      github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
       (
         github.event_name == 'issue_comment' &&
@@ -39,6 +36,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_PERSONAL_ACCESS_TOKEN: ${{ github.token }}
       FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
 
     steps:
       - name: Resolve pull request
