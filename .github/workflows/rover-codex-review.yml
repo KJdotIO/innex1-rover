@@ -165,6 +165,19 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: innex1-rover
 
+      - name: React to Nexy request
+        if: ${{ github.event_name == 'issue_comment' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+            --method POST \
+            --field content=eyes >/dev/null || true
+
       - name: Post Nexy status
         if: ${{ steps.intent.outputs.status == 'true' }}
         shell: bash
