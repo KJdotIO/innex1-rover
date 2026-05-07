@@ -146,6 +146,17 @@ def table_cell(value: Any) -> str:
     return str(value).replace("\n", " ").replace("|", "\\|").strip()
 
 
+def concise_table_text(value: Any, *, limit: int = 90) -> str:
+    text = table_cell(value)
+    if not text:
+        return ""
+    sentence = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)[0]
+    if len(sentence) <= limit:
+        return sentence
+    clipped = sentence[: limit - 3].rsplit(" ", 1)[0].rstrip()
+    return f"{clipped or sentence[: limit - 3]}..."
+
+
 def optional_env_int(name: str) -> int | None:
     value = os.environ.get(name)
     if value is None:
@@ -263,10 +274,10 @@ def build_review_body(
             location = f"`{finding['file']}:{finding['line']}`"
             label = f"{SEVERITY_BADGES[finding['severity']]} {SEVERITY_LABELS[finding['severity']]}"
             title = table_cell(finding["title"])
-            body = table_cell(finding["body"])
+            takeaway = concise_table_text(finding["body"])
             effort = EFFORT_LABELS[finding["effort"]]
             confidence = f"{finding['confidence']:.0%}"
-            lines.append(f"| {label}: {title} | {location} | {effort} | {confidence} | {body} |")
+            lines.append(f"| {label}: {title} | {location} | {effort} | {confidence} | {takeaway} |")
     if review["checks_run"]:
         lines.extend(details_block("Checks run", [f"- {item}" for item in review["checks_run"]]))
 
