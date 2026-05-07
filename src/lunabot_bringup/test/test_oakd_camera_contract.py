@@ -34,9 +34,9 @@ def test_normalise_bool_text_rejects_unknown_launch_value():
         normalise_bool_text("sometimes", "enable_depth")
 
 
-def test_select_depthai_launch_file_uses_camera_launch_for_all_output_sets():
-    assert select_depthai_launch_file(enable_pointcloud=True) == "camera.launch.py"
-    assert select_depthai_launch_file(enable_pointcloud=False) == "camera.launch.py"
+def test_select_depthai_launch_file_uses_v3_driver_launch_for_all_output_sets():
+    assert select_depthai_launch_file(enable_pointcloud=True) == "driver.launch.py"
+    assert select_depthai_launch_file(enable_pointcloud=False) == "driver.launch.py"
 
 
 def test_camera_topic_remappings_match_existing_front_camera_contract():
@@ -50,7 +50,7 @@ def test_camera_topic_remappings_match_existing_front_camera_contract():
     assert ("oak_front/rgb/image_rect", "/camera_front/image") in remappings
     assert ("oak_front/rgb/camera_info", "/camera_front/camera_info") in remappings
     assert ("oak_front/stereo/image_raw", "/camera_front/depth_image") in remappings
-    assert ("oak_front/points", "/camera_front/points") in remappings
+    assert ("oak_front/rgbd/points", "/camera_front/points") in remappings
 
 
 def test_camera_topic_remappings_can_disable_depth_outputs():

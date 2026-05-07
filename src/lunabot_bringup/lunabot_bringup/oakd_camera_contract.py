@@ -30,7 +30,7 @@ def bool_to_launch_text(value: bool) -> str:
 def select_depthai_launch_file(enable_pointcloud: bool) -> str:
     """Return the DepthAI launch file needed for the requested output set."""
     _ = enable_pointcloud
-    return "camera.launch.py"
+    return "driver.launch.py"
 
 
 def camera_topic_remappings(
@@ -48,7 +48,7 @@ def camera_topic_remappings(
     if enable_depth:
         remappings.append((f"{driver_name}/stereo/image_raw", FRONT_DEPTH_IMAGE_TOPIC))
     if enable_pointcloud:
-        remappings.append((f"{driver_name}/points", FRONT_POINTS_TOPIC))
+        remappings.append((f"{driver_name}/rgbd/points", FRONT_POINTS_TOPIC))
     return remappings
 
 

@@ -62,7 +62,7 @@ def _launch_setup(context):
     if not params_file:
         raise ValueError("Expected non-empty launch value for 'params_file'.")
 
-    depthai_launch = _package_path("depthai_ros_driver").joinpath(
+    depthai_launch = _package_path("depthai_ros_driver_v3").joinpath(
         "launch",
         select_depthai_launch_file(enable_pointcloud),
     )
@@ -102,7 +102,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "camera_model",
                 default_value="OAK-D-PRO",
-                description="DepthAI camera model passed to depthai_ros_driver.",
+                description="DepthAI camera model passed to depthai_ros_driver_v3.",
             ),
             DeclareLaunchArgument(
                 "parent_frame",
