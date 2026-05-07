@@ -1,4 +1,4 @@
-name: INX One Review
+name: Innex Review
 
 on:
   issue_comment:
@@ -122,12 +122,12 @@ jobs:
               if "<!-- codex-rover-review -->" in (review.get("body") or "")
           ][-8:]
           lines = [
-              "# Previous INX One Reviews",
+              "# Previous Innex Reviews",
               "",
               "Use this to avoid drip-feed re-reviews. Verify previous blockers first; do not re-report addressed findings.",
           ]
           if not innex_reviews:
-              lines.append("\nNo previous INX One reviews were found for this PR.")
+              lines.append("\nNo previous Innex reviews were found for this PR.")
           for review in innex_reviews:
               lines.extend([
                   "",
@@ -137,7 +137,54 @@ jobs:
           Path("review-target/codex-review-history.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
 
+      - name: Detect Innex request intent
+        id: intent
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 automation/scripts/detect_innex_review_intent.py \
+            --reviews review-target/codex-pr-reviews.json \
+            --head-sha "${PR_HEAD_SHA}" \
+            --comment "${REVIEW_REQUEST_BODY}"
+
+      - name: Create Innex app token
+        id: app-token
+        if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.INNEX_APP_ID }}
+          private-key: ${{ secrets.INNEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: innex1-rover
+
+      - name: Post Innex status
+        if: ${{ steps.intent.outputs.status == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          LATEST_REVIEW_STATE: ${{ steps.intent.outputs.latest_review_state }}
+          LATEST_REVIEW_AUTHOR: ${{ steps.intent.outputs.latest_review_author }}
+          LATEST_REVIEW_SUBMITTED_AT: ${{ steps.intent.outputs.latest_review_submitted_at }}
+          LATEST_REVIEW_COMMIT_SHORT: ${{ steps.intent.outputs.latest_review_commit_short }}
+          HEAD_SHA_SHORT: ${{ steps.intent.outputs.head_sha_short }}
+        run: |
+          set -euo pipefail
+          python3 automation/scripts/post_innex_review_status.py --mode status
+
+      - name: Skip duplicate Innex review
+        if: ${{ steps.intent.outputs.already_reviewed == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA_SHORT: ${{ steps.intent.outputs.head_sha_short }}
+        run: |
+          set -euo pipefail
+          python3 automation/scripts/post_innex_review_status.py --mode already-reviewed
+
       - name: Prepare Codex home
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
         shell: bash
         run: |
           rm -rf "${RUNNER_TEMP}/rover-codex-home"
@@ -145,6 +192,7 @@ jobs:
           cp automation/.github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
 
       - name: Run Codex rover review
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
         shell: bash
         env:
           LITELLM_REVIEW_KEY: ${{ secrets.LITELLM_REVIEW_KEY }}
@@ -215,17 +263,8 @@ jobs:
             -c 'shell_environment_policy.inherit="none"' \
             - < "$GITHUB_WORKSPACE/automation/.github/codex/prompts/rover-review.md"
 
-      - name: Create INX app token
-        id: app-token
-        if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.INNEX_APP_ID }}
-          private-key: ${{ secrets.INNEX_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: innex1-rover
-
       - name: Post GitHub review
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
@@ -246,4 +285,5 @@ jobs:
         run: |
           rm -rf automation review-target
           rm -rf "${RUNNER_TEMP}/rover-codex-home"
-          rm -f codex-review.json
+          rm -rf .firecrawl research/.firecrawl wiki
+          rm -f codex-review.json codex-pr.diff codex-pr.json codex-pr-reviews.json codex-review-history.md

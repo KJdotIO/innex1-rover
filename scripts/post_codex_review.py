@@ -191,18 +191,52 @@ def build_review_body(
 
     lines = [
         "<!-- codex-rover-review -->",
-        "## INX One Review",
+        "## Innex Review",
         "",
         review["summary"].strip(),
         "",
         f"**Merge assessment:** {review['merge_assessment'].strip()}",
         "",
-        "| Severity | Meaning | Count |",
-        "| --- | --- | ---: |",
-        f"| 🔴 P0 | Critical blocker | {counts['P0']} |",
-        f"| 🟠 P1 | Major issue | {counts['P1']} |",
-        f"| 🟡 P2 | Minor or follow-up | {counts['P2']} |",
     ]
+
+    has_blocker = any(
+        finding["severity"] in {"P0", "P1"} and finding["confidence"] >= 0.8
+        for finding in findings
+    )
+    if has_blocker:
+        lines.extend(
+            [
+                "> [!CAUTION]",
+                "> **Changes requested:** high-confidence blocker(s) found. These should be fixed before merging.",
+                "",
+            ]
+        )
+    elif findings:
+        lines.extend(
+            [
+                "> [!NOTE]",
+                "> **Mergeable from Innex's review standpoint.** The notes below are non-blocking.",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "> [!TIP]",
+                "> ✅ **LGTM from Innex. No blocking issues found; mergeable from review standpoint.** 🎉",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "| Severity | Meaning | Count |",
+            "| --- | --- | ---: |",
+            f"| 🔴 P0 | Critical blocker | {counts['P0']} |",
+            f"| 🟠 P1 | Major issue | {counts['P1']} |",
+            f"| 🟡 P2 | Minor or follow-up | {counts['P2']} |",
+        ]
+    )
 
     if findings:
         lines.extend(["", "| Finding | Location | Effort | Confidence | Why it matters |", "| --- | --- | --- | ---: | --- |"])
@@ -214,9 +248,6 @@ def build_review_body(
             effort = EFFORT_LABELS[finding["effort"]]
             confidence = f"{finding['confidence']:.0%}"
             lines.append(f"| {label}: {title} | {location} | {effort} | {confidence} | {body} |")
-    else:
-        lines.extend(["", "LGTM! 🎉 No blocking issues found from this review pass."])
-
     if review["checks_run"]:
         lines.extend(["", "Checks run:"])
         lines.extend(f"- {item}" for item in review["checks_run"])

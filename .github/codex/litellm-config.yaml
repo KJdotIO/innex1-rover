@@ -1,7 +1,7 @@
 model_list:
   - model_name: rover-review
     litellm_params:
-      model: openai/gpt-5.5
+      model: openai/gpt-5.2
       api_base: http://127.0.0.1:8318/v1
       api_key: os.environ/VIBEPROXY_API_KEY
 
