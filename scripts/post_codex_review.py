@@ -156,6 +156,18 @@ def optional_env_int(name: str) -> int | None:
         raise SystemExit(f"{name} must be an integer") from exc
 
 
+def details_block(summary: str, lines: list[str]) -> list[str]:
+    return [
+        "",
+        "<details>",
+        f"<summary>{summary}</summary>",
+        "",
+        *lines,
+        "",
+        "</details>",
+    ]
+
+
 def format_finding(finding: dict[str, Any], *, inline: bool) -> str:
     label = SEVERITY_LABELS[finding["severity"]]
     badge = SEVERITY_BADGES[finding["severity"]]
@@ -193,10 +205,6 @@ def build_review_body(
         "<!-- codex-rover-review -->",
         "## Nexy Review",
         "",
-        review["summary"].strip(),
-        "",
-        f"**Merge assessment:** {review['merge_assessment'].strip()}",
-        "",
     ]
 
     has_blocker = any(
@@ -204,10 +212,12 @@ def build_review_body(
         for finding in findings
     )
     if has_blocker:
+        blocker_count = counts["P0"] + counts["P1"]
+        blocker_label = "blocker" if blocker_count == 1 else "blockers"
         lines.extend(
             [
                 "> [!CAUTION]",
-                "> **Changes requested:** high-confidence blocker(s) found. These should be fixed before merging.",
+                f"> **Changes requested:** {blocker_count} high-confidence {blocker_label} found. These should be fixed before merging.",
                 "",
             ]
         )
@@ -230,6 +240,15 @@ def build_review_body(
 
     lines.extend(
         [
+            review["summary"].strip(),
+            "",
+            f"**Merge assessment:** {review['merge_assessment'].strip()}",
+            "",
+        ]
+    )
+
+    lines.extend(
+        [
             "| Severity | Meaning | Count |",
             "| --- | --- | ---: |",
             f"| 🔴 P0 | Critical blocker | {counts['P0']} |",
@@ -249,28 +268,26 @@ def build_review_body(
             confidence = f"{finding['confidence']:.0%}"
             lines.append(f"| {label}: {title} | {location} | {effort} | {confidence} | {body} |")
     if review["checks_run"]:
-        lines.extend(["", "Checks run:"])
-        lines.extend(f"- {item}" for item in review["checks_run"])
+        lines.extend(details_block("Checks run", [f"- {item}" for item in review["checks_run"]]))
 
     if review["docs_consulted"]:
-        lines.extend(["", "Docs consulted:"])
-        lines.extend(f"- {item}" for item in review["docs_consulted"])
+        lines.extend(details_block("Docs consulted", [f"- {item}" for item in review["docs_consulted"]]))
 
     if review["risks_not_checked"]:
-        lines.extend(["", "Risks not checked:"])
-        lines.extend(f"- {item}" for item in review["risks_not_checked"])
+        lines.extend(details_block("Risks not checked", [f"- {item}" for item in review["risks_not_checked"]]))
 
     if non_inline_findings or skipped_inline_findings:
-        lines.extend(["", "Findings not posted inline:"])
+        non_inline_lines = []
         for finding in [*non_inline_findings, *skipped_inline_findings]:
             location = f"{finding['file']}:{finding['line']}"
-            lines.append(
+            non_inline_lines.append(
                 f"- **{finding['severity']} {finding['title']}** at `{location}`: "
                 f"{finding['body'].strip()}"
             )
             references = finding.get("references") or []
             if references:
-                lines.extend(f"  Reference: {item}" for item in references)
+                non_inline_lines.extend(f"  Reference: {item}" for item in references)
+        lines.extend(details_block("Findings not posted inline", non_inline_lines))
 
     return "\n".join(lines).strip() + "\n"
 

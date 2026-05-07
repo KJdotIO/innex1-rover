@@ -24,7 +24,31 @@ def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
 
+def help_body() -> str:
+    return "\n".join(
+        [
+            STATUS_MARKER,
+            "## Nexy Help",
+            "",
+            "Here are the commands I understand:",
+            "",
+            "| Command | What it does | Starts the model? |",
+            "| --- | --- | --- |",
+            "| `/innex` | Reviews the PR, unless this commit has already been reviewed. | Sometimes |",
+            "| `/innex please focus on launch files` | Reviews the PR and treats the extra text as guidance. | Sometimes |",
+            "| `/innex status` | Shows the latest Nexy review state and reviewed commit. | No |",
+            "| `/innex force review` | Runs a fresh review even if this commit was already reviewed. | Yes |",
+            "| `/innex help` | Shows this help message. | No |",
+            "",
+            "I only request changes for high-confidence P0/P1 blockers. Smaller notes stay non-blocking.",
+        ]
+    ).strip() + "\n"
+
+
 def build_body(mode: str) -> str:
+    if mode == "help":
+        return help_body()
+
     latest_state = env("LATEST_REVIEW_STATE", "none")
     latest_author = env("LATEST_REVIEW_AUTHOR", "none")
     latest_time = env("LATEST_REVIEW_SUBMITTED_AT")
@@ -66,7 +90,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=env("GITHUB_REPOSITORY"))
     parser.add_argument("--pr", default=env("PR_NUMBER"))
-    parser.add_argument("--mode", choices={"status", "already-reviewed"}, required=True)
+    parser.add_argument("--mode", choices={"status", "already-reviewed", "help"}, required=True)
     args = parser.parse_args()
     if not args.repo:
         raise SystemExit("--repo or GITHUB_REPOSITORY is required")

@@ -39,6 +39,7 @@ Use `docs/assets/innex-app-avatar.png` as the app avatar. It uses the Innova mar
 | `/innex please review this PR` | Same as `/innex`; extra text is treated as review guidance. | Sometimes |
 | `/innex status` | Posts the latest Nexy review state and reviewed commit. | No |
 | `/innex force review` | Runs a fresh review even if the current head SHA was already reviewed. | Yes |
+| `/innex help` | Posts the command table without running a review. | No |
 
 ## Review Behaviour
 
@@ -51,6 +52,8 @@ One command is enough:
 The reviewer reads the PR title, body, diff, relevant docs, wiki pages and previous Nexy reviews. On a re-review it verifies previous findings first and avoids drip-feeding new blockers unless a newly introduced or clearly missed issue is genuinely merge-blocking.
 
 Blocking reviews should be rare. Nexy requests changes only for high-confidence P0/P1 issues. If there are no blockers, it posts a prominent LGTM note and says the PR is mergeable from the review standpoint.
+
+The review output is decision-first. Supporting detail such as checks, docs and unposted findings is tucked into collapsible sections so the top of the review stays easy to scan.
 
 `/innex status` posts the latest Nexy review state without starting a model run.
 

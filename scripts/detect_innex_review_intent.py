@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decide whether an Innex review request should run the model."""
+"""Decide whether a Nexy review request should run the model."""
 
 from __future__ import annotations
 
@@ -51,15 +51,23 @@ def main() -> int:
     comment = args.comment or ""
     lower_comment = comment.lower()
     status_requested = "/innex status" in lower_comment
+    help_requested = "/innex help" in lower_comment
     force_requested = bool(FORCE_RE.search(comment))
 
     reviews = innex_reviews(load_reviews(args.reviews))
     latest = reviews[-1] if reviews else {}
     latest_commit = latest.get("commit_id") or ""
     same_head = bool(latest_commit and latest_commit == args.head_sha)
-    already_reviewed = bool(comment.strip()) and same_head and not status_requested and not force_requested
+    already_reviewed = (
+        bool(comment.strip())
+        and same_head
+        and not status_requested
+        and not help_requested
+        and not force_requested
+    )
 
     append_output("status", str(status_requested).lower())
+    append_output("help", str(help_requested).lower())
     append_output("already_reviewed", str(already_reviewed).lower())
     append_output("force_requested", str(force_requested).lower())
     append_output("latest_review_id", str(latest.get("id") or ""))

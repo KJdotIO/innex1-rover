@@ -21,7 +21,8 @@ concurrency:
       (
         github.event_name == 'issue_comment' &&
         github.actor != 'innex1-reviewer[bot]' &&
-        contains(github.event.comment.body, '/innex status') == false
+        contains(github.event.comment.body, '/innex status') == false &&
+        contains(github.event.comment.body, '/innex help') == false
       )
     }}
 
@@ -179,7 +180,7 @@ jobs:
             --field content=eyes >/dev/null || true
 
       - name: Post Nexy status
-        if: ${{ steps.intent.outputs.status == 'true' }}
+        if: ${{ steps.intent.outputs.status == 'true' || steps.intent.outputs.help == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
@@ -191,7 +192,11 @@ jobs:
           HEAD_SHA_SHORT: ${{ steps.intent.outputs.head_sha_short }}
         run: |
           set -euo pipefail
-          python3 automation/scripts/post_innex_review_status.py --mode status
+          mode="status"
+          if [ "${{ steps.intent.outputs.help }}" = "true" ]; then
+            mode="help"
+          fi
+          python3 automation/scripts/post_innex_review_status.py --mode "${mode}"
 
       - name: Skip duplicate Nexy review
         if: ${{ steps.intent.outputs.already_reviewed == 'true' }}
@@ -205,7 +210,7 @@ jobs:
           python3 automation/scripts/post_innex_review_status.py --mode already-reviewed
 
       - name: Prepare Codex home
-        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.help != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
         shell: bash
         run: |
           rm -rf "${RUNNER_TEMP}/rover-codex-home"
@@ -213,7 +218,7 @@ jobs:
           cp automation/.github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
 
       - name: Run Codex rover review
-        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.help != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
         shell: bash
         env:
           LITELLM_REVIEW_KEY: ${{ secrets.LITELLM_REVIEW_KEY }}
@@ -285,7 +290,7 @@ jobs:
             - < "$GITHUB_WORKSPACE/automation/.github/codex/prompts/rover-review.md"
 
       - name: Post GitHub review
-        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
+        if: ${{ steps.intent.outputs.status != 'true' && steps.intent.outputs.help != 'true' && steps.intent.outputs.already_reviewed != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
