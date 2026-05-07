@@ -35,14 +35,12 @@ def select_depthai_launch_file(enable_pointcloud: bool) -> str:
 
 def camera_topic_remappings(
     driver_name: str,
-    use_rectified_rgb: bool,
     enable_depth: bool,
     enable_pointcloud: bool,
 ) -> list[tuple[str, str]]:
     """Return remappings from DepthAI topics to the rover front-camera contract."""
-    rgb_suffix = "image_rect" if use_rectified_rgb else "image_raw"
     remappings = [
-        (f"{driver_name}/rgb/{rgb_suffix}", FRONT_RGB_IMAGE_TOPIC),
+        (f"{driver_name}/rgb/image_raw", FRONT_RGB_IMAGE_TOPIC),
         (f"{driver_name}/rgb/camera_info", FRONT_CAMERA_INFO_TOPIC),
     ]
     if enable_depth:
@@ -59,7 +57,6 @@ def camera_launch_arguments(
     params_file: str,
     enable_depth: bool,
     enable_pointcloud: bool,
-    use_rectified_rgb: bool,
 ) -> dict[str, str]:
     """Return launch arguments for the DepthAI camera launch include."""
     return {
@@ -70,5 +67,4 @@ def camera_launch_arguments(
         "enable_color": "true",
         "enable_depth": bool_to_launch_text(enable_depth),
         "pointcloud.enable": bool_to_launch_text(enable_pointcloud),
-        "rectify_rgb": bool_to_launch_text(use_rectified_rgb),
     }

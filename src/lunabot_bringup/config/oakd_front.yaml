@@ -3,6 +3,8 @@
     driver:
       i_usb_speed: SUPER
       i_enable_ir: true
+    camera:
+      i_nn_type: none
     pipeline_gen:
       i_pipeline_type: RGBD
       i_enable_imu: true

@@ -42,12 +42,11 @@ def test_select_depthai_launch_file_uses_v3_driver_launch_for_all_output_sets():
 def test_camera_topic_remappings_match_existing_front_camera_contract():
     remappings = camera_topic_remappings(
         driver_name="oak_front",
-        use_rectified_rgb=True,
         enable_depth=True,
         enable_pointcloud=True,
     )
 
-    assert ("oak_front/rgb/image_rect", "/camera_front/image") in remappings
+    assert ("oak_front/rgb/image_raw", "/camera_front/image") in remappings
     assert ("oak_front/rgb/camera_info", "/camera_front/camera_info") in remappings
     assert ("oak_front/stereo/image_raw", "/camera_front/depth_image") in remappings
     assert ("oak_front/rgbd/points", "/camera_front/points") in remappings
@@ -56,7 +55,6 @@ def test_camera_topic_remappings_match_existing_front_camera_contract():
 def test_camera_topic_remappings_can_disable_depth_outputs():
     remappings = camera_topic_remappings(
         driver_name="oak_front",
-        use_rectified_rgb=False,
         enable_depth=False,
         enable_pointcloud=False,
     )
@@ -75,7 +73,6 @@ def test_camera_launch_arguments_keep_depth_optional_and_usb3_first():
         params_file="/tmp/oakd_front.yaml",
         enable_depth=True,
         enable_pointcloud=False,
-        use_rectified_rgb=True,
     )
 
     assert launch_args["name"] == "oak_front"
@@ -85,4 +82,3 @@ def test_camera_launch_arguments_keep_depth_optional_and_usb3_first():
     assert launch_args["enable_color"] == "true"
     assert launch_args["enable_depth"] == "true"
     assert launch_args["pointcloud.enable"] == "false"
-    assert launch_args["rectify_rgb"] == "true"

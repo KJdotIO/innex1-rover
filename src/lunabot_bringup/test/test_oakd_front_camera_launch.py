@@ -48,7 +48,6 @@ def test_generate_launch_description_exposes_hardware_camera_arguments(
         "params_file",
         "enable_depth",
         "enable_pointcloud",
-        "use_rectified_rgb",
     ]
     assert len(validators) == 1
 
@@ -69,7 +68,6 @@ def test_launch_setup_rejects_invalid_depth_toggle(monkeypatch: pytest.MonkeyPat
             "params_file": "/tmp/oakd_front.yaml",
             "enable_depth": "sometimes",
             "enable_pointcloud": "false",
-            "use_rectified_rgb": "true",
         }
     )
 
@@ -93,7 +91,6 @@ def test_launch_setup_returns_grouped_depthai_include(monkeypatch: pytest.Monkey
             "params_file": "/tmp/oakd_front.yaml",
             "enable_depth": "true",
             "enable_pointcloud": "true",
-            "use_rectified_rgb": "true",
         }
     )
 

@@ -44,7 +44,6 @@ def _launch_setup(context):
     """Resolve launch arguments and return the DepthAI include group."""
     enable_depth = _validate_bool_launch_argument(context, "enable_depth")
     enable_pointcloud = _validate_bool_launch_argument(context, "enable_pointcloud")
-    use_rectified_rgb = _validate_bool_launch_argument(context, "use_rectified_rgb")
 
     driver_name = LaunchConfiguration("driver_name").perform(context).strip()
     if not driver_name:
@@ -70,7 +69,6 @@ def _launch_setup(context):
         SetRemap(src=source, dst=target)
         for source, target in camera_topic_remappings(
             driver_name=driver_name,
-            use_rectified_rgb=use_rectified_rgb,
             enable_depth=enable_depth,
             enable_pointcloud=enable_pointcloud,
         )
@@ -84,7 +82,6 @@ def _launch_setup(context):
             params_file=params_file,
             enable_depth=enable_depth,
             enable_pointcloud=enable_pointcloud,
-            use_rectified_rgb=use_rectified_rgb,
         ).items(),
     )
     return [GroupAction([*remap_actions, depthai_include])]
@@ -123,14 +120,6 @@ def generate_launch_description():
                 "enable_pointcloud",
                 default_value="false",
                 description="Publish /camera_front/points when true.",
-            ),
-            DeclareLaunchArgument(
-                "use_rectified_rgb",
-                default_value="true",
-                description=(
-                    "Remap DepthAI rectified RGB into /camera_front/image. "
-                    "Set false to use the raw RGB stream."
-                ),
             ),
             OpaqueFunction(function=_launch_setup),
         ]
