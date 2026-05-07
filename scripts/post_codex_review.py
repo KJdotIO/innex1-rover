@@ -28,7 +28,10 @@ SEVERITY_BADGES = {
 
 
 def run(args: list[str]) -> str:
-    result = subprocess.run(args, check=True, capture_output=True, text=True)
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip()
+        raise SystemExit(f"Command failed: {' '.join(args)}\n{message}")
     return result.stdout
 
 
@@ -220,8 +223,6 @@ def review_event(decision: str, findings: list[dict[str, Any]]) -> str:
     has_blocker = any(finding["severity"] in {"P0", "P1"} for finding in findings)
     if decision == "request_changes" or has_blocker:
         return "REQUEST_CHANGES"
-    if decision == "approve" and not has_blocker:
-        return "APPROVE"
     return "COMMENT"
 
 
