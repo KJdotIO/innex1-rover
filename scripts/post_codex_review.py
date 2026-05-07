@@ -25,6 +25,11 @@ SEVERITY_BADGES = {
     "P1": "🟠",
     "P2": "🟡",
 }
+EFFORT_LABELS = {
+    "quick_win": "Quick win",
+    "moderate": "Moderate",
+    "heavy_lift": "Heavy lift",
+}
 
 
 def run(args: list[str]) -> str:
@@ -50,7 +55,9 @@ def load_review(path: Path) -> dict[str, Any]:
 
 def validate_review(data: dict[str, Any]) -> None:
     required = {
+        "review_mode",
         "summary",
+        "merge_assessment",
         "decision",
         "findings",
         "checks_run",
@@ -67,6 +74,9 @@ def validate_review(data: dict[str, Any]) -> None:
     for index, finding in enumerate(data["findings"], start=1):
         for key in (
             "severity",
+            "category",
+            "effort",
+            "confidence",
             "title",
             "file",
             "line",
@@ -79,6 +89,13 @@ def validate_review(data: dict[str, Any]) -> None:
                 raise SystemExit(f"Finding {index} is missing {key}")
         if finding["severity"] not in SEVERITY_ORDER:
             raise SystemExit(f"Finding {index} has unknown severity {finding['severity']!r}")
+        if finding["effort"] not in EFFORT_LABELS:
+            raise SystemExit(f"Finding {index} has unknown effort {finding['effort']!r}")
+        confidence = finding["confidence"]
+        if not isinstance(confidence, int | float) or not 0 <= confidence <= 1:
+            raise SystemExit(f"Finding {index} confidence must be between 0 and 1")
+        if finding["severity"] in {"P0", "P1"} and confidence < 0.8:
+            raise SystemExit(f"Finding {index} is blocking but confidence is below 0.8")
         if not isinstance(finding["line"], int) or finding["line"] < 1:
             raise SystemExit(f"Finding {index} line must be a positive integer")
 
@@ -144,6 +161,8 @@ def format_finding(finding: dict[str, Any], *, inline: bool) -> str:
     badge = SEVERITY_BADGES[finding["severity"]]
     body = (
         f"**{badge} {label}: {finding['title']}**\n\n"
+        f"_Category: {finding['category']} · Effort: {EFFORT_LABELS[finding['effort']]} · "
+        f"Confidence: {finding['confidence']:.0%}_\n\n"
         f"{finding['body'].strip()}\n\n"
         f"**Evidence:** {finding['evidence'].strip()}\n\n"
         f"**Suggested fix:** {finding['suggested_fix'].strip()}"
@@ -172,9 +191,11 @@ def build_review_body(
 
     lines = [
         "<!-- codex-rover-review -->",
-        "## INX One Rover Review",
+        "## INX One Review",
         "",
         review["summary"].strip(),
+        "",
+        f"**Merge assessment:** {review['merge_assessment'].strip()}",
         "",
         "| Severity | Meaning | Count |",
         "| --- | --- | ---: |",
@@ -184,13 +205,17 @@ def build_review_body(
     ]
 
     if findings:
-        lines.extend(["", "| Finding | Location | Why it matters |", "| --- | --- | --- |"])
+        lines.extend(["", "| Finding | Location | Effort | Confidence | Why it matters |", "| --- | --- | --- | ---: | --- |"])
         for finding in findings:
             location = f"`{finding['file']}:{finding['line']}`"
             label = f"{SEVERITY_BADGES[finding['severity']]} {SEVERITY_LABELS[finding['severity']]}"
             title = table_cell(finding["title"])
             body = table_cell(finding["body"])
-            lines.append(f"| {label}: {title} | {location} | {body} |")
+            effort = EFFORT_LABELS[finding["effort"]]
+            confidence = f"{finding['confidence']:.0%}"
+            lines.append(f"| {label}: {title} | {location} | {effort} | {confidence} | {body} |")
+    else:
+        lines.extend(["", "LGTM! 🎉 No blocking issues found from this review pass."])
 
     if review["checks_run"]:
         lines.extend(["", "Checks run:"])
@@ -220,8 +245,11 @@ def build_review_body(
 
 
 def review_event(decision: str, findings: list[dict[str, Any]]) -> str:
-    has_blocker = any(finding["severity"] in {"P0", "P1"} for finding in findings)
-    if decision == "request_changes" or has_blocker:
+    has_blocker = any(
+        finding["severity"] in {"P0", "P1"} and finding["confidence"] >= 0.8
+        for finding in findings
+    )
+    if has_blocker:
         return "REQUEST_CHANGES"
     return "COMMENT"
 

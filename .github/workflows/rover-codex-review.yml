@@ -1,4 +1,4 @@
-name: Rover Codex Review
+name: INX One Review
 
 on:
   issue_comment:
@@ -14,7 +14,7 @@ on:
         default: "false"
 
 concurrency:
-  group: rover-codex-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
+  group: innex-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        contains(github.event.comment.body, '@rover-review') &&
+        contains(github.event.comment.body, '@innex') &&
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       )
     runs-on: [self-hosted]
@@ -36,6 +36,7 @@ jobs:
     env:
       FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
+      INNEX_APP_CONFIGURED: ${{ secrets.INNEX_APP_ID != '' && secrets.INNEX_APP_PRIVATE_KEY != '' }}
 
     steps:
       - name: Resolve pull request
@@ -91,10 +92,12 @@ jobs:
           set -euo pipefail
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" > review-target/codex-pr.json
           gh pr diff "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" > review-target/codex-pr.diff
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}/reviews?per_page=100" > review-target/codex-pr-reviews.json
           python3 - <<'PY'
           import json
           import os
           import secrets
+          from pathlib import Path
 
           pr = json.load(open("review-target/codex-pr.json", encoding="utf-8"))
 
@@ -112,6 +115,26 @@ jobs:
           write_env("PR_HEAD_SHA", pr["head"]["sha"])
           write_env("PR_DIFF_FILE", "codex-pr.diff")
           write_env("REVIEW_REQUEST_BODY", os.environ.get("REVIEW_REQUEST_BODY", ""))
+
+          reviews = json.load(open("review-target/codex-pr-reviews.json", encoding="utf-8"))
+          innex_reviews = [
+              review for review in reviews
+              if "<!-- codex-rover-review -->" in (review.get("body") or "")
+          ][-8:]
+          lines = [
+              "# Previous INX One Reviews",
+              "",
+              "Use this to avoid drip-feed re-reviews. Verify previous blockers first; do not re-report addressed findings.",
+          ]
+          if not innex_reviews:
+              lines.append("\nNo previous INX One reviews were found for this PR.")
+          for review in innex_reviews:
+              lines.extend([
+                  "",
+                  f"## Review {review.get('id')} - {review.get('state')} - {review.get('submitted_at')}",
+                  (review.get("body") or "").strip(),
+              ])
+          Path("review-target/codex-review-history.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
 
       - name: Prepare Codex home
@@ -192,10 +215,20 @@ jobs:
             -c 'shell_environment_policy.inherit="none"' \
             - < "$GITHUB_WORKSPACE/automation/.github/codex/prompts/rover-review.md"
 
+      - name: Create INX app token
+        id: app-token
+        if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.INNEX_APP_ID }}
+          private-key: ${{ secrets.INNEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: innex1-rover
+
       - name: Post GitHub review
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}

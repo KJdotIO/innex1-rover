@@ -16,3 +16,6 @@ wiki/
 codex-pr.diff
 codex-pr.json
 codex-review.json
+
+# GitHub App manifest conversion output
+innex-app-conversion.json
