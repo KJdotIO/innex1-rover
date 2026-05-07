@@ -16,9 +16,3 @@ required = true
 [mcp_servers.grep_app]
 url = "https://mcp.grep.app"
 required = false
-
-[mcp_servers.github]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-github"]
-env_vars = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
-required = false

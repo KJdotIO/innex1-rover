@@ -37,8 +37,6 @@ jobs:
       issues: write
 
     env:
-      GH_TOKEN: ${{ github.token }}
-      GITHUB_PERSONAL_ACCESS_TOKEN: ${{ github.token }}
       FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
       REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
 
@@ -46,6 +44,8 @@ jobs:
       - name: Resolve pull request
         id: pr
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -88,6 +88,8 @@ jobs:
 
       - name: Prepare review context
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" > review-target/codex-pr.json
@@ -194,6 +196,7 @@ jobs:
       - name: Post GitHub review
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           REVIEW_REQUEST_BODY: ${{ github.event.comment.body || '' }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
