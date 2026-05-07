@@ -63,7 +63,111 @@ jobs:
 
           echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
 
+      - name: Detect cheap Nexy command
+        id: command
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="${REVIEW_REQUEST_BODY,,}"
+          if [[ "${body}" == *"/innex help"* ]]; then
+            echo "help=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "help=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ "${body}" == *"/innex status"* ]]; then
+            echo "status=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Nexy app token
+        id: app-token
+        if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.INNEX_APP_ID }}
+          private-key: ${{ secrets.INNEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: innex1-rover
+
+      - name: React to Nexy request
+        if: ${{ github.event_name == 'issue_comment' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+            --method POST \
+            --field content=eyes >/dev/null || true
+
+      - name: Post Nexy help
+        if: ${{ steps.command.outputs.help == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          body="$(cat <<'MD'
+          <!-- codex-rover-status -->
+          ## Nexy Help
+
+          Here are the commands I understand:
+
+          | Command | What it does | Starts the model? |
+          | --- | --- | --- |
+          | `/innex` | Reviews the PR, unless this commit has already been reviewed. | Sometimes |
+          | `/innex please focus on launch files` | Reviews the PR and treats the extra text as guidance. | Sometimes |
+          | `/innex status` | Shows the latest Nexy review state and reviewed commit. | No |
+          | `/innex force review` | Runs a fresh review even if this commit was already reviewed. | Yes |
+          | `/innex help` | Shows this help message. | No |
+
+          I only request changes for high-confidence P0/P1 blockers. Smaller notes stay non-blocking.
+          MD
+          )"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${{ steps.pr.outputs.number }}/comments" \
+            --method POST \
+            --field body="${body}" >/dev/null
+
+      - name: Post Nexy status
+        if: ${{ steps.command.outputs.status == 'true' && steps.command.outputs.help != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}/reviews?per_page=100" > "${RUNNER_TEMP}/nexy-reviews.json"
+          python3 - "${RUNNER_TEMP}/nexy-reviews.json" "${{ steps.pr.outputs.number }}" <<'PY' > "${RUNNER_TEMP}/nexy-status.md"
+          import json
+          import sys
+
+          marker = "<!-- codex-rover-review -->"
+          reviews = json.load(open(sys.argv[1], encoding="utf-8"))
+          innex_reviews = [review for review in reviews if marker in (review.get("body") or "")]
+          latest = innex_reviews[-1] if innex_reviews else {}
+          lines = ["<!-- codex-rover-status -->", "## Nexy Status", ""]
+          if not latest:
+              lines.append("No previous Nexy review was found for this PR.")
+          else:
+              author = (latest.get("user") or {}).get("login") or "unknown"
+              commit = (latest.get("commit_id") or "")[:7] or "unknown"
+              state = (latest.get("state") or "unknown").lower()
+              lines.extend([
+                  f"Latest Nexy review: **{state}** by `{author}`.",
+                  f"Reviewed commit: `{commit}`.",
+              ])
+              if latest.get("submitted_at"):
+                  lines.append(f"Submitted: `{latest['submitted_at']}`.")
+          print("\n".join(lines).strip())
+          PY
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${{ steps.pr.outputs.number }}/comments" \
+            --method POST \
+            --field "body=$(cat "${RUNNER_TEMP}/nexy-status.md")" >/dev/null
+
       - name: Checkout trusted automation
+        if: ${{ steps.command.outputs.help != 'true' && steps.command.outputs.status != 'true' }}
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -71,6 +175,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout pull request merge
+        if: ${{ steps.command.outputs.help != 'true' && steps.command.outputs.status != 'true' }}
         uses: actions/checkout@v6
         with:
           ref: refs/pull/${{ steps.pr.outputs.number }}/merge
@@ -79,12 +184,14 @@ jobs:
           persist-credentials: false
 
       - name: Mark workspace as safe
+        if: ${{ steps.command.outputs.help != 'true' && steps.command.outputs.status != 'true' }}
         shell: bash
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE/automation"
           git config --global --add safe.directory "$GITHUB_WORKSPACE/review-target"
 
       - name: Checkout project wiki
+        if: ${{ steps.command.outputs.help != 'true' && steps.command.outputs.status != 'true' }}
         uses: actions/checkout@v6
         continue-on-error: true
         with:
@@ -94,6 +201,7 @@ jobs:
           persist-credentials: false
 
       - name: Prepare review context
+        if: ${{ steps.command.outputs.help != 'true' && steps.command.outputs.status != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -147,6 +255,7 @@ jobs:
           PY
 
       - name: Detect Nexy request intent
+        if: ${{ steps.command.outputs.help != 'true' && steps.command.outputs.status != 'true' }}
         id: intent
         shell: bash
         run: |
@@ -155,48 +264,6 @@ jobs:
             --reviews review-target/codex-pr-reviews.json \
             --head-sha "${PR_HEAD_SHA}" \
             --comment "${REVIEW_REQUEST_BODY}"
-
-      - name: Create Nexy app token
-        id: app-token
-        if: ${{ env.INNEX_APP_CONFIGURED == 'true' }}
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.INNEX_APP_ID }}
-          private-key: ${{ secrets.INNEX_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: innex1-rover
-
-      - name: React to Nexy request
-        if: ${{ github.event_name == 'issue_comment' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
-          COMMENT_ID: ${{ github.event.comment.id }}
-        run: |
-          set -euo pipefail
-          gh api \
-            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
-            --method POST \
-            --field content=eyes >/dev/null || true
-
-      - name: Post Nexy status
-        if: ${{ steps.intent.outputs.status == 'true' || steps.intent.outputs.help == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          LATEST_REVIEW_STATE: ${{ steps.intent.outputs.latest_review_state }}
-          LATEST_REVIEW_AUTHOR: ${{ steps.intent.outputs.latest_review_author }}
-          LATEST_REVIEW_SUBMITTED_AT: ${{ steps.intent.outputs.latest_review_submitted_at }}
-          LATEST_REVIEW_COMMIT_SHORT: ${{ steps.intent.outputs.latest_review_commit_short }}
-          HEAD_SHA_SHORT: ${{ steps.intent.outputs.head_sha_short }}
-        run: |
-          set -euo pipefail
-          mode="status"
-          if [ "${{ steps.intent.outputs.help }}" = "true" ]; then
-            mode="help"
-          fi
-          python3 automation/scripts/post_innex_review_status.py --mode "${mode}"
 
       - name: Skip duplicate Nexy review
         if: ${{ steps.intent.outputs.already_reviewed == 'true' }}
