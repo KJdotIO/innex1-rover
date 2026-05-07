@@ -113,21 +113,72 @@ jobs:
           cp .github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
 
       - name: Run Codex rover review
-        uses: openai/codex-action@v1
-        with:
-          openai-api-key: ${{ secrets.LITELLM_REVIEW_KEY }}
-          responses-api-endpoint: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
-          prompt-file: .github/codex/prompts/rover-review.md
-          output-file: codex-review.json
-          output-schema-file: .github/codex/schemas/rover-review.schema.json
-          codex-home: ${{ runner.temp }}/rover-codex-home
-          sandbox: read-only
-          # This job runs only on our trusted self-hosted runner. `drop-sudo`
-          # prompts for an admin password on macOS runners, which makes the job
-          # hang, so we rely on Codex's read-only sandbox instead.
-          safety-strategy: unsafe
-          model: rover-review
-          effort: high
+        shell: bash
+        env:
+          LITELLM_REVIEW_KEY: ${{ secrets.LITELLM_REVIEW_KEY }}
+          CODEX_RESPONSES_API_ENDPOINT: ${{ secrets.CODEX_RESPONSES_API_ENDPOINT }}
+        run: |
+          set -euo pipefail
+
+          command -v codex >/dev/null
+
+          server_info="${RUNNER_TEMP}/rover-codex-proxy.json"
+          rm -f "${server_info}"
+
+          cleanup_proxy() {
+            if [ -n "${proxy_pid:-}" ]; then
+              kill "${proxy_pid}" >/dev/null 2>&1 || true
+            fi
+            rm -f "${server_info}"
+          }
+          trap cleanup_proxy EXIT
+
+          (
+            printf '%s' "${LITELLM_REVIEW_KEY}" |
+              npx -y @openai/codex-responses-api-proxy \
+                --http-shutdown \
+                --server-info "${server_info}" \
+                --upstream-url "${CODEX_RESPONSES_API_ENDPOINT}"
+          ) &
+          proxy_pid=$!
+
+          for _ in {1..30}; do
+            if [ -s "${server_info}" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [ ! -s "${server_info}" ]; then
+            echo "Codex Responses API proxy did not start." >&2
+            exit 1
+          fi
+
+          proxy_port="$(python3 - "${server_info}" <<'PY'
+          import json
+          import sys
+
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          print(data["port"])
+          PY
+          )"
+
+          {
+            echo
+            echo '[model_providers.codex-action-responses-proxy]'
+            echo 'name = "Codex Action Responses Proxy"'
+            echo "base_url = \"http://127.0.0.1:${proxy_port}/v1\""
+            echo 'wire_api = "responses"'
+          } >> "${RUNNER_TEMP}/rover-codex-home/config.toml"
+
+          CODEX_HOME="${RUNNER_TEMP}/rover-codex-home" codex exec \
+            --sandbox read-only \
+            --output-schema .github/codex/schemas/rover-review.schema.json \
+            --output-last-message codex-review.json \
+            -c 'model="rover-review"' \
+            -c 'model_provider="codex-action-responses-proxy"' \
+            -c 'model_reasoning_effort="high"' \
+            - < .github/codex/prompts/rover-review.md
 
       - name: Post GitHub review
         shell: bash
