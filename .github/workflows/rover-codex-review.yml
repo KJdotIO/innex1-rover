@@ -12,10 +12,6 @@ on:
         description: Print the GitHub review payload instead of posting it
         required: false
         default: "false"
-      automation_ref:
-        description: Trusted ref containing the review workflow support files
-        required: false
-        default: main
 
 concurrency:
   group: rover-codex-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
@@ -60,7 +56,7 @@ jobs:
       - name: Checkout trusted automation
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.automation_ref || github.event.repository.default_branch }}
+          ref: ${{ github.event.repository.default_branch }}
           path: automation
           persist-credentials: false
 
@@ -154,6 +150,7 @@ jobs:
                 --upstream-url "${CODEX_RESPONSES_API_ENDPOINT}"
           ) &
           proxy_pid=$!
+          unset LITELLM_REVIEW_KEY CODEX_RESPONSES_API_ENDPOINT
 
           for _ in {1..30}; do
             if [ -s "${server_info}" ]; then
@@ -192,6 +189,7 @@ jobs:
             -c 'model="rover-review"' \
             -c 'model_provider="codex-action-responses-proxy"' \
             -c 'model_reasoning_effort="high"' \
+            -c 'shell_environment_policy.inherit="none"' \
             - < "$GITHUB_WORKSPACE/automation/.github/codex/prompts/rover-review.md"
 
       - name: Post GitHub review
