@@ -25,6 +25,8 @@ scripts/convert_innex_github_app_manifest.sh CODE_FROM_URL
 
 The conversion output contains the private key. Do not commit it.
 
+The app manifest includes an inactive webhook URL because GitHub requires `hook_attributes.url` during manifest creation. INX One does not use webhooks; GitHub Actions handles the `/innex` trigger.
+
 Set the returned app id and PEM as repository secrets, then install the app on `KJdotIO/innex1-rover`.
 
 Use `docs/assets/innex-app-avatar.png` as the app avatar. It uses the Innova mark on a dark background so it remains visible on GitHub's light theme.
