@@ -1,10 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-code="${1:-}"
-if [ -z "${code}" ]; then
-  echo "Usage: $0 MANIFEST_CODE" >&2
+input="${1:-}"
+if [ -z "${input}" ]; then
+  echo "Usage: $0 MANIFEST_CODE_OR_REDIRECT_URL" >&2
   exit 1
+fi
+
+if [ "${input}" = "CODE" ] || [ "${input}" = "CODE_FROM_URL" ] || [ "${input}" = "PASTE_REDIRECT_URL_OR_CODE_HERE" ]; then
+  echo "Replace ${input} with the real temporary code from GitHub's redirect URL." >&2
+  exit 1
+fi
+
+code="${input}"
+if [[ "${input}" == http://* || "${input}" == https://* ]]; then
+  code="$(python3 - "${input}" <<'PY'
+import sys
+from urllib.parse import parse_qs, urlparse
+
+query = parse_qs(urlparse(sys.argv[1]).query)
+values = query.get("code")
+if not values or not values[0]:
+    raise SystemExit("Could not find a code= value in the supplied URL")
+print(values[0])
+PY
+)"
 fi
 
 output="${INNEX_APP_OUTPUT:-innex-app-conversion.json}"

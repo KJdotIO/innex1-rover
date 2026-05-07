@@ -10,7 +10,8 @@ if [ ! -f "${manifest_path}" ]; then
   exit 1
 fi
 
-tmp_html="$(mktemp "${TMPDIR:-/tmp}/innex-app-manifest.XXXXXX.html")"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/innex-app-manifest.XXXXXX")"
+tmp_html="${tmp_dir}/index.html"
 account_type="$(gh api "users/${owner}" --jq '.type' 2>/dev/null || echo User)"
 
 python3 - "${manifest_path}" "${owner}" "${account_type}" "${state}" "${tmp_html}" <<'PY'
@@ -43,6 +44,6 @@ Path(tmp_html).write_text(
 PY
 
 echo "Opening GitHub App manifest flow for ${owner} (${account_type})."
-echo "After GitHub redirects, copy the 'code=' value and run:"
-echo "  scripts/convert_innex_github_app_manifest.sh CODE"
+echo "After GitHub redirects, copy the full redirect URL or just the 'code=' value and run:"
+echo "  scripts/convert_innex_github_app_manifest.sh 'PASTE_REDIRECT_URL_OR_CODE_HERE'"
 open "${tmp_html}"

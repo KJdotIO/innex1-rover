@@ -17,10 +17,10 @@ Run:
 scripts/create_innex_github_app.sh
 ```
 
-GitHub will open the app manifest flow for the `KJdotIO` account. After it redirects, copy the `code=` value from the URL and run:
+GitHub will open the app manifest flow for the `KJdotIO` account. After it redirects, copy either the full redirect URL or the `code=` value from the URL and run:
 
 ```bash
-scripts/convert_innex_github_app_manifest.sh CODE_FROM_URL
+scripts/convert_innex_github_app_manifest.sh 'PASTE_REDIRECT_URL_OR_CODE_HERE'
 ```
 
 The conversion output contains the private key. Do not commit it.
