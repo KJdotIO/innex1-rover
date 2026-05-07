@@ -11,15 +11,20 @@ if [ ! -f "${manifest_path}" ]; then
 fi
 
 tmp_html="$(mktemp "${TMPDIR:-/tmp}/innex-app-manifest.XXXXXX.html")"
-python3 - "${manifest_path}" "${owner}" "${state}" "${tmp_html}" <<'PY'
+account_type="$(gh api "users/${owner}" --jq '.type' 2>/dev/null || echo User)"
+
+python3 - "${manifest_path}" "${owner}" "${account_type}" "${state}" "${tmp_html}" <<'PY'
 import html
 import json
 import sys
 from pathlib import Path
 
-manifest_path, owner, state, tmp_html = sys.argv[1:]
+manifest_path, owner, account_type, state, tmp_html = sys.argv[1:]
 manifest = json.dumps(json.load(open(manifest_path, encoding="utf-8")))
-action = f"https://github.com/organizations/{owner}/settings/apps/new?state={state}"
+if account_type == "Organization":
+    action = f"https://github.com/organizations/{owner}/settings/apps/new?state={state}"
+else:
+    action = f"https://github.com/settings/apps/new?state={state}"
 Path(tmp_html).write_text(
     "\n".join(
         [
@@ -37,7 +42,7 @@ Path(tmp_html).write_text(
 )
 PY
 
-echo "Opening GitHub App manifest flow for ${owner}."
+echo "Opening GitHub App manifest flow for ${owner} (${account_type})."
 echo "After GitHub redirects, copy the 'code=' value and run:"
 echo "  scripts/convert_innex_github_app_manifest.sh CODE"
 open "${tmp_html}"
