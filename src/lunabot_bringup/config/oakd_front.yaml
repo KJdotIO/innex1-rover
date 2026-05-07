@@ -3,6 +3,18 @@
     driver:
       i_usb_speed: SUPER
       i_enable_ir: true
+      i_publish_tf_from_calibration: true
+      i_tf_tf_prefix: oak_front
+      i_tf_camera_model: OAK-D-PRO
+      i_tf_base_frame: oak_front
+      i_tf_parent_frame: camera_front_link
+      i_tf_cam_pos_x: 0.0
+      i_tf_cam_pos_y: 0.0
+      i_tf_cam_pos_z: 0.0
+      i_tf_cam_roll: 0.0
+      i_tf_cam_pitch: 0.0
+      i_tf_cam_yaw: 0.0
+      i_tf_imu_from_descr: false
     camera:
       i_nn_type: none
     pipeline_gen:
