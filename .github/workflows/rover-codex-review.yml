@@ -12,6 +12,10 @@ on:
         description: Print the GitHub review payload instead of posting it
         required: false
         default: "false"
+      automation_ref:
+        description: Trusted ref containing the review workflow support files
+        required: false
+        default: main
 
 concurrency:
   group: rover-codex-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
@@ -44,9 +48,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pr_number="${{ github.event.pull_request.number }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             pr_number="${{ inputs.pr_number }}"
           else
             pr_number="${{ github.event.issue.number }}"
@@ -54,23 +56,33 @@ jobs:
 
           echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
 
+      - name: Checkout trusted automation
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.automation_ref || github.event.repository.default_branch }}
+          path: automation
+          persist-credentials: false
+
       - name: Checkout pull request merge
         uses: actions/checkout@v6
         with:
           ref: refs/pull/${{ steps.pr.outputs.number }}/merge
+          path: review-target
           fetch-depth: 0
           persist-credentials: false
 
       - name: Mark workspace as safe
         shell: bash
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/automation"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/review-target"
 
       - name: Checkout project wiki
         uses: actions/checkout@v6
         continue-on-error: true
         with:
           repository: ${{ github.repository }}.wiki
-          path: wiki
+          path: review-target/wiki
           token: ${{ github.token }}
           persist-credentials: false
 
@@ -78,14 +90,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" > codex-pr.json
-          gh pr diff "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" > codex-pr.diff
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" > review-target/codex-pr.json
+          gh pr diff "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" > review-target/codex-pr.diff
           python3 - <<'PY'
           import json
           import os
           import secrets
 
-          pr = json.load(open("codex-pr.json", encoding="utf-8"))
+          pr = json.load(open("review-target/codex-pr.json", encoding="utf-8"))
 
           def write_env(name: str, value: str) -> None:
               marker = f"EOF_{secrets.token_hex(8)}"
@@ -108,7 +120,7 @@ jobs:
         run: |
           rm -rf "${RUNNER_TEMP}/rover-codex-home"
           mkdir -p "${RUNNER_TEMP}/rover-codex-home"
-          cp .github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
+          cp automation/.github/codex/config/config.toml "${RUNNER_TEMP}/rover-codex-home/config.toml"
 
       - name: Run Codex rover review
         shell: bash
@@ -170,13 +182,14 @@ jobs:
           } >> "${RUNNER_TEMP}/rover-codex-home/config.toml"
 
           CODEX_HOME="${RUNNER_TEMP}/rover-codex-home" codex exec \
+            --cd "$GITHUB_WORKSPACE/review-target" \
             --sandbox read-only \
-            --output-schema .github/codex/schemas/rover-review.schema.json \
-            --output-last-message codex-review.json \
+            --output-schema "$GITHUB_WORKSPACE/automation/.github/codex/schemas/rover-review.schema.json" \
+            --output-last-message "$GITHUB_WORKSPACE/codex-review.json" \
             -c 'model="rover-review"' \
             -c 'model_provider="codex-action-responses-proxy"' \
             -c 'model_reasoning_effort="high"' \
-            - < .github/codex/prompts/rover-review.md
+            - < "$GITHUB_WORKSPACE/automation/.github/codex/prompts/rover-review.md"
 
       - name: Post GitHub review
         shell: bash
@@ -190,12 +203,12 @@ jobs:
           if [ "${DRY_RUN}" = "true" ]; then
             args+=(--dry-run)
           fi
-          python3 scripts/post_codex_review.py codex-review.json "${args[@]}"
+          python3 automation/scripts/post_codex_review.py codex-review.json "${args[@]}"
 
       - name: Clean review workspace artefacts
         if: always()
         shell: bash
         run: |
-          rm -rf wiki
+          rm -rf automation review-target
           rm -rf "${RUNNER_TEMP}/rover-codex-home"
-          rm -f codex-pr.diff codex-pr.json codex-review.json
+          rm -f codex-review.json
