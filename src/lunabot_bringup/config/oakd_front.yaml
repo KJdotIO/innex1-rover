@@ -1,17 +1,21 @@
 /**:
   ros__parameters:
-    camera:
-      i_pipeline_type: RGBD
+    driver:
       i_usb_speed: SUPER
-      i_enable_imu: true
       i_enable_ir: true
+    pipeline_gen:
+      i_pipeline_type: RGBD
+      i_enable_imu: true
     rgb:
       i_publish_topic: true
+      i_enable_nn: false
       i_width: 640
       i_height: 480
       i_fps: 30.0
     stereo:
       i_publish_topic: true
+      i_enable_left_spatial_nn: false
+      i_enable_right_spatial_nn: false
       i_width: 640
       i_height: 400
       i_fps: 15.0
