@@ -11,7 +11,7 @@ command = "npx"
 args = ["-y", "firecrawl-mcp"]
 env_vars = ["FIRECRAWL_API_KEY"]
 startup_timeout_sec = 60.0
-required = true
+required = false
 
 [mcp_servers.grep_app]
 url = "https://mcp.grep.app"

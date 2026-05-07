@@ -15,6 +15,16 @@ from typing import Any
 
 
 SEVERITY_ORDER = {"P0": 0, "P1": 1, "P2": 2}
+SEVERITY_LABELS = {
+    "P0": "P0 Critical",
+    "P1": "P1 Major",
+    "P2": "P2 Minor",
+}
+SEVERITY_BADGES = {
+    "P0": "🔴",
+    "P1": "🟠",
+    "P2": "🟡",
+}
 
 
 def run(args: list[str]) -> str:
@@ -112,12 +122,28 @@ def get_pr_files(repo: str, pr_number: int) -> dict[str, set[int]]:
     return files
 
 
+def table_cell(value: Any) -> str:
+    return str(value).replace("\n", " ").replace("|", "\\|").strip()
+
+
+def optional_env_int(name: str) -> int | None:
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise SystemExit(f"{name} must be an integer") from exc
+
+
 def format_finding(finding: dict[str, Any], *, inline: bool) -> str:
+    label = SEVERITY_LABELS[finding["severity"]]
+    badge = SEVERITY_BADGES[finding["severity"]]
     body = (
-        f"**{finding['severity']}: {finding['title']}**\n\n"
+        f"**{badge} {label}: {finding['title']}**\n\n"
         f"{finding['body'].strip()}\n\n"
-        f"Evidence: {finding['evidence'].strip()}\n\n"
-        f"Suggested fix: {finding['suggested_fix'].strip()}"
+        f"**Evidence:** {finding['evidence'].strip()}\n\n"
+        f"**Suggested fix:** {finding['suggested_fix'].strip()}"
     )
     references = finding.get("references") or []
     if references:
@@ -143,12 +169,25 @@ def build_review_body(
 
     lines = [
         "<!-- codex-rover-review -->",
-        "## Codex Rover Review",
+        "## INX One Rover Review",
         "",
         review["summary"].strip(),
         "",
-        f"Findings: {counts['P0']} P0, {counts['P1']} P1, {counts['P2']} P2.",
+        "| Severity | Meaning | Count |",
+        "| --- | --- | ---: |",
+        f"| 🔴 P0 | Critical blocker | {counts['P0']} |",
+        f"| 🟠 P1 | Major issue | {counts['P1']} |",
+        f"| 🟡 P2 | Minor or follow-up | {counts['P2']} |",
     ]
+
+    if findings:
+        lines.extend(["", "| Finding | Location | Why it matters |", "| --- | --- | --- |"])
+        for finding in findings:
+            location = f"`{finding['file']}:{finding['line']}`"
+            label = f"{SEVERITY_BADGES[finding['severity']]} {SEVERITY_LABELS[finding['severity']]}"
+            title = table_cell(finding["title"])
+            body = table_cell(finding["body"])
+            lines.append(f"| {label}: {title} | {location} | {body} |")
 
     if review["checks_run"]:
         lines.extend(["", "Checks run:"])
@@ -181,7 +220,7 @@ def review_event(decision: str, findings: list[dict[str, Any]]) -> str:
     has_blocker = any(finding["severity"] in {"P0", "P1"} for finding in findings)
     if decision == "request_changes" or has_blocker:
         return "REQUEST_CHANGES"
-    if decision == "approve" and not findings:
+    if decision == "approve" and not has_blocker:
         return "APPROVE"
     return "COMMENT"
 
@@ -254,7 +293,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("review_json", type=Path)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
-    parser.add_argument("--pr", type=int, default=os.environ.get("PR_NUMBER"))
+    parser.add_argument(
+        "--pr",
+        type=int,
+        default=optional_env_int("PR_NUMBER"),
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 

@@ -9,10 +9,13 @@ CODEX_RESPONSES_API_ENDPOINT="${CODEX_RESPONSES_API_ENDPOINT:-http://127.0.0.1:4
 LITELLM_REVIEW_KEY="${LITELLM_REVIEW_KEY:-sk-local-rover-review}"
 created_wiki=0
 created_diff=0
+proxy_port=""
 
 tmp_dir="$(mktemp -d)"
 cleanup() {
-  if [ -n "${proxy_pid:-}" ]; then
+  if [ -n "${proxy_port:-}" ]; then
+    curl -sf "http://127.0.0.1:${proxy_port}/shutdown" >/dev/null 2>&1 || true
+  elif [ -n "${proxy_pid:-}" ]; then
     kill "$proxy_pid" >/dev/null 2>&1 || true
   fi
   if [ "$created_wiki" = "1" ]; then
@@ -36,8 +39,8 @@ git fetch origin main --quiet || true
 
 PR_DIFF_FILE="${PR_DIFF_FILE:-codex-pr.diff}"
 export PR_DIFF_FILE
-git diff --find-renames "$BASE_REF"...HEAD > "$PR_DIFF_FILE"
-if [ "$PR_DIFF_FILE" = "codex-pr.diff" ]; then
+if [ ! -f "$PR_DIFF_FILE" ]; then
+  git diff --find-renames "$BASE_REF"...HEAD > "$PR_DIFF_FILE"
   created_diff=1
 fi
 
