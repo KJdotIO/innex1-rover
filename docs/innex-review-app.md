@@ -69,6 +69,40 @@ model: openai/gpt-5.2
 
 That is the normal review model. Keep heavier models for a future explicit deep-review mode if we decide the extra cost is worth it.
 
+## Laptop-Local Runtime
+
+Run the Nexy worker from the laptop's internal disk, not from an external SSD. GitHub Actions keeps runner state, job locks and checkouts under the runner install directory; if that directory disappears mid-job, GitHub can be left with an offline-but-busy runner and a review stuck in progress.
+
+Set up the stable local runtime with:
+
+```bash
+scripts/setup_nexy_laptop_runtime.sh --configure-runner
+```
+
+By default this creates:
+
+```text
+~/nexy/innex1-rover-review
+~/actions-runners/innex1-rover
+```
+
+Start LiteLLM in one terminal:
+
+```bash
+~/nexy/innex1-rover-review/start_litellm_rover_review.sh
+```
+
+Start the runner in another terminal:
+
+```bash
+cd ~/actions-runners/innex1-rover
+./run.sh
+```
+
+The workflow targets runners labelled `rover-review`, so this worker must keep that label. The setup script configures it automatically.
+
+The job still checks out the PR and automation code into the runner workspace. The important bit is that the workspace is now under `~/actions-runners/innex1-rover/_work`, so closing or unplugging an external drive does not remove the running job from underneath GitHub Actions.
+
 ## Local Cleanup
 
 After local experiments, run:
