@@ -49,6 +49,11 @@ Start with a low throttle cap:
 ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
 ```
 
+This launch starts the drivetrain bridge and velocity gate. Keep
+`dry_run:=false` for real first-motion tests: if the serial controller is
+missing, the bridge faults and the gate stays closed. Use `dry_run:=true` only
+when you deliberately want a no-motor-output dry run.
+
 If the Sabertooth UART is not `/dev/ttyTHS1`, pass the actual device:
 
 ```bash
@@ -110,6 +115,8 @@ game_controller_node
   -> /cmd_vel_teleop
   -> twist_mux
   -> /cmd_vel_safe
+  -> velocity_gate
+  -> /cmd_vel_gated
   -> drivetrain_bridge
   -> Jetson UART TX
   -> Sabertooth S1

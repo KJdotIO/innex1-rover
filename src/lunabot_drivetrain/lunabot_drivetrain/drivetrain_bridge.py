@@ -66,6 +66,8 @@ class DrivetrainBridge(Node):
             f"Drivetrain bridge started — "
             f"port={self._serial_port}, "
             f"protocol={self._serial_protocol}, "
+            f"dry_run={self._dry_run}, "
+            f"cmd_vel_topic={self._cmd_vel_topic}, "
             f"addresses={self._addresses}"
         )
 
@@ -74,6 +76,8 @@ class DrivetrainBridge(Node):
         self.declare_parameter("serial_port", "/dev/ttyTHS1")
         self.declare_parameter("baud_rate", 9600)
         self.declare_parameter("serial_protocol", "legacy_simplified")
+        self.declare_parameter("dry_run", False)
+        self.declare_parameter("cmd_vel_topic", "/cmd_vel_gated")
         self.declare_parameter("sabertooth_addresses", [128, 129])
         self.declare_parameter("track_width_m", 0.44)
         self.declare_parameter("wheel_radius_m", 0.065)
@@ -93,6 +97,10 @@ class DrivetrainBridge(Node):
         self._serial_protocol = str(
             self.get_parameter("serial_protocol").value
         ).strip().lower()
+        self._dry_run = bool(self.get_parameter("dry_run").value)
+        self._cmd_vel_topic = str(
+            self.get_parameter("cmd_vel_topic").value
+        ).strip()
         self._addresses = list(
             self.get_parameter("sabertooth_addresses").value
         )
@@ -131,6 +139,8 @@ class DrivetrainBridge(Node):
                 f"{sorted(_SUPPORTED_PROTOCOLS)}, "
                 f"got {self._serial_protocol!r}"
             )
+        if not self._cmd_vel_topic:
+            raise ValueError("cmd_vel_topic must not be empty")
         if self._track_width <= 0.0:
             raise ValueError(
                 f"track_width_m must be positive: "
@@ -197,7 +207,7 @@ class DrivetrainBridge(Node):
         self._serial: Any = None
 
     def _init_serial(self) -> None:
-        """Open the UART serial port.  Logs a warning if unavailable."""
+        """Open the UART serial port, failing closed unless dry-run is explicit."""
         try:
             import serial as pyserial
             self._serial = pyserial.Serial(
@@ -209,18 +219,33 @@ class DrivetrainBridge(Node):
             self._state = DrivetrainStatus.STATE_READY
             self.get_logger().info(f"Serial port {self._serial_port} opened")
         except Exception as exc:
-            self.get_logger().warn(
-                f"Serial port {self._serial_port} unavailable: {exc}. "
-                f"Running in dry-run mode (no motor output)."
-            )
             self._serial = None
             self._controller_online = [False, False]
+            self._handle_serial_unavailable(exc)
+
+    def _handle_serial_unavailable(self, exc: Exception) -> None:
+        """Put the bridge in the configured no-serial state."""
+        if self._dry_run:
+            self.get_logger().warn(
+                f"Serial port {self._serial_port} unavailable: {exc}. "
+                "Explicit dry-run enabled, so motor output is disabled "
+                "but ROS interfaces stay active."
+            )
             self._state = DrivetrainStatus.STATE_READY
+            return
+
+        self.get_logger().error(
+            f"Serial port {self._serial_port} unavailable: {exc}. "
+            "dry_run is false, so drivetrain bridge is FAULTED and "
+            "will not accept motion commands."
+        )
+        self._fault_code = DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
+        self._state = DrivetrainStatus.STATE_FAULT
 
     def _init_ros(self) -> None:
         """Set up publishers, subscribers, and timers."""
         self._cmd_vel_sub = self.create_subscription(
-            Twist, "/cmd_vel_safe", self._cmd_vel_callback, 10
+            Twist, self._cmd_vel_topic, self._cmd_vel_callback, 10
         )
         self._inhibit_sub = self.create_subscription(
             Bool,
