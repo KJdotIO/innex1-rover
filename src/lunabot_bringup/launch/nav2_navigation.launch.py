@@ -5,10 +5,11 @@ from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
-from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes, Node
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import LoadComposableNodes, Node
 from launch_ros.descriptions import ComposableNode, ParameterFile
+from nav2_common.launch import RewrittenYaml
 
 
 def _bringup_path(*parts: str) -> str:
@@ -53,10 +54,22 @@ def generate_launch_description():
         ("/tf_static", "tf_static"),
     ]
 
+    param_substitutions = {
+        "use_sim_time": use_sim_time,
+        "autostart": autostart,
+    }
+
     collision_monitor_params = _nav_config_path("collision_monitor.yaml")
 
-    configured_params = ParameterFile(params_file, allow_substs=True)
-    nav2_params = [configured_params, {"use_sim_time": use_sim_time}]
+    configured_params = ParameterFile(
+        RewrittenYaml(
+            source_file=params_file,
+            root_key=namespace,
+            param_rewrites=param_substitutions,
+            convert_types=True,
+        ),
+        allow_substs=True,
+    )
 
     stdout_linebuf_envvar = SetEnvironmentVariable(
         "RCUTILS_LOGGING_BUFFERED_STREAM", "1"
@@ -88,7 +101,7 @@ def generate_launch_description():
 
     declare_use_composition_cmd = DeclareLaunchArgument(
         "use_composition",
-        default_value="True",
+        default_value="False",
         description="Use composed bringup if True",
     )
 
@@ -111,7 +124,7 @@ def generate_launch_description():
     )
 
     load_nodes = GroupAction(
-        condition=UnlessCondition(use_composition),
+        condition=IfCondition(PythonExpression(["not ", use_composition])),
         actions=[
             Node(
                 package="nav2_controller",
@@ -119,7 +132,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=[*remappings, ("cmd_vel", "cmd_vel_nav")],
             ),
@@ -130,7 +143,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=remappings,
             ),
@@ -141,7 +154,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=remappings,
             ),
@@ -152,7 +165,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=remappings,
             ),
@@ -163,7 +176,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=remappings,
             ),
@@ -174,7 +187,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=remappings,
             ),
@@ -185,7 +198,7 @@ def generate_launch_description():
                 output="screen",
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                parameters=nav2_params,
+                parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
                 remappings=[
                     *remappings,
@@ -222,16 +235,6 @@ def generate_launch_description():
         ],
     )
 
-    nav2_container = ComposableNodeContainer(
-        condition=IfCondition(use_composition),
-        name=container_name,
-        namespace=namespace,
-        package="rclcpp_components",
-        executable="component_container_isolated",
-        output="screen",
-        arguments=["--ros-args", "--log-level", log_level],
-    )
-
     load_composable_nodes = LoadComposableNodes(
         condition=IfCondition(use_composition),
         target_container=container_name_full,
@@ -240,49 +243,49 @@ def generate_launch_description():
                 package="nav2_controller",
                 plugin="nav2_controller::ControllerServer",
                 name="controller_server",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=[*remappings, ("cmd_vel", "cmd_vel_nav")],
             ),
             ComposableNode(
                 package="nav2_smoother",
                 plugin="nav2_smoother::SmootherServer",
                 name="smoother_server",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=remappings,
             ),
             ComposableNode(
                 package="nav2_planner",
                 plugin="nav2_planner::PlannerServer",
                 name="planner_server",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=remappings,
             ),
             ComposableNode(
                 package="nav2_behaviors",
                 plugin="behavior_server::BehaviorServer",
                 name="behavior_server",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=remappings,
             ),
             ComposableNode(
                 package="nav2_bt_navigator",
                 plugin="nav2_bt_navigator::BtNavigator",
                 name="bt_navigator",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=remappings,
             ),
             ComposableNode(
                 package="nav2_waypoint_follower",
                 plugin="nav2_waypoint_follower::WaypointFollower",
                 name="waypoint_follower",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=remappings,
             ),
             ComposableNode(
                 package="nav2_velocity_smoother",
                 plugin="nav2_velocity_smoother::VelocitySmoother",
                 name="velocity_smoother",
-                parameters=nav2_params,
+                parameters=[configured_params],
                 remappings=[
                     *remappings,
                     ("cmd_vel", "cmd_vel_nav"),
@@ -325,6 +328,5 @@ def generate_launch_description():
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
     ld.add_action(load_nodes)
-    ld.add_action(nav2_container)
     ld.add_action(load_composable_nodes)
     return ld
