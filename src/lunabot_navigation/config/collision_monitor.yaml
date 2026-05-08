@@ -15,7 +15,7 @@ collision_monitor:
     cmd_vel_in_topic: "cmd_vel"
     cmd_vel_out_topic: "cmd_vel_safe"
     transform_tolerance: 0.2
-    source_timeout: 0.5
+    source_timeout: 0.0
     base_shift_correction: true
     stop_pub_timeout: 2.0
 
@@ -47,7 +47,6 @@ collision_monitor:
       topic: "/camera_front/points"
       min_height: 0.10
       max_height: 0.60
-      source_timeout: 0.5
       enabled: true
 
     rear_camera:
@@ -55,7 +54,6 @@ collision_monitor:
       topic: "/camera_rear/points"
       min_height: 0.10
       max_height: 0.60
-      source_timeout: 0.5
       enabled: true
 
     lidar:
@@ -63,5 +61,4 @@ collision_monitor:
       topic: "/ouster/points"
       min_height: 0.10
       max_height: 0.60
-      source_timeout: 0.6
       enabled: true

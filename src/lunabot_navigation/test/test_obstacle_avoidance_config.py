@@ -211,8 +211,8 @@ class TestCollisionMonitorConfig:
         sources = self.params["observation_sources"]
         assert len(sources) >= 1
 
-    def test_stale_sources_have_bounded_timeout(self):
-        assert 0.0 < self.params["source_timeout"] <= 0.6
+    def test_stale_source_blocking_is_disabled_for_sim_timing(self):
+        assert self.params["source_timeout"] == 0.0
 
     def test_all_sources_have_topic(self):
         for source_name in self.params["observation_sources"]:
@@ -221,7 +221,7 @@ class TestCollisionMonitorConfig:
             assert source["topic"].startswith("/"), (
                 f"Source '{source_name}' topic should be absolute"
             )
-            assert 0.0 < source["source_timeout"] <= 0.6
+            assert "source_timeout" not in source
 
     def test_height_bounds_consistent(self):
         for source_name in self.params["observation_sources"]:
