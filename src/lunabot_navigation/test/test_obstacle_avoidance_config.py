@@ -135,6 +135,54 @@ class TestInflationLayerConfig:
             >= self.local_inflation["inflation_radius"]
         )
 
+    def test_inflation_costs_decay_promptly(self):
+        assert self.global_inflation["cost_scaling_factor"] >= 3.0
+        assert self.local_inflation["cost_scaling_factor"] >= 3.0
+
+    def test_local_inflation_matches_controller_scaling_band(self):
+        config = _load_yaml(NAV2_PARAMS_PATH)
+        controller = config["controller_server"]["ros__parameters"]["FollowPath"]
+        assert controller["cost_scaling_dist"] <= self.local_inflation[
+            "inflation_radius"
+        ]
+
+
+class TestControllerGoalConfig:
+    """Verify mission navigation has explicit goal and progress checks."""
+
+    def setup_method(self):
+        config = _load_yaml(NAV2_PARAMS_PATH)
+        self.params = config["controller_server"]["ros__parameters"]
+
+    def test_goal_checker_is_explicit_and_stateful(self):
+        assert self.params["goal_checker_plugins"] == ["goal_checker"]
+        goal_checker = self.params["goal_checker"]
+        assert goal_checker["plugin"] == "nav2_controller::SimpleGoalChecker"
+        assert goal_checker["stateful"] is True
+        assert goal_checker["xy_goal_tolerance"] >= 0.25
+
+    def test_progress_checker_allows_slow_final_approach(self):
+        assert self.params["progress_checker_plugins"] == ["progress_checker"]
+        progress_checker = self.params["progress_checker"]
+        assert progress_checker["plugin"] == "nav2_controller::SimpleProgressChecker"
+        assert progress_checker["required_movement_radius"] <= 0.25
+        assert progress_checker["movement_time_allowance"] >= 10.0
+
+
+class TestCostmapPublishingConfig:
+    """Verify costmap topic publishing stays lean for Jetson mission runs."""
+
+    def setup_method(self):
+        config = _load_yaml(NAV2_PARAMS_PATH)
+        self.global_params = _costmap_params(config, "global_costmap")
+        self.local_params = _costmap_params(config, "local_costmap")
+
+    def test_global_costmap_does_not_publish_full_updates(self):
+        assert self.global_params["always_send_full_costmap"] is False
+
+    def test_local_costmap_publish_frequency_is_visualisation_only_rate(self):
+        assert self.local_params["publish_frequency"] <= 2.0
+
 
 class TestCollisionMonitorConfig:
     """Verify the collision monitor YAML is well-formed."""
@@ -161,7 +209,10 @@ class TestCollisionMonitorConfig:
 
     def test_observation_sources_not_empty(self):
         sources = self.params["observation_sources"]
-        assert len(sources) >= 1
+        assert sources == ["front_camera", "rear_camera"]
+
+    def test_stale_source_timeout_covers_sim_sensor_jitter(self):
+        assert 2.0 <= self.params["source_timeout"] <= 3.0
 
     def test_all_sources_have_topic(self):
         for source_name in self.params["observation_sources"]:
@@ -170,6 +221,7 @@ class TestCollisionMonitorConfig:
             assert source["topic"].startswith("/"), (
                 f"Source '{source_name}' topic should be absolute"
             )
+            assert "source_timeout" not in source
 
     def test_height_bounds_consistent(self):
         for source_name in self.params["observation_sources"]:
