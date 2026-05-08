@@ -209,7 +209,7 @@ class TestCollisionMonitorConfig:
 
     def test_observation_sources_not_empty(self):
         sources = self.params["observation_sources"]
-        assert len(sources) >= 1
+        assert sources == ["front_camera", "rear_camera"]
 
     def test_stale_source_timeout_covers_sim_sensor_jitter(self):
         assert 2.0 <= self.params["source_timeout"] <= 3.0

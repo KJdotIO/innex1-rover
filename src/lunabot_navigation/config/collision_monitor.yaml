@@ -40,7 +40,7 @@ collision_monitor:
       polygon_pub_topic: "polygon_slowdown"
       enabled: true
 
-    observation_sources: ["front_camera", "rear_camera", "lidar"]
+    observation_sources: ["front_camera", "rear_camera"]
 
     front_camera:
       type: "pointcloud"
@@ -52,13 +52,6 @@ collision_monitor:
     rear_camera:
       type: "pointcloud"
       topic: "/camera_rear/points"
-      min_height: 0.10
-      max_height: 0.60
-      enabled: true
-
-    lidar:
-      type: "pointcloud"
-      topic: "/ouster/points"
       min_height: 0.10
       max_height: 0.60
       enabled: true
