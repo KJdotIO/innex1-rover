@@ -7,7 +7,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch_ros.actions import LoadComposableNodes, Node
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes, Node
 from launch_ros.descriptions import ComposableNode, ParameterFile
 from nav2_common.launch import RewrittenYaml
 
@@ -101,7 +101,7 @@ def generate_launch_description():
 
     declare_use_composition_cmd = DeclareLaunchArgument(
         "use_composition",
-        default_value="False",
+        default_value="True",
         description="Use composed bringup if True",
     )
 
@@ -235,6 +235,16 @@ def generate_launch_description():
         ],
     )
 
+    nav2_container = ComposableNodeContainer(
+        condition=IfCondition(use_composition),
+        name=container_name,
+        namespace=namespace,
+        package="rclcpp_components",
+        executable="component_container_isolated",
+        output="screen",
+        arguments=["--ros-args", "--log-level", log_level],
+    )
+
     load_composable_nodes = LoadComposableNodes(
         condition=IfCondition(use_composition),
         target_container=container_name_full,
@@ -328,5 +338,6 @@ def generate_launch_description():
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
     ld.add_action(load_nodes)
+    ld.add_action(nav2_container)
     ld.add_action(load_composable_nodes)
     return ld

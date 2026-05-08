@@ -49,7 +49,11 @@ def _is_falsey(value):
 
 
 def _build_nav2_start_actions(
-    nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+    nav2_launch_path,
+    nav_params_path,
+    use_sim_time,
+    enable_teleop,
+    nav2_use_composition,
 ):
     """Return Nav2 start actions for direct or muxed operation."""
     nav2_launch = GroupAction(
@@ -60,6 +64,7 @@ def _build_nav2_start_actions(
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
                     "autostart": "true",
+                    "use_composition": nav2_use_composition,
                 }.items(),
             ),
         ],
@@ -76,6 +81,7 @@ def _build_nav2_start_actions(
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
                     "autostart": "true",
+                    "use_composition": nav2_use_composition,
                 }.items(),
             ),
         ],
@@ -103,11 +109,16 @@ def _handle_preflight_exit(
     nav_params_path,
     use_sim_time,
     enable_teleop,
+    nav2_use_composition,
 ):
     """Start Nav2 only when the launch-gate preflight passes."""
     if event.returncode == 0:
         return _build_nav2_start_actions(
-            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path,
+            nav_params_path,
+            use_sim_time,
+            enable_teleop,
+            nav2_use_composition,
         )
 
     return [
@@ -171,6 +182,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
     enable_teleop = LaunchConfiguration("enable_teleop")
+    nav2_use_composition = LaunchConfiguration("nav2_use_composition")
     enforce_preflight = LaunchConfiguration("enforce_preflight")
     preflight_config = LaunchConfiguration("preflight_config")
     preflight_lidar_debug_config = LaunchConfiguration("preflight_lidar_debug_config")
@@ -314,6 +326,7 @@ def generate_launch_description():
                 nav_params_path,
                 use_sim_time,
                 enable_teleop,
+                nav2_use_composition,
             ),
         ),
         condition=IfCondition(_is_truthy(enforce_preflight)),
@@ -329,6 +342,7 @@ def generate_launch_description():
                 nav_params_path,
                 use_sim_time,
                 enable_teleop,
+                nav2_use_composition,
             ),
         ),
         condition=IfCondition(_is_truthy(enforce_preflight)),
@@ -336,7 +350,11 @@ def generate_launch_description():
 
     direct_nav2_start = GroupAction(
         _build_nav2_start_actions(
-            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path,
+            nav_params_path,
+            use_sim_time,
+            enable_teleop,
+            nav2_use_composition,
         ),
         condition=IfCondition(_is_falsey(enforce_preflight)),
     )
@@ -383,6 +401,14 @@ def generate_launch_description():
                 "enable_teleop",
                 default_value="false",
                 description=("Launch joystick teleoperation through twist_mux."),
+            ),
+            DeclareLaunchArgument(
+                "nav2_use_composition",
+                default_value="true",
+                description=(
+                    "Launch Nav2 servers in a component container to reduce "
+                    "process overhead on the Jetson."
+                ),
             ),
             DeclareLaunchArgument(
                 "enforce_preflight",

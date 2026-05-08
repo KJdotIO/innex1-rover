@@ -14,8 +14,8 @@ collision_monitor:
     odom_frame_id: "odom"
     cmd_vel_in_topic: "cmd_vel"
     cmd_vel_out_topic: "cmd_vel_safe"
-    transform_tolerance: 0.5
-    source_timeout: 0.0
+    transform_tolerance: 0.2
+    source_timeout: 0.5
     base_shift_correction: true
     stop_pub_timeout: 2.0
 
@@ -26,7 +26,7 @@ collision_monitor:
       points: [0.30, 0.22, 0.30, -0.22, -0.35, -0.22, -0.35, 0.22]
       action_type: "stop"
       max_points: 3
-      visualize: true
+      visualize: false
       polygon_pub_topic: "polygon_stop"
       enabled: true
 
@@ -36,7 +36,7 @@ collision_monitor:
       action_type: "slowdown"
       max_points: 6
       slowdown_ratio: 0.3
-      visualize: true
+      visualize: false
       polygon_pub_topic: "polygon_slowdown"
       enabled: true
 
@@ -47,6 +47,7 @@ collision_monitor:
       topic: "/camera_front/points"
       min_height: 0.10
       max_height: 0.60
+      source_timeout: 0.5
       enabled: true
 
     rear_camera:
@@ -54,6 +55,7 @@ collision_monitor:
       topic: "/camera_rear/points"
       min_height: 0.10
       max_height: 0.60
+      source_timeout: 0.5
       enabled: true
 
     lidar:
@@ -61,4 +63,5 @@ collision_monitor:
       topic: "/ouster/points"
       min_height: 0.10
       max_height: 0.60
+      source_timeout: 0.6
       enabled: true
