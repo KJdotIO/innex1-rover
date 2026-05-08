@@ -18,6 +18,14 @@ def _fake_logger():
     )
 
 
+def _fake_publisher():
+    """Return a publisher stub that records messages."""
+    publisher = MagicMock()
+    publisher.messages = []
+    publisher.publish.side_effect = publisher.messages.append
+    return publisher
+
+
 def _make_manager(monkeypatch):
     """Construct a MissionManager without spinning a real ROS node."""
     monkeypatch.setattr(
@@ -38,6 +46,13 @@ def _make_manager(monkeypatch):
     manager._cycle_count = 0
     manager._estop_active = False
     manager._motion_inhibited = False
+    manager._last_failure_reason = ""
+    manager._mission_active = False
+    manager._mission_state_pub = _fake_publisher()
+    manager._autonomy_mode_pub = _fake_publisher()
+    manager._time_remaining_pub = _fake_publisher()
+    manager._cycle_count_pub = _fake_publisher()
+    manager._failure_reason_pub = _fake_publisher()
     return manager
 
 
@@ -50,6 +65,46 @@ def test_initial_state_is_initialize_mission(monkeypatch):
     """Initial FSM state must be INITIALIZE_MISSION."""
     manager = _make_manager(monkeypatch)
     assert manager._state == MissionState.INITIALIZE_MISSION
+
+
+def test_operator_state_publishers_emit_current_snapshot(monkeypatch):
+    """Mission manager should publish passive operator telemetry."""
+    manager = _make_manager(monkeypatch)
+    manager._state = MissionState.NAV_TO_EXCAVATION
+    manager._cycle_count = 2
+    manager._last_failure_reason = "none"
+
+    manager._publish_operator_state()
+
+    assert manager._mission_state_pub.messages[-1].data == "nav_to_excavation"
+    assert manager._autonomy_mode_pub.messages[-1].data == "idle"
+    assert manager._time_remaining_pub.messages[-1].data == 1200.0
+    assert manager._cycle_count_pub.messages[-1].data == 2
+    assert manager._failure_reason_pub.messages[-1].data == "none"
+
+
+def test_autonomy_mode_reports_safety_states(monkeypatch):
+    """Operator mode should surface inhibit and E-stop states."""
+    manager = _make_manager(monkeypatch)
+    manager._mission_active = True
+
+    assert manager._autonomy_mode_text() == "autonomous"
+
+    manager._motion_inhibited = True
+    assert manager._autonomy_mode_text() == "motion_inhibited"
+
+    manager._estop_active = True
+    assert manager._autonomy_mode_text() == "estop"
+
+
+def test_set_failure_reason_updates_operator_topic(monkeypatch):
+    """Failure reasons should be visible without waiting for another state change."""
+    manager = _make_manager(monkeypatch)
+
+    manager._set_failure_reason("Navigation failed")
+
+    assert manager._last_failure_reason == "Navigation failed"
+    assert manager._failure_reason_pub.messages[-1].data == "Navigation failed"
 
 
 # ------------------------------------------------------------------

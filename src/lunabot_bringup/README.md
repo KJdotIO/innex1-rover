@@ -59,6 +59,21 @@ The mission manager subscribes to `/safety/estop` and `/safety/motion_inhibit`
 signals — if either is active the attempt is short-circuited with a safety-stop
 failure, and no action goal is sent.
 
+### Passive operator telemetry
+
+The mission manager publishes a small Foxglove-friendly state contract:
+
+| Topic | Type | Meaning |
+|-------|------|---------|
+| `/mission/state` | `std_msgs/String` | Current FSM state, lower-case |
+| `/mission/autonomy_mode` | `std_msgs/String` | `idle`, `autonomous`, `motion_inhibited`, `estop`, `safe_fail`, or `halted` |
+| `/mission/time_remaining_s` | `std_msgs/Float32` | Remaining time from the 1200 s mission budget |
+| `/mission/cycle_count` | `std_msgs/Int32` | Completed excavation/deposition cycles |
+| `/mission/last_failure_reason` | `std_msgs/String` | Last terminal or safety failure reason |
+
+These topics are passive telemetry only. They are safe to show in Foxglove
+during autonomy because they do not provide a command path back into the rover.
+
 ## Mission Dry Run
 
 Use the dry-run launch when you want one bounded operator-facing regression pass in sim:
