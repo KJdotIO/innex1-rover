@@ -21,6 +21,7 @@ concurrency:
       (
         github.event_name == 'issue_comment' &&
         github.actor != 'innex1-reviewer[bot]' &&
+        (contains(github.event.comment.body, '/innex') || contains(github.event.comment.body, '/nexy')) &&
         contains(github.event.comment.body, '/innex status') == false &&
         contains(github.event.comment.body, '/innex help') == false &&
         contains(github.event.comment.body, '/nexy status') == false &&
@@ -36,7 +37,7 @@ jobs:
       github.event.issue.pull_request &&
       (contains(github.event.comment.body, '/innex help') || contains(github.event.comment.body, '/nexy help')) &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, rover-review]
     permissions:
       issues: write
       contents: read
@@ -103,7 +104,7 @@ jobs:
       contains(github.event.comment.body, '/innex help') == false &&
       contains(github.event.comment.body, '/nexy help') == false &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, rover-review]
     permissions:
       issues: write
       pull-requests: read
@@ -183,7 +184,7 @@ jobs:
         contains(github.event.comment.body, '/nexy status') == false &&
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       )
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, rover-review]
     permissions:
       contents: read
       pull-requests: write
