@@ -211,8 +211,8 @@ class TestCollisionMonitorConfig:
         sources = self.params["observation_sources"]
         assert len(sources) >= 1
 
-    def test_stale_source_blocking_is_disabled_for_sim_timing(self):
-        assert self.params["source_timeout"] == 0.0
+    def test_stale_source_timeout_covers_sim_sensor_jitter(self):
+        assert 2.0 <= self.params["source_timeout"] <= 3.0
 
     def test_all_sources_have_topic(self):
         for source_name in self.params["observation_sources"]:
