@@ -1,0 +1,261 @@
+# Hardware Week Runbook
+
+This is the short version for the first week back with the rover. It is not a
+replacement for thinking. It is here so the team does not have to remember
+which terminal had the magic incantation while a judge, a router, and a pile of
+sand are all staring back.
+
+The rulebook constraints that shape this are simple:
+
+- setup is 10 minutes;
+- the run is 20 minutes;
+- the rover has to move within the first 5 minutes of the run;
+- autonomy must be announced before it starts, and declared complete or failed
+  before anyone touches the controls again;
+- average comms use must stay at or below 4,000 Kbps;
+- only mission-critical electronics come into Mission Control.
+
+## Before You Leave The Pit
+
+Do the boring checks before the rover is in the arena. They are cheaper there.
+
+On the Jetson:
+
+```bash
+cd ~/innex1-rover
+git status --short
+git branch --show-current
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install --packages-up-to lunabot_bringup
+source install/setup.bash
+```
+
+If you are testing a PR, use the real Jetson checkout:
+
+```bash
+cd ~/innex1-rover
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+git checkout <branch-name>
+colcon build --symlink-install --packages-up-to lunabot_bringup
+source install/setup.bash
+```
+
+If the checkout is dirty, stop and read the diff. Do not blindly reset the
+Jetson. Someone may have changed a local port, serial device, or Zed setting for
+a reason.
+
+## Kill The Old Run
+
+Before each fresh launch, clear old ROS, Nav2, RViz, and Gazebo processes:
+
+```bash
+pkill -f "ros2 launch" || true
+pkill -f "ros2 run" || true
+pkill -f "rviz2" || true
+pkill -f "ign gazebo" || true
+pkill -f "gz sim" || true
+sleep 2
+ps -eo pid,cmd | egrep "ros2|rviz2|ign gazebo|gz sim|mission_manager|nav2" | grep -v egrep || true
+```
+
+That last command should print nothing useful. If something is still alive,
+kill it before blaming Nav2 for yesterday's leftovers.
+
+## Start Lean
+
+For a competition-style software posture, check the runtime profile:
+
+```bash
+ros2 run lunabot_bringup runtime_profile check
+ros2 run lunabot_bringup runtime_profile show --profile hardware_competition
+```
+
+For Mission Control, keep Foxglove boring. Show mission state, safety,
+drivetrain status, excavation status, localisation status, diagnostics, and the
+minimum camera view you need. Do not stream raw point clouds or every debug
+costmap during a scored run unless someone can explain why that is worth the
+bandwidth.
+
+The useful telemetry set is:
+
+```text
+/mission/state
+/mission/autonomy_mode
+/mission/time_remaining_s
+/mission/cycle_count
+/mission/last_failure_reason
+/safety/estop
+/safety/motion_inhibit
+/drivetrain/status
+/excavation/status
+/localisation/start_zone_status
+/diagnostics
+```
+
+Check bandwidth at the network edge as well as in ROS:
+
+```bash
+ip -s link
+sar -n DEV 1 10
+```
+
+If `sar` is not installed, use the router dashboard, `ifstat`, or `nload`. The
+rule is about the robot comms link, not whether one ROS topic looks polite.
+
+## First Motion
+
+Do not start with full autonomy. Start with something you can stop.
+
+For drivetrain bench work, use the Sabertooth bring-up guide:
+
+```bash
+ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
+```
+
+Then send a tiny command from another terminal:
+
+```bash
+ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.05}, angular: {z: 0.0}}"
+ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"
+```
+
+Watch these while doing it:
+
+```bash
+ros2 topic echo /drivetrain/status
+ros2 topic echo /drivetrain/telemetry
+ros2 topic echo /safety/motion_inhibit
+```
+
+If the rover is on the ground and someone says "just a small one", treat that as
+a request for a proper stop plan, not as permission to improvise.
+
+## Before Autonomy
+
+The minimum useful checks are:
+
+```bash
+ros2 topic hz /diagnostics
+ros2 topic echo /mission/state --once
+ros2 topic echo /mission/autonomy_mode --once
+ros2 topic echo /localisation/start_zone_status --once
+ros2 action list | grep navigate
+ros2 lifecycle nodes
+```
+
+In RViz or Foxglove, check:
+
+- TF is coherent: `map`, `odom`, `base_footprint`, `base_link`;
+- the rover pose is believable;
+- costmaps are not filled solid around the rover;
+- `/cmd_vel_safe` changes when Nav2 or teleop commands motion;
+- `/cmd_vel_gated` only opens when drivetrain and safety state allow it.
+
+For autonomy scoring, say the quiet part out loud before touching anything:
+
+1. Tell the Mission Control Judge what autonomy attempt is about to begin.
+2. Start the attempt.
+3. Do not touch the controller or laptop while the rover is still in that
+   autonomy attempt.
+4. Announce whether the attempt completed or failed before taking manual
+   control back.
+
+This is not theatre. It is how the points are recognised.
+
+## Evidence Bags
+
+Record bags for runs that teach us something. Do not keep every messy half-run
+as "golden"; that word should mean the run was clean enough to trust later.
+
+For a lean evidence pack around a command:
+
+```bash
+ros2 run lunabot_bringup mission_evidence \
+  --profile minimal \
+  --label hardware-check \
+  -- ros2 launch lunabot_bringup mission_manager.launch.py
+```
+
+Evidence packs live under:
+
+```text
+~/innex1_mission_evidence/
+```
+
+Before calling a bag useful, check:
+
+```bash
+ros2 bag info ~/innex1_mission_evidence/<pack>/bag
+cat ~/innex1_mission_evidence/<pack>/manifest.json
+```
+
+The manifest should tell you the command, profile, git SHA, return codes, and
+summary. If the summary says failed, keep it as a fault bag and name it that way.
+
+## When Something Fails
+
+Use this order. It avoids debugging vibes, which are famously not a sensor.
+
+First, check the summary topics:
+
+```bash
+ros2 topic echo /mission/state --once
+ros2 topic echo /mission/autonomy_mode --once
+ros2 topic echo /mission/last_failure_reason --once
+ros2 topic echo /diagnostics --once
+```
+
+If the rover does not move:
+
+- check `/safety/estop` and `/safety/motion_inhibit`;
+- check `/drivetrain/status`;
+- check whether `/cmd_vel_safe` is being produced;
+- check whether `/cmd_vel_gated` is blocked;
+- only then look at motors, serial, and Sabertooth wiring.
+
+If navigation fails:
+
+- check localisation freshness first;
+- check TF before touching planner parameters;
+- check whether Nav2 lifecycle nodes are active;
+- check whether costmaps are empty, stale, or inflated into a wall;
+- check the mission log for the first failed attempt, not the last noisy
+  recovery.
+
+If excavation or deposition fails:
+
+- stop motion first;
+- check the mechanism status topic;
+- check driver fault and limit switch state;
+- record the bag and log before cycling power.
+
+If comms degrade:
+
+- stop raw streams;
+- close RViz if Foxglove has enough telemetry;
+- check router counters;
+- keep the rover responsive before trying to preserve a pretty view.
+
+## End Of Run
+
+When the run ends, stop the rover before celebrating or sulking:
+
+```bash
+ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"
+```
+
+Do not disconnect the robot or pack Mission Control until the judge says so.
+The rulebook allows the robot to need relocation or unloading after the timer.
+
+Then save the evidence path, the branch, and the short human note:
+
+```text
+Bag:
+Branch:
+What happened:
+What to try next:
+```
+
+Keep the note short. Future-you wants the truth, not a novella.

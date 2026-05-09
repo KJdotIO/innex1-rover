@@ -148,6 +148,11 @@ ros2 run lunabot_bringup mission_evidence \
 The workflow is documented in
 [`docs/mission_evidence_workflow.md`](docs/mission_evidence_workflow.md).
 
+## Hardware week runbook
+
+For first-motion, ground-control, comms and evidence-capture procedure on the
+Jetson, use [`docs/hardware_week_runbook.md`](docs/hardware_week_runbook.md).
+
 ## Visualisation options
 
 | Tool | Purpose | Command |
