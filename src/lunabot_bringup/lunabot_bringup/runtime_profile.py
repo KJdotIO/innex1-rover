@@ -12,8 +12,9 @@ from typing import Any
 import yaml
 
 COMPETITION_BUDGET_KBPS = 4000.0
-RAW_STREAM_MARKERS = ("image", "points", "pointcloud", "camera")
 COMPETITION_PROFILES = ("sim_competition", "hardware_competition")
+RAW_TOPIC_SUFFIXES = ("/image", "/depth_image", "/points")
+RAW_TOPIC_MARKERS = ("pointcloud",)
 
 
 @dataclass(frozen=True)
@@ -173,12 +174,15 @@ def validate_profile(profile: RuntimeProfile) -> list[str]:
                 f"{COMPETITION_BUDGET_KBPS:.0f} Kbps"
             )
 
-        exposed = " ".join(profile.foxglove_allowlist).lower()
-        forbidden = [marker for marker in RAW_STREAM_MARKERS if marker in exposed]
+        forbidden = [
+            topic
+            for topic in profile.foxglove_allowlist
+            if _is_raw_stream_topic(topic)
+        ]
         if forbidden:
             errors.append(
-                f"{profile.name}: competition Foxglove allowlist exposes raw "
-                f"stream markers: {', '.join(forbidden)}"
+                f"{profile.name}: competition Foxglove allowlist exposes raw streams: "
+                f"{', '.join(forbidden)}"
             )
 
         off_by_default = " ".join(profile.off_by_default).lower()
@@ -186,6 +190,16 @@ def validate_profile(profile: RuntimeProfile) -> list[str]:
             if marker not in off_by_default:
                 errors.append(f"{profile.name}: {marker} must be off by default")
     return errors
+
+
+def _is_raw_stream_topic(topic: str) -> bool:
+    """Return True when a topic is too heavy for competition Foxglove use."""
+    normalised = topic.strip().lower()
+    if normalised.endswith("/compressed") or normalised.endswith("/camera_info"):
+        return False
+    return normalised.endswith(RAW_TOPIC_SUFFIXES) or any(
+        marker in normalised for marker in RAW_TOPIC_MARKERS
+    )
 
 
 def validate_profiles(profiles: dict[str, RuntimeProfile]) -> list[str]:

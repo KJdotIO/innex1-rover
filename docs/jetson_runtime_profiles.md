@@ -2,13 +2,14 @@
 
 The competition communications rule that matters most for software is simple:
 average data utilisation must stay at or below **4,000 Kbps**. There is no peak
-limit, but treating that as permission to stream raw sensors would be a small
-masterclass in missing the point.
+limit. We still keep the average low because the operator link needs to stay
+stable.
 
 The default competition posture is:
 
 - run autonomy and safety locally on the Jetson;
 - expose only operator telemetry and health topics to Foxglove;
+- stream camera video only through compressed image topics;
 - keep raw images, point clouds, RViz, Gazebo and heavy rosbag captures off by
   default;
 - record evidence locally with the minimal rosbag profile unless debugging
@@ -45,10 +46,35 @@ For `hardware_competition`, expose only:
 - `/excavation/status`
 - `/localisation/start_zone_status`
 - `/diagnostics`
+- `/power/telemetry`
+- `/camera_front/image/compressed`
+- `/camera_front/camera_info`
 
-Do not expose raw camera images, point clouds, debug costmap panels or the heavy
-rosbag profile during a scored run. If a raw stream is needed for diagnosis, use
-`hardware_bringup` or `sim_debug`, say why, and turn it back off before the run.
+Do not expose raw camera images, depth images, point clouds, debug costmap
+panels or the heavy rosbag profile during a scored run. If a raw stream is
+needed for diagnosis, use `hardware_bringup` or `sim_debug`, say why, and turn
+it back off before the run.
+
+Start Foxglove through the project launch file so the allowlist and camera
+compression stay consistent:
+
+```bash
+ros2 launch lunabot_bringup foxglove_ground_control.launch.py \
+  profile:=hardware_competition \
+  use_sim_time:=false
+```
+
+For simulation:
+
+```bash
+ros2 launch lunabot_bringup foxglove_ground_control.launch.py \
+  profile:=sim_competition \
+  use_sim_time:=true
+```
+
+The front camera is republished as `/camera_front/image/compressed` with JPEG
+quality `50` by default. The rear camera republisher is available with
+`enable_rear_camera:=true`, but keep it off unless you need it.
 
 ## Measurement Commands
 
@@ -60,6 +86,7 @@ ros2 run lunabot_bringup runtime_profile show --profile hardware_competition --j
 ros2 topic bw /mission/state
 ros2 topic bw /drivetrain/status
 ros2 topic bw /excavation/status
+ros2 topic bw /camera_front/image/compressed
 ros2 topic hz /diagnostics
 top -b -n 1 | head -n 20
 free -h
@@ -101,3 +128,11 @@ ros2 run lunabot_bringup mission_evidence \
 
 Use `debug` or `heavy` evidence profiles only for short investigations. They are
 not the default scored-run posture.
+
+## Navigation Debug
+
+When the rover gets close to craters or boulders, use a debug profile instead of
+adding costmaps and point clouds to the operator layout. The useful debug topics
+are `/global_costmap/costmap`, `/local_costmap/costmap`, `/map`, paths, TF and
+collision monitor polygons. Do not stream those at the same time as camera video
+unless you are doing a short, supervised investigation.
