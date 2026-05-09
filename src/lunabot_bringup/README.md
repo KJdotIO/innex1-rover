@@ -18,6 +18,8 @@ Use bring-up launches when validating end-to-end behaviour. Avoid debugging subs
 - `launch/`: stack launch entrypoints (navigation and related orchestration paths).
 - `launch/mission_manager.launch.py`: starts the standalone mission supervisor node.
 - `launch/mission_dry_run.launch.py`: one-command sim dry run for travel, excavate, and deposit.
+- `launch/rover_diagnostics.launch.py`: publishes standard `/diagnostics`
+  summaries for operator and bag review.
 
 ## Mission Manager
 
@@ -96,6 +98,24 @@ For a direct shell exit code without the composed sim launch, run the harness en
 ```bash
 ros2 run lunabot_bringup mission_dry_run
 ```
+
+## Runtime Diagnostics
+
+Start the diagnostics aggregator with:
+
+```bash
+ros2 launch lunabot_bringup rover_diagnostics.launch.py
+```
+
+It publishes `diagnostic_msgs/DiagnosticArray` on `/diagnostics` for:
+
+- safety command state
+- drivetrain status
+- start-zone localisation readiness
+- excavation status
+
+Each item uses standard `OK`, `WARN`, `ERROR`, and `STALE` levels so Foxglove,
+bags, and future preflight tooling can show health without scraping logs.
 
 ## Common failure modes
 
