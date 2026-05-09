@@ -82,6 +82,49 @@ For a direct shell exit code without the composed sim launch, run the harness en
 ros2 run lunabot_bringup mission_dry_run
 ```
 
+## Mission Evidence Packs
+
+Use `mission_evidence` when you want a repeatable rosbag capture with the
+run context kept next to it. The default profile is intentionally lean: mission
+state, safety state, subsystem status, TF and command topics. Raw images and
+point clouds only live in the `heavy` profile so normal dry runs do not quietly
+turn into a disk and bandwidth test.
+
+Create a dry-run evidence pack and record around a mission command:
+
+```bash
+ros2 run lunabot_bringup mission_evidence \
+  --profile minimal \
+  --label sim-dry-run \
+  --use-sim-time \
+  -- ros2 launch lunabot_bringup mission_dry_run.launch.py
+```
+
+The helper creates `~/innex1_mission_evidence/<timestamp>_<label>/` with:
+
+- `bag/`: the rosbag2 recording.
+- `logs/rosbag_record.log`: recorder output.
+- `logs/mission_command.log`: mission command output when one is provided.
+- `config/`: copied bring-up configs used to understand the run later.
+- `manifest.json`: git SHA, profile, topic allowlist, commands and exit codes.
+
+For a command preview without starting `ros2 bag record`, run:
+
+```bash
+ros2 run lunabot_bringup mission_evidence --plan-only --profile debug
+```
+
+Replay a saved pack with the command written in `manifest.json`, normally:
+
+```bash
+ros2 bag play ~/innex1_mission_evidence/<pack>/bag
+```
+
+The helper passes `--max-bag-duration` and `--max-bag-size` to rosbag2 so long
+runs split cleanly instead of producing one awkward file. On the Jetson Humble
+image the available storage backend is `sqlite3`; keep that as the default
+unless `ros2 bag record --help` shows MCAP has been installed.
+
 ## Common failure modes
 
 - Launch starts successfully but one critical node crashes shortly after (dependency mismatch).
