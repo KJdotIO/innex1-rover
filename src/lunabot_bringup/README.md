@@ -200,9 +200,9 @@ ros2 bag play ~/innex1_mission_evidence/<pack>/bag
 ```
 
 The helper passes `--max-bag-duration` and `--max-bag-size` to rosbag2 so long
-runs split cleanly instead of producing one awkward file. On the Jetson Humble
-image the available storage backend is `sqlite3`; keep that as the default
-unless `ros2 bag record --help` shows MCAP has been installed.
+runs split into manageable files. On the Jetson Humble image the available
+storage backend is `sqlite3`; keep that as the default unless
+`ros2 bag record --help` shows MCAP has been installed.
 
 ## Runtime Diagnostics
 

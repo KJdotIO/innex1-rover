@@ -1,9 +1,8 @@
 # Hardware Week Runbook
 
-This is the short version for the first week back with the rover. It is not a
-replacement for thinking. It is here so the team does not have to remember
-which terminal had the magic incantation while a judge, a router, and a pile of
-sand are all staring back.
+Use this during the first week back with the rover. It gives the team one
+place for the commands, checks, callouts, and evidence capture steps needed for
+hardware bring-up and scored-run rehearsal.
 
 The rulebook constraints that shape this are simple:
 
@@ -17,7 +16,7 @@ The rulebook constraints that shape this are simple:
 
 ## Before You Leave The Pit
 
-Do the boring checks before the rover is in the arena. They are cheaper there.
+Run these checks before the rover is in the arena.
 
 On the Jetson:
 
@@ -60,8 +59,8 @@ sleep 2
 ps -eo pid,cmd | egrep "ros2|rviz2|ign gazebo|gz sim|mission_manager|nav2" | grep -v egrep || true
 ```
 
-That last command should print nothing useful. If something is still alive,
-kill it before blaming Nav2 for yesterday's leftovers.
+That last command should not show any active rover processes. If something is
+still running, stop it before launching a fresh stack.
 
 ## Start Lean
 
@@ -72,11 +71,11 @@ ros2 run lunabot_bringup runtime_profile check
 ros2 run lunabot_bringup runtime_profile show --profile hardware_competition
 ```
 
-For Mission Control, keep Foxglove boring. Show mission state, safety,
-drivetrain status, excavation status, localisation status, diagnostics, and the
-minimum camera view you need. Do not stream raw point clouds or every debug
-costmap during a scored run unless someone can explain why that is worth the
-bandwidth.
+For Mission Control, keep Foxglove limited to the topics needed to operate the
+rover. Show mission state, safety, drivetrain status, excavation status,
+localisation status, diagnostics, and the minimum camera view needed for the
+run. Do not stream raw point clouds or every debug costmap during a scored run
+unless the team has a specific reason to spend the bandwidth.
 
 The useful telemetry set is:
 
@@ -102,7 +101,7 @@ sar -n DEV 1 10
 ```
 
 If `sar` is not installed, use the router dashboard, `ifstat`, or `nload`. The
-rule is about the robot comms link, not whether one ROS topic looks polite.
+limit applies to the robot comms link, not to an individual ROS topic.
 
 ## First Motion
 
@@ -114,7 +113,7 @@ For drivetrain bench work, use the Sabertooth bring-up guide:
 ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
 ```
 
-Then send a tiny command from another terminal:
+Then send a low-speed command from another terminal:
 
 ```bash
 ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.05}, angular: {z: 0.0}}"
@@ -129,8 +128,8 @@ ros2 topic echo /drivetrain/telemetry
 ros2 topic echo /safety/motion_inhibit
 ```
 
-If the rover is on the ground and someone says "just a small one", treat that as
-a request for a proper stop plan, not as permission to improvise.
+If the rover is on the ground, agree the stop command and operator before any
+motion test starts.
 
 ## Before Autonomy
 
@@ -153,7 +152,7 @@ In RViz or Foxglove, check:
 - `/cmd_vel_safe` changes when Nav2 or teleop commands motion;
 - `/cmd_vel_gated` only opens when drivetrain and safety state allow it.
 
-For autonomy scoring, say the quiet part out loud before touching anything:
+For autonomy scoring, use explicit callouts:
 
 1. Tell the Mission Control Judge what autonomy attempt is about to begin.
 2. Start the attempt.
@@ -162,12 +161,13 @@ For autonomy scoring, say the quiet part out loud before touching anything:
 4. Announce whether the attempt completed or failed before taking manual
    control back.
 
-This is not theatre. It is how the points are recognised.
+Do this every time. The judge needs to know when autonomy starts, when it ends,
+and whether manual control has resumed.
 
 ## Evidence Bags
 
-Record bags for runs that teach us something. Do not keep every messy half-run
-as "golden"; that word should mean the run was clean enough to trust later.
+Record bags for runs that need later review. Do not keep every messy half-run
+as "golden"; use that label only for runs clean enough to trust later.
 
 For a lean evidence pack around a command:
 
@@ -196,7 +196,8 @@ summary. If the summary says failed, keep it as a fault bag and name it that way
 
 ## When Something Fails
 
-Use this order. It avoids debugging vibes, which are famously not a sensor.
+Use this order. It checks the high-level state before moving into subsystem
+debugging.
 
 First, check the summary topics:
 
@@ -236,11 +237,11 @@ If comms degrade:
 - stop raw streams;
 - close RViz if Foxglove has enough telemetry;
 - check router counters;
-- keep the rover responsive before trying to preserve a pretty view.
+- keep the rover responsive before preserving high-bandwidth visualisation.
 
 ## End Of Run
 
-When the run ends, stop the rover before celebrating or sulking:
+When the run ends, stop the rover first:
 
 ```bash
 ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"
@@ -249,7 +250,7 @@ ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.0}, 
 Do not disconnect the robot or pack Mission Control until the judge says so.
 The rulebook allows the robot to need relocation or unloading after the timer.
 
-Then save the evidence path, the branch, and the short human note:
+Then save the evidence path, branch, and short note:
 
 ```text
 Bag:
@@ -258,4 +259,4 @@ What happened:
 What to try next:
 ```
 
-Keep the note short. Future-you wants the truth, not a novella.
+Keep the note short. Record what happened and what the next test should check.

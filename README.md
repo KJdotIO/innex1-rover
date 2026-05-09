@@ -135,7 +135,7 @@ The profile rules live in
 
 ## Mission evidence bags
 
-Use the evidence helper when a run is worth keeping:
+Use the evidence helper when a run should be reviewed later:
 
 ```bash
 ros2 run lunabot_bringup mission_evidence \

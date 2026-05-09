@@ -1,10 +1,10 @@
 # Mission evidence workflow
 
-This is the way we record runs that are worth keeping.
+Use this workflow to record runs that should be reviewed later.
 
-Most runs are not worth keeping. If the stack was half-launched, the rover was
-already in a strange pose, or someone was still tuning parameters mid-run, do
-not bless that bag as evidence. Keep it only if it explains a specific fault.
+Do not keep every run as evidence. If the stack was half-launched, the rover was
+already in an unusual pose, or parameters were changing mid-run, keep the bag
+only when it explains a specific fault.
 
 ## Golden shuttle bag
 
@@ -18,8 +18,8 @@ checkpoint route:
 5. deposition target at `(0.3, -2.8, 0.0)`
 
 Those coordinates come from `src/lunabot_bringup/config/arena_waypoints.yaml`.
-The midpoint is deliberate. It keeps the mission route honest about the
-obstacle zone instead of asking Nav2 to solve one big vague goal.
+The midpoint is deliberate. It makes the route pass through the obstacle-zone
+checkpoint instead of sending Nav2 one long start-to-zone goal.
 
 The launch is simulation-only. It starts Nav2 directly and bypasses the
 AprilTag readiness gate because the moon yard sim does not always provide a
@@ -92,5 +92,4 @@ Use `debug` when a run failed and you need navigation state. It adds odometry,
 scan, map, costmaps, and action status.
 
 Use `heavy` only for short perception investigations. It records raw image and
-point-cloud topics and can burn disk quickly. That is fine when you mean it.
-It is annoying when you do it by accident.
+point-cloud topics and can use disk space quickly.
