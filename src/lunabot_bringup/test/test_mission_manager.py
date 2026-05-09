@@ -354,6 +354,35 @@ def test_midpoint_can_be_disabled_for_direct_nav(monkeypatch):
     assert sent == [("navigate_to_excavation", goals["excavation"])]
 
 
+def test_nav_sequence_stops_when_safety_trips_between_legs(monkeypatch):
+    """Navigation should not start the next leg after an E-stop or inhibit."""
+    manager = _make_manager(monkeypatch)
+    first_goal = _nav_test_goal("mid_obstacle")
+    second_goal = _nav_test_goal("excavation")
+    safe_states = iter([True, False])
+    sent = []
+    monkeypatch.setattr(manager, "_is_safe", lambda: next(safe_states))
+    monkeypatch.setattr(
+        manager,
+        "_send_nav_goal",
+        lambda goal, label: sent.append((label, goal)) or (True, "ok"),
+    )
+
+    success, detail = manager._send_nav_sequence(
+        [
+            ("navigate_to_mid_obstacle", first_goal),
+            ("navigate_to_excavation", second_goal),
+        ],
+        "navigate_to_excavation",
+    )
+
+    assert not success
+    assert detail == (
+        "navigate_to_excavation: safety stop active before navigate_to_excavation"
+    )
+    assert sent == [("navigate_to_mid_obstacle", first_goal)]
+
+
 def test_deposit_success_transitions_to_check_next_cycle_time(monkeypatch):
     """DEPOSIT must advance to CHECK_NEXT_CYCLE_TIME on success."""
     manager = _make_manager(monkeypatch)

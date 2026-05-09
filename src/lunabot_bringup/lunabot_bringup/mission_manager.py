@@ -608,6 +608,8 @@ class MissionManager(Node):
         """Send configured navigation goals in order."""
         completed: list[str] = []
         for goal_label, goal in goals:
+            if not self._is_safe():
+                return False, f"{label}: safety stop active before {goal_label}"
             success, detail = self._send_nav_goal(goal, goal_label)
             if not success:
                 return False, detail

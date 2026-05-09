@@ -180,6 +180,9 @@ ros2 run lunabot_bringup mission_evidence --plan-only --profile debug
 
 Record the one-cycle checkpoint shuttle route with:
 
+This launch is simulation-only. It disables the AprilTag readiness gate and uses
+sim-time defaults, so do not use it as a hardware bring-up path.
+
 ```bash
 ros2 run lunabot_bringup mission_evidence \
   --profile minimal \

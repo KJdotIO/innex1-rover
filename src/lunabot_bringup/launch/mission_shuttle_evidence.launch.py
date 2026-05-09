@@ -108,6 +108,7 @@ def generate_launch_description():
         executable="rover_diagnostics",
         name="rover_diagnostics",
         output="screen",
+        parameters=[{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}],
     )
 
     mission_manager = Node(
