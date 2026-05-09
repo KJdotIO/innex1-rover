@@ -17,6 +17,7 @@ mission_manager:
     waypoint_mid_obstacle_x: 3.0
     waypoint_mid_obstacle_y: -1.1
     waypoint_mid_obstacle_yaw: 0.0
+    waypoint_mid_obstacle_enabled: true
 
     # Excavation zone target pose -- clear of rock_6 (6.15,-2.1).
     waypoint_excavation_x: 6.0

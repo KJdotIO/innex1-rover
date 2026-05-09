@@ -133,6 +133,21 @@ ros2 run lunabot_bringup runtime_profile show --profile hardware_competition
 The profile rules live in
 [`docs/jetson_runtime_profiles.md`](docs/jetson_runtime_profiles.md).
 
+## Mission evidence bags
+
+Use the evidence helper when a run is worth keeping:
+
+```bash
+ros2 run lunabot_bringup mission_evidence \
+  --profile minimal \
+  --label golden-shuttle \
+  --use-sim-time \
+  -- ros2 launch lunabot_bringup mission_shuttle_evidence.launch.py
+```
+
+The workflow is documented in
+[`docs/mission_evidence_workflow.md`](docs/mission_evidence_workflow.md).
+
 ## Visualisation options
 
 | Tool | Purpose | Command |

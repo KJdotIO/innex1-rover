@@ -18,6 +18,8 @@ Use bring-up launches when validating end-to-end behaviour. Avoid debugging subs
 - `launch/`: stack launch entrypoints (navigation and related orchestration paths).
 - `launch/mission_manager.launch.py`: starts the standalone mission supervisor node.
 - `launch/mission_dry_run.launch.py`: one-command sim dry run for travel, excavate, and deposit.
+- `launch/mission_shuttle_evidence.launch.py`: one-cycle waypoint shuttle run for
+  golden rosbag evidence.
 - `launch/rover_diagnostics.launch.py`: publishes standard `/diagnostics`
   summaries for operator and bag review.
 
@@ -174,6 +176,18 @@ For a command preview without starting `ros2 bag record`, run:
 
 ```bash
 ros2 run lunabot_bringup mission_evidence --plan-only --profile debug
+```
+
+Record the one-cycle checkpoint shuttle route with:
+
+```bash
+ros2 run lunabot_bringup mission_evidence \
+  --profile minimal \
+  --label golden-shuttle \
+  --use-sim-time \
+  -- ros2 launch lunabot_bringup mission_shuttle_evidence.launch.py \
+    launch_rviz:=false \
+    max_shuttle_cycles:=1
 ```
 
 Replay a saved pack with the command written in `manifest.json`, normally:

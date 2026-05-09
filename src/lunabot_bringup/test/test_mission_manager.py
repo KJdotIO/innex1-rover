@@ -270,6 +270,90 @@ def test_nav_to_deposition_success_transitions_to_deposit(monkeypatch):
     assert next_state == MissionState.DEPOSIT
 
 
+def _nav_test_goal(name):
+    """Return a small stand-in for a NavigateToPose goal."""
+    return SimpleNamespace(name=name)
+
+
+def _patch_waypoint_goals(monkeypatch, manager):
+    """Patch configured waypoint lookups with small test goals."""
+    goals = {
+        "mid_obstacle": _nav_test_goal("mid_obstacle"),
+        "excavation": _nav_test_goal("excavation"),
+        "deposition": _nav_test_goal("deposition"),
+    }
+    monkeypatch.setattr(manager, "_waypoint_goal", lambda prefix: goals[prefix])
+    return goals
+
+
+def test_navigate_to_excavation_routes_through_midpoint(monkeypatch):
+    """Excavation travel should use the obstacle-zone midpoint."""
+    manager = _make_manager(monkeypatch)
+    goals = _patch_waypoint_goals(monkeypatch, manager)
+    sent = []
+    monkeypatch.setattr(manager, "_mid_obstacle_enabled", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_send_nav_goal",
+        lambda goal, label: sent.append((label, goal)) or (True, "ok"),
+    )
+
+    success, detail = manager._send_navigate_to_excavation()
+
+    assert success
+    assert detail == (
+        "navigate_to_excavation succeeded via "
+        "navigate_to_mid_obstacle, navigate_to_excavation"
+    )
+    assert sent == [
+        ("navigate_to_mid_obstacle", goals["mid_obstacle"]),
+        ("navigate_to_excavation", goals["excavation"]),
+    ]
+
+
+def test_navigate_to_deposition_routes_through_midpoint(monkeypatch):
+    """Deposition travel should use the obstacle-zone midpoint."""
+    manager = _make_manager(monkeypatch)
+    goals = _patch_waypoint_goals(monkeypatch, manager)
+    sent = []
+    monkeypatch.setattr(manager, "_mid_obstacle_enabled", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_send_nav_goal",
+        lambda goal, label: sent.append((label, goal)) or (True, "ok"),
+    )
+
+    success, detail = manager._send_navigate_to_deposition()
+
+    assert success
+    assert detail == (
+        "navigate_to_deposition succeeded via "
+        "navigate_to_mid_obstacle, navigate_to_deposition"
+    )
+    assert sent == [
+        ("navigate_to_mid_obstacle", goals["mid_obstacle"]),
+        ("navigate_to_deposition", goals["deposition"]),
+    ]
+
+
+def test_midpoint_can_be_disabled_for_direct_nav(monkeypatch):
+    """The midpoint remains configurable for local debugging."""
+    manager = _make_manager(monkeypatch)
+    goals = _patch_waypoint_goals(monkeypatch, manager)
+    sent = []
+    monkeypatch.setattr(manager, "_mid_obstacle_enabled", lambda: False)
+    monkeypatch.setattr(
+        manager,
+        "_send_nav_goal",
+        lambda goal, label: sent.append((label, goal)) or (True, "ok"),
+    )
+
+    success, _detail = manager._send_navigate_to_excavation()
+
+    assert success
+    assert sent == [("navigate_to_excavation", goals["excavation"])]
+
+
 def test_deposit_success_transitions_to_check_next_cycle_time(monkeypatch):
     """DEPOSIT must advance to CHECK_NEXT_CYCLE_TIME on success."""
     manager = _make_manager(monkeypatch)
