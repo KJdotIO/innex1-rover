@@ -41,7 +41,7 @@ def _launch_nodes(context):
             "--remap",
             "in:=/camera_front/image",
             "--remap",
-            "out:=/camera_front/image",
+            "out/compressed:=/camera_front/image/compressed",
         ],
         parameters=[
             {
@@ -65,7 +65,7 @@ def _launch_nodes(context):
             "--remap",
             "in:=/camera_rear/image",
             "--remap",
-            "out:=/camera_rear/image",
+            "out/compressed:=/camera_rear/image/compressed",
         ],
         parameters=[
             {
