@@ -53,6 +53,7 @@ setup(
             "mission_dry_run = lunabot_bringup.mission_dry_run:main",
             "mission_manager = lunabot_bringup.mission_manager:main",
             "preflight_check = lunabot_bringup.preflight_check:main",
+            "runtime_profile = lunabot_bringup.runtime_profile:main",
             "rover_diagnostics = lunabot_bringup.rover_diagnostics:main",
         ],
     },
