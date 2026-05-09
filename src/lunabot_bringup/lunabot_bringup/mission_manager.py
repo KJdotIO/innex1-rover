@@ -81,6 +81,7 @@ class MissionManager(Node):
         self.declare_parameter("waypoint_mid_obstacle_x", 3.0)
         self.declare_parameter("waypoint_mid_obstacle_y", -1.1)
         self.declare_parameter("waypoint_mid_obstacle_yaw", 0.0)
+        self.declare_parameter("waypoint_mid_obstacle_enabled", True)
         self.declare_parameter("waypoint_excavation_x", 6.0)
         self.declare_parameter("waypoint_excavation_y", -1.5)
         self.declare_parameter("waypoint_excavation_yaw", 0.0)
@@ -561,6 +562,22 @@ class MissionManager(Node):
         goal.pose.pose.orientation.w = math.cos(yaw / 2.0)
         return goal
 
+    def _mid_obstacle_enabled(self) -> bool:
+        """Return whether mission travel should route through the midpoint."""
+        value = self.get_parameter("waypoint_mid_obstacle_enabled").value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    def _waypoint_goal(self, prefix: str) -> NavigateToPose.Goal | None:
+        """Build one configured waypoint goal, returning None on bad params."""
+        x = self._safe_float_parameter(f"waypoint_{prefix}_x")
+        y = self._safe_float_parameter(f"waypoint_{prefix}_y")
+        yaw = self._safe_float_parameter(f"waypoint_{prefix}_yaw")
+        if x is None or y is None or yaw is None:
+            return None
+        return self._build_nav_goal(x, y, yaw)
+
     def _send_nav_goal(self, goal, label: str) -> tuple[bool, str]:
         """Send a NavigateToPose goal and wait for the result."""
         available, detail = self._wait_for_server(
@@ -583,27 +600,54 @@ class MissionManager(Node):
         )
         return self._check_goal_result(goal_handle, label, timeout)
 
+    def _send_nav_sequence(
+        self,
+        goals: list[tuple[str, NavigateToPose.Goal]],
+        label: str,
+    ) -> tuple[bool, str]:
+        """Send configured navigation goals in order."""
+        completed: list[str] = []
+        for goal_label, goal in goals:
+            if not self._is_safe():
+                return False, f"{label}: safety stop active before {goal_label}"
+            success, detail = self._send_nav_goal(goal, goal_label)
+            if not success:
+                return False, detail
+            completed.append(goal_label)
+
+        return True, f"{label} succeeded via {', '.join(completed)}"
+
     def _send_navigate_to_excavation(self) -> tuple[bool, str]:
         """Send a NavigateToPose goal toward the excavation zone."""
-        x = self._safe_float_parameter("waypoint_excavation_x")
-        y = self._safe_float_parameter("waypoint_excavation_y")
-        yaw = self._safe_float_parameter("waypoint_excavation_yaw")
-        if x is None or y is None or yaw is None:
+        excavation_goal = self._waypoint_goal("excavation")
+        if excavation_goal is None:
             return False, "excavation waypoint parameters invalid"
 
-        goal = self._build_nav_goal(x, y, yaw)
-        return self._send_nav_goal(goal, "navigate_to_excavation")
+        goals = []
+        if self._mid_obstacle_enabled():
+            midpoint_goal = self._waypoint_goal("mid_obstacle")
+            if midpoint_goal is None:
+                return False, "mid-obstacle waypoint parameters invalid"
+            goals.append(("navigate_to_mid_obstacle", midpoint_goal))
+        goals.append(("navigate_to_excavation", excavation_goal))
+
+        return self._send_nav_sequence(goals, "navigate_to_excavation")
 
     def _send_navigate_to_deposition(self) -> tuple[bool, str]:
         """Send a NavigateToPose goal toward the deposition zone."""
-        x = self._safe_float_parameter("waypoint_deposition_x")
-        y = self._safe_float_parameter("waypoint_deposition_y")
-        yaw = self._safe_float_parameter("waypoint_deposition_yaw")
-        if x is None or y is None or yaw is None:
+        deposition_goal = self._waypoint_goal("deposition")
+        if deposition_goal is None:
             return False, "deposition waypoint parameters invalid"
 
-        goal = self._build_nav_goal(x, y, yaw)
-        return self._send_nav_goal(goal, "navigate_to_deposition")
+        goals = []
+        if self._mid_obstacle_enabled():
+            midpoint_goal = self._waypoint_goal("mid_obstacle")
+            if midpoint_goal is None:
+                return False, "mid-obstacle waypoint parameters invalid"
+            goals.append(("navigate_to_mid_obstacle", midpoint_goal))
+        goals.append(("navigate_to_deposition", deposition_goal))
+
+        return self._send_nav_sequence(goals, "navigate_to_deposition")
 
     def _send_excavate(self) -> tuple[bool, str]:
         """Send an Excavate action goal."""

@@ -40,6 +40,7 @@ def test_load_profiles_reads_minimal_topic_allowlist():
     minimal = profiles["minimal"]
 
     assert "/mission/state" in minimal.topics
+    assert "/diagnostics" in minimal.topics
     assert "/ouster/points" not in minimal.topics
     assert profiles["heavy"].topics[-1] == "/ouster/points"
 
@@ -170,4 +171,38 @@ def test_parse_mission_summary_extracts_flat_dry_run_results(tmp_path):
         },
         "overall": "fail",
         "failure_reason": "excavate failed",
+    }
+
+
+def test_parse_mission_summary_extracts_shuttle_cycle_count(tmp_path):
+    log_path = tmp_path / "mission_command.log"
+    log_path.write_text(
+        "[mission_manager]: Completed cycle 1/1\n"
+        "[mission_manager]: Mission halted after 1 cycles.\n",
+        encoding="utf-8",
+    )
+
+    summary = parse_mission_summary(log_path)
+
+    assert summary == {
+        "completed_cycles": 1,
+        "overall": "pass",
+        "failure_reason": "",
+    }
+
+
+def test_parse_mission_summary_marks_safe_fail_as_failure(tmp_path):
+    log_path = tmp_path / "mission_command.log"
+    log_path.write_text(
+        "[mission_manager]: Safe-fail triggered; halting mission.\n"
+        "[mission_manager]: Mission halted after 0 cycles.\n",
+        encoding="utf-8",
+    )
+
+    summary = parse_mission_summary(log_path)
+
+    assert summary == {
+        "completed_cycles": 0,
+        "overall": "fail",
+        "failure_reason": "safe-fail triggered",
     }

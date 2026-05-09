@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -27,8 +28,10 @@ DEFAULT_SNAPSHOT_RELATIVE_PATHS = (
     "config/arena_waypoints.yaml",
     "config/preflight_checks_dry_run.yaml",
     "config/rosbag_evidence_profiles.yaml",
+    "launch/mission_shuttle_evidence.launch.py",
 )
 SUMMARY_STEPS = ("travel", "excavate", "deposit", "overall")
+MISSION_HALTED_RE = re.compile(r"Mission halted after (?P<cycles>\d+) cycles?\.")
 
 
 @dataclass(frozen=True)
@@ -260,18 +263,39 @@ def write_manifest(
 
 
 def parse_mission_summary(log_path: Path) -> dict[str, Any]:
-    """Extract flat dry-run result lines from a mission command log."""
+    """Extract readable mission result details from a command log."""
     if not log_path.exists():
         return {}
 
     step_results: dict[str, str] = {}
+    completed_cycles: int | None = None
+    safe_fail = False
+    failure_reason = ""
     for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if ": " not in line:
-            continue
+        halted_match = MISSION_HALTED_RE.search(line)
+        if halted_match is not None:
+            completed_cycles = int(halted_match.group("cycles"))
 
-        name, value = line.split(": ", 1)
-        if name in SUMMARY_STEPS and value in {"pass", "fail"}:
-            step_results[name] = value
+        if "Safe-fail triggered" in line:
+            safe_fail = True
+            failure_reason = "safe-fail triggered"
+
+        if "Safety stop during mission" in line:
+            safe_fail = True
+            failure_reason = "safety stop during mission"
+
+        if ": " in line:
+            name, value = line.split(": ", 1)
+            if name in SUMMARY_STEPS and value in {"pass", "fail"}:
+                step_results[name] = value
+
+    if completed_cycles is not None:
+        overall = "fail" if safe_fail or completed_cycles == 0 else "pass"
+        return {
+            "completed_cycles": completed_cycles,
+            "overall": overall,
+            "failure_reason": failure_reason,
+        }
 
     if not step_results:
         return {}
@@ -281,7 +305,6 @@ def parse_mission_summary(log_path: Path) -> dict[str, Any]:
         for step in SUMMARY_STEPS
         if step != "overall" and step_results.get(step) == "fail"
     ]
-    failure_reason = ""
     if step_results.get("overall") == "fail":
         if failed_steps:
             failure_reason = f"{failed_steps[0]} failed"
