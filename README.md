@@ -153,6 +153,12 @@ The workflow is documented in
 For first-motion, ground-control, comms and evidence-capture procedure on the
 Jetson, use [`docs/hardware_week_runbook.md`](docs/hardware_week_runbook.md).
 
+## Active runtime paths
+
+Use [`docs/active_runtime_paths.md`](docs/active_runtime_paths.md) to check
+which launch files are current for sim, hardware bring-up, mission evidence,
+and operator telemetry.
+
 ## Visualisation options
 
 | Tool | Purpose | Command |
@@ -188,8 +194,8 @@ src/
 ├── lunabot_interfaces/      # Custom ROS messages and actions
 ├── lunabot_localisation/    # EKF + RTAB-Map SLAM + AprilTag localisation
 ├── lunabot_navigation/      # Nav2 config, costmaps, collision monitor
-├── lunabot_perception/      # Crater and hazard detection (scaffolding)
-├── lunabot_safety/          # Safety node scaffolding
+├── lunabot_perception/      # Crater detection feeding Nav2 costmaps
+├── lunabot_safety/          # E-stop to motion-inhibit bridge
 ├── lunabot_simulation/      # Gazebo Fortress worlds and ros_gz bridges
 └── lunabot_teleop/          # Manual control
 ```

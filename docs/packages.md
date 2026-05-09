@@ -13,7 +13,7 @@
 | `lunabot_description` | ament_cmake | URDF/Xacro assets only — robot model |
 | `lunabot_simulation` | ament_cmake | Gazebo worlds (`moon_yard.sdf`), sim launch |
 | `lunabot_teleop` | ament_python | Joystick control |
-| `lunabot_perception` | ament_python | Placeholder — nothing implemented yet |
+| `lunabot_perception` | ament_python | `crater_detection` — publishes `/crater_grid` for Nav2 costmaps |
 | `lunabot_safety` | ament_python | `estop_node` — subscribes `/safety/estop`, publishes `/safety/motion_inhibit` |
 
 ## External (vendored)
@@ -43,3 +43,9 @@
 
 ### lunabot_simulation
 - `worlds/moon_yard.sdf` — primary test environment
+
+## Active launch paths
+
+The default runtime map lives in
+[`docs/active_runtime_paths.md`](active_runtime_paths.md). Use that document to
+decide which launch file to start before adding a new launch path.
