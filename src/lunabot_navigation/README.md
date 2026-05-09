@@ -28,8 +28,8 @@ At runtime, navigation expects:
 
 The June baseline still uses the stock Nav2 `navigate_to_pose` tree from
 `nav2_bt_navigator`. The custom mission BT in this package is only a scaffold
-for future work under issue `#107`, so it should not shape the current runtime
-story.
+for future work under issue `#107`, so it is not part of the current runtime
+path.
 
 ## Common failure modes
 

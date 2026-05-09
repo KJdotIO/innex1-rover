@@ -66,7 +66,7 @@ uses `serial_protocol:=legacy_simplified` by default. Use
 `serial_protocol:=packetized` only if the Sabertooth DIP switches are set for
 Packet Serial instead.
 
-## Send a tiny motion command
+## Send a low-speed motion command
 
 In a second terminal:
 
