@@ -1,0 +1,54 @@
+preflight:
+  use_interface_contracts: false
+
+  sim_time:
+    enabled: false
+
+  topic_message_timeout_s: 2.0
+  topic_discovery_timeout_s: 2.0
+
+  required_topics:
+    - name: /drivetrain/status
+      type: lunabot_interfaces/msg/DrivetrainStatus
+      min_messages: 1
+      critical: true
+      reliability: reliable
+      expected_fields:
+        state: 1
+        fault_code: 0
+        estop_active: false
+        motion_inhibited: false
+        controller_online[0]: true
+        controller_online[1]: true
+    - name: /drivetrain/telemetry
+      type: lunabot_interfaces/msg/DrivetrainTelemetry
+      min_messages: 1
+      critical: true
+      reliability: reliable
+      expected_fields:
+        fault_code: 0
+        estop_active: false
+        motion_inhibited: false
+        controller_online[0]: true
+        controller_online[1]: true
+    - name: /excavation/telemetry
+      type: lunabot_interfaces/msg/ExcavationTelemetry
+      min_messages: 1
+      critical: true
+      reliability: reliable
+      expected_fields:
+        estop_active: false
+        driver_fault: false
+        fault_code: 0
+    - name: /localisation/start_zone_status
+      type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+      min_messages: 1
+      critical: true
+      reliability: reliable
+      expected_fields:
+        ready: true
+        state: ready
+
+  required_tf_links: []
+  required_actions: []
+  required_nodes: []

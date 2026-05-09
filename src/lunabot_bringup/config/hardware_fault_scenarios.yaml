@@ -1,0 +1,227 @@
+scenarios:
+  nominal:
+    description: Healthy hardware-boundary publishers for dry preflight checks.
+    topics:
+      - name: /drivetrain/status
+        type: lunabot_interfaces/msg/DrivetrainStatus
+        rate_hz: 5.0
+        fields:
+          state: 1
+          fault_code: 0
+          estop_active: false
+          motion_inhibited: false
+          controller_online: [true, true]
+      - name: /drivetrain/telemetry
+        type: lunabot_interfaces/msg/DrivetrainTelemetry
+        rate_hz: 5.0
+        fields:
+          wheel_velocity_rps: [0.0, 0.0, 0.0, 0.0]
+          encoder_ticks: [0, 0, 0, 0]
+          controller_online: [true, true]
+          estop_active: false
+          motion_inhibited: false
+          fault_code: 0
+      - name: /excavation/telemetry
+        type: lunabot_interfaces/msg/ExcavationTelemetry
+        rate_hz: 5.0
+        fields:
+          estop_active: false
+          driver_fault: false
+          home_switch: true
+          motor_enabled: false
+          motor_current_a: 0.0
+          fault_code: 0
+      - name: /localisation/start_zone_status
+        type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+        rate_hz: 2.0
+        fields:
+          state: ready
+          ready: true
+          reason_code: locked
+          reason_detail: start-zone tag lock stable
+          stable_lock_age_s: 1.0
+          search_elapsed_s: 0.0
+
+  drivetrain_controller_offline:
+    description: Sabertooth controller missing at the drivetrain boundary.
+    topics:
+      - name: /drivetrain/status
+        type: lunabot_interfaces/msg/DrivetrainStatus
+        rate_hz: 5.0
+        fields:
+          state: 4
+          fault_code: 3
+          estop_active: false
+          motion_inhibited: false
+          controller_online: [false, false]
+      - name: /drivetrain/telemetry
+        type: lunabot_interfaces/msg/DrivetrainTelemetry
+        rate_hz: 5.0
+        fields:
+          wheel_velocity_rps: [0.0, 0.0, 0.0, 0.0]
+          encoder_ticks: [0, 0, 0, 0]
+          controller_online: [false, false]
+          estop_active: false
+          motion_inhibited: false
+          fault_code: 3
+      - name: /excavation/telemetry
+        type: lunabot_interfaces/msg/ExcavationTelemetry
+        rate_hz: 5.0
+        fields:
+          estop_active: false
+          driver_fault: false
+          home_switch: true
+          motor_enabled: false
+          motor_current_a: 0.0
+          fault_code: 0
+      - name: /localisation/start_zone_status
+        type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+        rate_hz: 2.0
+        fields:
+          state: ready
+          ready: true
+          reason_code: locked
+          reason_detail: start-zone tag lock stable
+          stable_lock_age_s: 1.0
+          search_elapsed_s: 0.0
+
+  estop_asserted:
+    description: Operator or safety path has asserted the E-stop.
+    topics:
+      - name: /safety/estop
+        type: std_msgs/msg/Bool
+        rate_hz: 5.0
+        transient_local: true
+        fields:
+          data: true
+      - name: /safety/motion_inhibit
+        type: std_msgs/msg/Bool
+        rate_hz: 5.0
+        transient_local: true
+        fields:
+          data: true
+      - name: /drivetrain/status
+        type: lunabot_interfaces/msg/DrivetrainStatus
+        rate_hz: 5.0
+        fields:
+          state: 5
+          fault_code: 1
+          estop_active: true
+          motion_inhibited: true
+          controller_online: [true, true]
+      - name: /drivetrain/telemetry
+        type: lunabot_interfaces/msg/DrivetrainTelemetry
+        rate_hz: 5.0
+        fields:
+          wheel_velocity_rps: [0.0, 0.0, 0.0, 0.0]
+          encoder_ticks: [0, 0, 0, 0]
+          controller_online: [true, true]
+          estop_active: true
+          motion_inhibited: true
+          fault_code: 1
+      - name: /excavation/telemetry
+        type: lunabot_interfaces/msg/ExcavationTelemetry
+        rate_hz: 5.0
+        fields:
+          estop_active: true
+          driver_fault: false
+          home_switch: true
+          motor_enabled: false
+          motor_current_a: 0.0
+          fault_code: 1
+      - name: /localisation/start_zone_status
+        type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+        rate_hz: 2.0
+        fields:
+          state: ready
+          ready: true
+          reason_code: locked
+          reason_detail: start-zone tag lock stable
+          stable_lock_age_s: 1.0
+          search_elapsed_s: 0.0
+
+  excavation_driver_fault:
+    description: Excavation motor driver reports a persistent fault.
+    topics:
+      - name: /drivetrain/status
+        type: lunabot_interfaces/msg/DrivetrainStatus
+        rate_hz: 5.0
+        fields:
+          state: 1
+          fault_code: 0
+          estop_active: false
+          motion_inhibited: false
+          controller_online: [true, true]
+      - name: /drivetrain/telemetry
+        type: lunabot_interfaces/msg/DrivetrainTelemetry
+        rate_hz: 5.0
+        fields:
+          wheel_velocity_rps: [0.0, 0.0, 0.0, 0.0]
+          encoder_ticks: [0, 0, 0, 0]
+          controller_online: [true, true]
+          estop_active: false
+          motion_inhibited: false
+          fault_code: 0
+      - name: /excavation/telemetry
+        type: lunabot_interfaces/msg/ExcavationTelemetry
+        rate_hz: 5.0
+        fields:
+          estop_active: false
+          driver_fault: true
+          home_switch: true
+          motor_enabled: false
+          motor_current_a: 0.0
+          fault_code: 2
+      - name: /localisation/start_zone_status
+        type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+        rate_hz: 2.0
+        fields:
+          state: ready
+          ready: true
+          reason_code: locked
+          reason_detail: start-zone tag lock stable
+          stable_lock_age_s: 1.0
+          search_elapsed_s: 0.0
+
+  localisation_lost:
+    description: Start-zone localisation is stale or unavailable.
+    topics:
+      - name: /drivetrain/status
+        type: lunabot_interfaces/msg/DrivetrainStatus
+        rate_hz: 5.0
+        fields:
+          state: 1
+          fault_code: 0
+          estop_active: false
+          motion_inhibited: false
+          controller_online: [true, true]
+      - name: /drivetrain/telemetry
+        type: lunabot_interfaces/msg/DrivetrainTelemetry
+        rate_hz: 5.0
+        fields:
+          wheel_velocity_rps: [0.0, 0.0, 0.0, 0.0]
+          encoder_ticks: [0, 0, 0, 0]
+          controller_online: [true, true]
+          estop_active: false
+          motion_inhibited: false
+          fault_code: 0
+      - name: /excavation/telemetry
+        type: lunabot_interfaces/msg/ExcavationTelemetry
+        rate_hz: 5.0
+        fields:
+          estop_active: false
+          driver_fault: false
+          home_switch: true
+          motor_enabled: false
+          motor_current_a: 0.0
+          fault_code: 0
+      - name: /localisation/start_zone_status
+        type: lunabot_interfaces/msg/LocalisationStartZoneStatus
+        rate_hz: 2.0
+        fields:
+          state: lost
+          ready: false
+          reason_code: tag_lost
+          reason_detail: start-zone tag not visible
+          stable_lock_age_s: 0.0
+          search_elapsed_s: 6.0

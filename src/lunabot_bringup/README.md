@@ -82,6 +82,51 @@ For a direct shell exit code without the composed sim launch, run the harness en
 ros2 run lunabot_bringup mission_dry_run
 ```
 
+## Hardware Fault Injection
+
+Use the hardware fault injector when you want software-only checks for real
+hardware boundary failures. It publishes the same ROS interfaces as the
+hardware-facing nodes, so preflight and dry-run tooling see a controller-offline
+drivetrain, asserted E-stop, excavation driver fault, or lost localisation as a
+real contract failure rather than a private test stub.
+
+List the available scenarios:
+
+```bash
+ros2 run lunabot_bringup hardware_fault_injector --scenario nominal --list
+```
+
+Publish a healthy mock boundary for a short preflight smoke check:
+
+```bash
+ros2 run lunabot_bringup hardware_fault_injector \
+  --scenario nominal --duration-s 8
+```
+
+In another terminal, check that the hardware-boundary preflight accepts the
+healthy case:
+
+```bash
+ros2 run lunabot_bringup preflight_check \
+  --config src/lunabot_bringup/config/preflight_checks_fault_injection.yaml \
+  --use-sim-time false
+```
+
+Then publish a fault, for example:
+
+```bash
+ros2 run lunabot_bringup hardware_fault_injector \
+  --scenario drivetrain_controller_offline --duration-s 12
+```
+
+The same preflight command should fail with a field mismatch such as
+`fault_code expected=0 got=3`. That is the point: the failure is visible on the
+real project topic and the operator-facing check says what changed.
+
+Scenarios that publish `/safety/estop` or `/safety/motion_inhibit` require an
+explicit `--allow-live-topics` flag. Use that only with an isolated
+`ROS_DOMAIN_ID`; those topics are live safety inputs, not harmless log lines.
+
 ## Common failure modes
 
 - Launch starts successfully but one critical node crashes shortly after (dependency mismatch).

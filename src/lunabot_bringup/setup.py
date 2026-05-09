@@ -52,6 +52,7 @@ setup(
             "mission_dry_run = lunabot_bringup.mission_dry_run:main",
             "mission_manager = lunabot_bringup.mission_manager:main",
             "preflight_check = lunabot_bringup.preflight_check:main",
+            "hardware_fault_injector = lunabot_bringup.hardware_fault_injection:main",
         ],
     },
 )
