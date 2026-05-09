@@ -9,28 +9,37 @@ LAYOUT_PATH = (
 )
 
 
-def _walk_panels(node):
+def _walk_layout_ids(node):
     if isinstance(node, dict):
-        if node.get("type") == "panel":
-            yield node
         for value in node.values():
-            yield from _walk_panels(value)
+            yield from _walk_layout_ids(value)
     elif isinstance(node, list):
         for item in node:
-            yield from _walk_panels(item)
+            yield from _walk_layout_ids(item)
+    elif isinstance(node, str):
+        yield node
+
+
+def _configured_topics(layout):
+    topics = set()
+    for config in layout["configById"].values():
+        topic = config.get("topicPath") or config.get("cameraTopic")
+        if topic:
+            topics.add(topic)
+    return topics
 
 
 def test_mission_control_layout_is_valid_json():
     layout = json.loads(LAYOUT_PATH.read_text(encoding="utf-8"))
 
-    assert layout["name"] == "INNEX-1 Mission Control"
-    assert layout["content"]["type"] == "split"
+    assert isinstance(layout["configById"], dict)
+    assert isinstance(layout["layout"], dict)
 
 
 def test_mission_control_layout_covers_operator_topics():
     layout = json.loads(LAYOUT_PATH.read_text(encoding="utf-8"))
 
-    topics = set(layout["topics"])
+    topics = _configured_topics(layout)
 
     assert "/mission/state" in topics
     assert "/safety/motion_inhibit" in topics
@@ -39,13 +48,14 @@ def test_mission_control_layout_covers_operator_topics():
     assert "/excavation/status" in topics
     assert "/localisation/start_zone_status" in topics
     assert "/power/telemetry" in topics
-    assert "/camera_front/image" in topics
+    assert "/camera_front/image/compressed" in topics
 
 
 def test_mission_control_layout_keeps_debug_streams_out():
     layout = json.loads(LAYOUT_PATH.read_text(encoding="utf-8"))
-    topics = set(layout["topics"])
+    topics = _configured_topics(layout)
 
+    assert "/camera_front/image" not in topics
     assert "/ouster/points" not in topics
     assert "/global_costmap/costmap" not in topics
     assert "/local_costmap/costmap" not in topics
@@ -53,12 +63,14 @@ def test_mission_control_layout_keeps_debug_streams_out():
 
 def test_mission_control_layout_has_expected_panel_groups():
     layout = json.loads(LAYOUT_PATH.read_text(encoding="utf-8"))
-    panels = {panel["title"]: panel for panel in _walk_panels(layout["content"])}
+    panels = set(_walk_layout_ids(layout["layout"]))
 
     assert {
-        "Front Camera",
-        "Diagnostics",
-        "Mission",
-        "Safety and Power",
-        "Subsystems",
+        "Image!front_camera",
+        "RawMessages!diagnostics",
+        "RawMessages!mission_state",
+        "RawMessages!motion_inhibit",
+        "RawMessages!power",
+        "RawMessages!drivetrain",
+        "RawMessages!excavation",
     }.issubset(panels)

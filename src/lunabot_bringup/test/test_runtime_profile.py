@@ -38,17 +38,19 @@ def test_competition_profiles_stay_below_rulebook_budget_with_margin():
         profile = profiles[name]
         assert profile.budget_kbps <= COMPETITION_BUDGET_KBPS
         assert profile.estimated_kbps <= profile.target_kbps
-        assert profile.budget_margin_kbps >= 3000.0
+        assert profile.budget_margin_kbps >= 1000.0
 
 
-def test_competition_foxglove_allowlists_exclude_raw_streams():
+def test_competition_foxglove_allowlists_exclude_raw_streams_but_allow_compressed_video():
     profiles = load_profiles(RUNTIME_PROFILES_PATH)
 
     for name in COMPETITION_PROFILES:
-        exposed = " ".join(profiles[name].foxglove_allowlist).lower()
-        assert "image" not in exposed
-        assert "points" not in exposed
-        assert "camera" not in exposed
+        exposed = set(profiles[name].foxglove_allowlist)
+        assert "/camera_front/image" not in exposed
+        assert "/camera_front/depth_image" not in exposed
+        assert "/camera_front/points" not in exposed
+        assert "/ouster/points" not in exposed
+        assert "/camera_front/image/compressed" in exposed
 
 
 def test_hardware_competition_keeps_debug_tools_off_by_default():

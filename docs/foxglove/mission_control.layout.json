@@ -1,117 +1,149 @@
 {
-  "name": "INNEX-1 Mission Control",
-  "description": "Lean Foxglove layout for hardware week and competition-style operation.",
-  "topics": [
-    "/mission/state",
-    "/mission/autonomy_mode",
-    "/mission/time_remaining_s",
-    "/mission/cycle_count",
-    "/mission/last_failure_reason",
-    "/safety/estop",
-    "/safety/motion_inhibit",
-    "/diagnostics",
-    "/drivetrain/status",
-    "/drivetrain/telemetry",
-    "/excavation/status",
-    "/excavation/telemetry",
-    "/localisation/start_zone_status",
-    "/power/telemetry",
-    "/camera_front/image"
-  ],
-  "content": {
-    "type": "split",
-    "direction": "row",
-    "items": [
-      {
-        "proportion": 2,
-        "content": {
-          "type": "split",
-          "direction": "column",
-          "items": [
-            {
-              "proportion": 2,
-              "content": {
-                "type": "panel",
-                "panelType": "Image",
-                "title": "Front Camera",
-                "config": {
-                  "cameraTopic": "/camera_front/image",
-                  "annotations": []
-                }
-              }
-            },
-            {
-              "proportion": 1,
-              "content": {
-                "type": "panel",
-                "panelType": "DiagnosticsSummary",
-                "title": "Diagnostics",
-                "config": {
-                  "topic": "/diagnostics"
-                }
-              }
-            }
-          ]
-        }
+  "configById": {
+    "Image!front_camera": {
+      "cameraTopic": "/camera_front/image/compressed",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
       },
-      {
-        "proportion": 1,
-        "content": {
-          "type": "split",
+      "rotation": 0,
+      "synchronize": true,
+      "zoom": 1
+    },
+    "RawMessages!mission_state": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/mission/state"
+    },
+    "RawMessages!autonomy_mode": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/mission/autonomy_mode"
+    },
+    "RawMessages!time_remaining": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/mission/time_remaining_s"
+    },
+    "RawMessages!cycle_count": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/mission/cycle_count"
+    },
+    "RawMessages!failure_reason": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/mission/last_failure_reason"
+    },
+    "RawMessages!motion_inhibit": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/safety/motion_inhibit"
+    },
+    "RawMessages!estop": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/safety/estop"
+    },
+    "RawMessages!power": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/power/telemetry"
+    },
+    "RawMessages!drivetrain": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/drivetrain/status"
+    },
+    "RawMessages!diagnostics": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/diagnostics"
+    },
+    "RawMessages!excavation": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/excavation/status"
+    },
+    "RawMessages!localisation": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/localisation/start_zone_status"
+    }
+  },
+  "globalVariables": {},
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": "Image!front_camera",
+      "second": "RawMessages!diagnostics",
+      "splitPercentage": 68
+    },
+    "second": {
+      "direction": "column",
+      "first": {
+        "direction": "column",
+        "first": {
+          "direction": "row",
+          "first": "RawMessages!mission_state",
+          "second": "RawMessages!autonomy_mode",
+          "splitPercentage": 50
+        },
+        "second": {
+          "direction": "row",
+          "first": "RawMessages!time_remaining",
+          "second": "RawMessages!cycle_count",
+          "splitPercentage": 50
+        },
+        "splitPercentage": 50
+      },
+      "second": {
+        "direction": "column",
+        "first": {
+          "direction": "row",
+          "first": "RawMessages!motion_inhibit",
+          "second": "RawMessages!estop",
+          "splitPercentage": 50
+        },
+        "second": {
           "direction": "column",
-          "items": [
-            {
-              "proportion": 1,
-              "content": {
-                "type": "panel",
-                "panelType": "RawMessages",
-                "title": "Mission",
-                "config": {
-                  "topics": [
-                    "/mission/state",
-                    "/mission/autonomy_mode",
-                    "/mission/time_remaining_s",
-                    "/mission/cycle_count",
-                    "/mission/last_failure_reason"
-                  ]
-                }
-              }
-            },
-            {
-              "proportion": 1,
-              "content": {
-                "type": "panel",
-                "panelType": "RawMessages",
-                "title": "Safety and Power",
-                "config": {
-                  "topics": [
-                    "/safety/estop",
-                    "/safety/motion_inhibit",
-                    "/power/telemetry"
-                  ]
-                }
-              }
-            },
-            {
-              "proportion": 1,
-              "content": {
-                "type": "panel",
-                "panelType": "RawMessages",
-                "title": "Subsystems",
-                "config": {
-                  "topics": [
-                    "/drivetrain/status",
-                    "/drivetrain/telemetry",
-                    "/excavation/status",
-                    "/excavation/telemetry",
-                    "/localisation/start_zone_status"
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-    ]
-  }
+          "first": {
+            "direction": "row",
+            "first": "RawMessages!power",
+            "second": "RawMessages!drivetrain",
+            "splitPercentage": 50
+          },
+          "second": {
+            "direction": "row",
+            "first": "RawMessages!excavation",
+            "second": "RawMessages!localisation",
+            "splitPercentage": 50
+          },
+          "splitPercentage": 50
+        },
+        "splitPercentage": 34
+      },
+      "splitPercentage": 50
+    },
+    "splitPercentage": 62
+  },
+  "playbackConfig": {
+    "speed": 1
+  },
+  "userNodes": {}
 }

@@ -76,7 +76,7 @@ profiles:
   sim_competition:
     description: Simulation dress rehearsal using competition telemetry rules.
     budget_kbps: 4000
-    target_kbps: 1000
+    target_kbps: 2500
     launch_arguments:
       navigation:
         use_sim_time: true
@@ -113,6 +113,8 @@ profiles:
       - /localisation/start_zone_status
       - /diagnostics
       - /power/telemetry
+      - /camera_front/image/compressed
+      - /camera_front/camera_info
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0
@@ -153,11 +155,17 @@ profiles:
       - name: /power/telemetry
         max_hz: 1.0
         estimated_bytes: 128
+      - name: /camera_front/image/compressed
+        max_hz: 5.0
+        estimated_bytes: 37500
+      - name: /camera_front/camera_info
+        max_hz: 1.0
+        estimated_bytes: 512
 
   hardware_bringup:
     description: Bench profile for hardware checkout before competition mode.
     budget_kbps: 4000
-    target_kbps: 1500
+    target_kbps: 2000
     launch_arguments:
       navigation:
         use_sim_time: false
@@ -200,6 +208,10 @@ profiles:
       - /localisation/start_zone_status
       - /diagnostics
       - /power/telemetry
+      - /camera_front/image/compressed
+      - /camera_rear/image/compressed
+      - /camera_front/camera_info
+      - /camera_rear/camera_info
     telemetry_topics:
       - name: /drivetrain/status
         max_hz: 5.0
@@ -222,11 +234,14 @@ profiles:
       - name: /power/telemetry
         max_hz: 1.0
         estimated_bytes: 128
+      - name: /camera_front/image/compressed
+        max_hz: 5.0
+        estimated_bytes: 37500
 
   hardware_competition:
     description: Lean default for the competition run.
     budget_kbps: 4000
-    target_kbps: 800
+    target_kbps: 2500
     launch_arguments:
       navigation:
         use_sim_time: false
@@ -271,6 +286,8 @@ profiles:
       - /localisation/start_zone_status
       - /diagnostics
       - /power/telemetry
+      - /camera_front/image/compressed
+      - /camera_front/camera_info
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0
@@ -311,3 +328,9 @@ profiles:
       - name: /power/telemetry
         max_hz: 1.0
         estimated_bytes: 128
+      - name: /camera_front/image/compressed
+        max_hz: 5.0
+        estimated_bytes: 37500
+      - name: /camera_front/camera_info
+        max_hz: 1.0
+        estimated_bytes: 512
