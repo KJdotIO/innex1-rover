@@ -30,6 +30,15 @@ def test_begin_cycle_resets_cycle_start_time():
     assert timer.cycleStartTime >= old_start
 
 
+def test_elapsed_mission_time_uses_monotonic_clock(monkeypatch):
+    """Elapsed mission time is exposed for passive operator telemetry."""
+    timer = MissionTimer()
+    timer.missionStartTime = 100.0
+    monkeypatch.setattr("time.monotonic", lambda: 112.5)
+
+    assert timer.elapsedMissionTime() == 12.5
+
+
 def test_record_cycle_time_returns_positive_float_and_increments_counter():
     """Verify recordCycleTime() returns a non-negative duration and increments completedCycles."""
     timer = MissionTimer()
