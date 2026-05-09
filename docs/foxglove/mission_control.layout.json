@@ -1,0 +1,117 @@
+{
+  "name": "INNEX-1 Mission Control",
+  "description": "Lean Foxglove layout for hardware week and competition-style operation.",
+  "topics": [
+    "/mission/state",
+    "/mission/autonomy_mode",
+    "/mission/time_remaining_s",
+    "/mission/cycle_count",
+    "/mission/last_failure_reason",
+    "/safety/estop",
+    "/safety/motion_inhibit",
+    "/diagnostics",
+    "/drivetrain/status",
+    "/drivetrain/telemetry",
+    "/excavation/status",
+    "/excavation/telemetry",
+    "/localisation/start_zone_status",
+    "/power/telemetry",
+    "/camera_front/image"
+  ],
+  "content": {
+    "type": "split",
+    "direction": "row",
+    "items": [
+      {
+        "proportion": 2,
+        "content": {
+          "type": "split",
+          "direction": "column",
+          "items": [
+            {
+              "proportion": 2,
+              "content": {
+                "type": "panel",
+                "panelType": "Image",
+                "title": "Front Camera",
+                "config": {
+                  "cameraTopic": "/camera_front/image",
+                  "annotations": []
+                }
+              }
+            },
+            {
+              "proportion": 1,
+              "content": {
+                "type": "panel",
+                "panelType": "DiagnosticsSummary",
+                "title": "Diagnostics",
+                "config": {
+                  "topic": "/diagnostics"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "proportion": 1,
+        "content": {
+          "type": "split",
+          "direction": "column",
+          "items": [
+            {
+              "proportion": 1,
+              "content": {
+                "type": "panel",
+                "panelType": "RawMessages",
+                "title": "Mission",
+                "config": {
+                  "topics": [
+                    "/mission/state",
+                    "/mission/autonomy_mode",
+                    "/mission/time_remaining_s",
+                    "/mission/cycle_count",
+                    "/mission/last_failure_reason"
+                  ]
+                }
+              }
+            },
+            {
+              "proportion": 1,
+              "content": {
+                "type": "panel",
+                "panelType": "RawMessages",
+                "title": "Safety and Power",
+                "config": {
+                  "topics": [
+                    "/safety/estop",
+                    "/safety/motion_inhibit",
+                    "/power/telemetry"
+                  ]
+                }
+              }
+            },
+            {
+              "proportion": 1,
+              "content": {
+                "type": "panel",
+                "panelType": "RawMessages",
+                "title": "Subsystems",
+                "config": {
+                  "topics": [
+                    "/drivetrain/status",
+                    "/drivetrain/telemetry",
+                    "/excavation/status",
+                    "/excavation/telemetry",
+                    "/localisation/start_zone_status"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
