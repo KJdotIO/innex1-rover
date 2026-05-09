@@ -57,6 +57,44 @@ DURABILITY_MAP = {
 }
 
 
+def _field_tokens(path: str) -> list[str | int]:
+    """Split a message field path into attribute and list-index tokens."""
+    tokens: list[str | int] = []
+    for part in path.split("."):
+        if not part:
+            raise ValueError(f"Invalid empty field in path '{path}'")
+        name, bracket, rest = part.partition("[")
+        if name:
+            tokens.append(name)
+        while bracket:
+            index_text, close, rest = rest.partition("]")
+            if not close or not index_text.isdigit():
+                raise ValueError(f"Invalid list index in field path '{path}'")
+            tokens.append(int(index_text))
+            bracket, rest = rest[:1], rest[1:]
+    return tokens
+
+
+def _read_field(message: Any, path: str) -> Any:
+    """Read a possibly nested message field such as controller_online[0]."""
+    value: Any = message
+    for token in _field_tokens(path):
+        value = value[token] if isinstance(token, int) else getattr(value, token)
+    return value
+
+
+def _fields_match(message: Any, expected_fields: dict[str, Any]) -> tuple[bool, str]:
+    """Return whether a message satisfies the configured field expectations."""
+    for path, expected in expected_fields.items():
+        try:
+            actual = _read_field(message, path)
+        except (AttributeError, IndexError, TypeError, ValueError) as exc:
+            return False, f"{path} unreadable: {exc}"
+        if actual != expected:
+            return False, f"{path} expected={expected!r} got={actual!r}"
+    return True, "field expectations met"
+
+
 @dataclass
 class CheckResult:
     """Result item for one preflight check."""
@@ -298,9 +336,14 @@ class PreflightChecker(Node):
         timeout_s: float,
         reliability: QoSReliabilityPolicy,
         durability: QoSDurabilityPolicy,
-    ) -> int:
+        expected_fields: dict[str, Any] | None,
+    ) -> tuple[int, int, str]:
         """Wait for the required message count on one topic."""
-        received = {"count": 0}
+        received = {
+            "count": 0,
+            "matching_count": 0,
+            "last_mismatch": "no messages received",
+        }
         qos = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=max(10, min_messages),
@@ -308,23 +351,39 @@ class PreflightChecker(Node):
             durability=durability,
         )
 
+        def _handle_message(msg) -> None:
+            received["count"] += 1
+            if not expected_fields:
+                received["matching_count"] += 1
+                return
+            matched, detail = _fields_match(msg, expected_fields)
+            if matched:
+                received["matching_count"] += 1
+            else:
+                received["last_mismatch"] = detail
+
         subscription = self.create_subscription(
             message_type,
             topic_name,
-            lambda _msg, bucket=received: bucket.__setitem__(
-                "count", bucket["count"] + 1
-            ),
+            _handle_message,
             qos,
         )
 
         try:
             deadline = time.monotonic() + timeout_s
-            while time.monotonic() < deadline and received["count"] < min_messages:
+            while (
+                time.monotonic() < deadline
+                and received["matching_count"] < min_messages
+            ):
                 rclpy.spin_once(self, timeout_sec=0.1)
         finally:
             self.destroy_subscription(subscription)
 
-        return received["count"]
+        return (
+            int(received["count"]),
+            int(received["matching_count"]),
+            str(received["last_mismatch"]),
+        )
 
     def _check_required_topics(self) -> None:
         """Check required topics for type and message flow."""
@@ -387,27 +446,46 @@ class PreflightChecker(Node):
                 continue
 
             message_type = get_message(expected_type)
-            received_count = self._wait_for_required_messages(
-                topic_name,
-                message_type,
-                min_messages=min_messages,
-                timeout_s=msg_timeout_s,
-                reliability=reliability,
-                durability=durability,
+            expected_fields = topic_cfg.get("expected_fields")
+            if expected_fields is not None and not isinstance(expected_fields, dict):
+                self._record(
+                    f"topic:{topic_name}",
+                    critical,
+                    False,
+                    "expected_fields must be a mapping",
+                    started,
+                )
+                continue
+
+            received_count, matching_count, mismatch_detail = (
+                self._wait_for_required_messages(
+                    topic_name,
+                    message_type,
+                    min_messages=min_messages,
+                    timeout_s=msg_timeout_s,
+                    reliability=reliability,
+                    durability=durability,
+                    expected_fields=expected_fields,
+                )
             )
 
-            if received_count >= min_messages:
+            if matching_count >= min_messages:
+                detail = f"received {received_count} msg(s)"
+                if expected_fields:
+                    detail += f", {matching_count} matched expected fields"
                 self._record(
                     f"topic:{topic_name}",
                     critical,
                     True,
-                    f"received {received_count} msg(s)",
+                    detail,
                     started,
                 )
                 continue
 
             detail = f"received {received_count} msg(s), "
-            detail += f"expected >= {min_messages}"
+            detail += f"{matching_count} matched, expected >= {min_messages}"
+            if expected_fields:
+                detail += f"; last mismatch: {mismatch_detail}"
             self._record(
                 f"topic:{topic_name}",
                 critical,
@@ -632,9 +710,7 @@ def _parse_bool_text(value: str) -> bool:
         return True
     if normalised in FALSE_STRINGS:
         return False
-    raise argparse.ArgumentTypeError(
-        f"Expected a boolean value, got: {value}"
-    )
+    raise argparse.ArgumentTypeError(f"Expected a boolean value, got: {value}")
 
 
 def _strip_ros_cli_args(args: list[str] | None) -> list[str]:

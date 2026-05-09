@@ -13,9 +13,11 @@ from lunabot_bringup.preflight_check import (
     ACTION_TYPE_MAP,
     DURABILITY_MAP,
     RELIABILITY_MAP,
+    _fields_match,
     _merge_contract_requirements,
     _parse_bool_text,
     _parse_qos_policy,
+    _read_field,
     _strip_ros_cli_args,
 )
 from lunabot_bringup.preflight_profiles import filter_preflight_config, validate_phase
@@ -103,16 +105,15 @@ def test_filter_preflight_config_keeps_runtime_actions_in_runtime_phase():
 
     filtered = filter_preflight_config(config, "runtime")
 
-    assert filtered["preflight"]["required_actions"] == config["preflight"][
-        "required_actions"
-    ]
+    assert (
+        filtered["preflight"]["required_actions"]
+        == config["preflight"]["required_actions"]
+    )
 
 
 def test_dry_run_preflight_config_keeps_mission_actions_in_runtime_phase():
     config_path = (
-        Path(__file__).resolve().parents[1]
-        / "config"
-        / "preflight_checks_dry_run.yaml"
+        Path(__file__).resolve().parents[1] / "config" / "preflight_checks_dry_run.yaml"
     )
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
@@ -228,6 +229,44 @@ def test_parse_qos_policy_accepts_known_value():
         )
         == DURABILITY_MAP["transient_local"]
     )
+
+
+def test_read_field_supports_indexed_message_fields():
+    message = SimpleNamespace(
+        controller_online=[True, False],
+        nested=SimpleNamespace(state="ready"),
+    )
+
+    assert _read_field(message, "controller_online[0]") is True
+    assert _read_field(message, "controller_online[1]") is False
+    assert _read_field(message, "nested.state") == "ready"
+
+
+def test_fields_match_reports_first_mismatch():
+    message = SimpleNamespace(fault_code=3, estop_active=False)
+
+    matched, detail = _fields_match(
+        message,
+        {"fault_code": 0, "estop_active": False},
+    )
+
+    assert matched is False
+    assert detail == "fault_code expected=0 got=3"
+
+
+def test_fault_injection_preflight_config_requires_healthy_fields():
+    config_path = (
+        Path(__file__).resolve().parents[1]
+        / "config"
+        / "preflight_checks_fault_injection.yaml"
+    )
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+
+    drivetrain_check = config["preflight"]["required_topics"][0]
+
+    assert drivetrain_check["name"] == "/drivetrain/status"
+    assert drivetrain_check["expected_fields"]["fault_code"] == 0
+    assert drivetrain_check["expected_fields"]["controller_online[0]"] is True
 
 
 def test_parse_qos_policy_rejects_unknown_durability_value():
