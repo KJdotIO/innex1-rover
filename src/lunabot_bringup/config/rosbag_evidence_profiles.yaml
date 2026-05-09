@@ -13,6 +13,7 @@ profiles:
       - /diagnostics
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /localisation/start_zone_status
       - /excavation/status
@@ -32,6 +33,7 @@ profiles:
       - /diagnostics
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /drivetrain/telemetry
       - /localisation/start_zone_status
@@ -59,6 +61,7 @@ profiles:
       - /diagnostics
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /drivetrain/telemetry
       - /localisation/start_zone_status

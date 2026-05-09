@@ -46,6 +46,28 @@
       "kind": "publisher",
       "source": "src/lunabot_bringup/lunabot_bringup/mission_manager.py",
       "phases": ["runtime"]
+    },
+    {
+      "name": "/safety/estop",
+      "type": "std_msgs/msg/Bool",
+      "kind": "subscription",
+      "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/safety/motion_inhibit",
+      "type": "std_msgs/msg/Bool",
+      "kind": "publisher",
+      "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
+      "phases": ["runtime", "hardware"],
+      "qos": "reliable, transient-local"
+    },
+    {
+      "name": "/safety/reset_motion_inhibit",
+      "type": "std_msgs/msg/Bool",
+      "kind": "subscription",
+      "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
+      "phases": ["runtime", "hardware"]
     }
   ],
   "tf_links": [

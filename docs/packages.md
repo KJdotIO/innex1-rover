@@ -14,7 +14,7 @@
 | `lunabot_simulation` | ament_cmake | Gazebo worlds (`moon_yard.sdf`), sim launch |
 | `lunabot_teleop` | ament_python | Joystick control |
 | `lunabot_perception` | ament_python | `crater_detection` — publishes `/crater_grid` for Nav2 costmaps |
-| `lunabot_safety` | ament_python | `estop_node` — subscribes `/safety/estop`, publishes `/safety/motion_inhibit` |
+| `lunabot_safety` | ament_python | `estop_node` — subscribes `/safety/estop` and `/safety/reset_motion_inhibit`, publishes `/safety/motion_inhibit` |
 
 ## External (vendored)
 - `src/external/leo_common-ros2` — Leo Rover base packages
