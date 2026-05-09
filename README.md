@@ -120,6 +120,19 @@ Exit codes:
 - `1`: warnings present
 - `2`: failures present
 
+## Jetson runtime profile
+
+Before a scored-run rehearsal, check that the runtime/comms profile is still
+lean:
+
+```bash
+ros2 run lunabot_bringup runtime_profile check
+ros2 run lunabot_bringup runtime_profile show --profile hardware_competition
+```
+
+The profile rules live in
+[`docs/jetson_runtime_profiles.md`](docs/jetson_runtime_profiles.md).
+
 ## Visualisation options
 
 | Tool | Purpose | Command |

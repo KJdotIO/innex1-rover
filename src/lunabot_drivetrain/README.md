@@ -13,9 +13,9 @@ encoder-derived odometry and telemetry.
   "Simplified Serial" wiring. Packet Serial is also supported by setting
   `serial_protocol:=packetized`.
 
-If the serial port is unavailable at startup the bridge enters **dry-run
-mode**: no motor output, but all ROS interfaces remain active. This allows
-desktop testing without hardware.
+Real hardware launches fail closed if the serial port is unavailable. For
+desktop or Jetson dry-runs without motor output, set `dry_run:=true`
+explicitly.
 
 ## Nodes
 
@@ -26,7 +26,7 @@ them to both Sabertooth controllers, and publishes status/telemetry.
 
 | Direction | Topic | Type |
 |-----------|-------|------|
-| Subscribe | `/cmd_vel_safe` | `geometry_msgs/Twist` |
+| Subscribe | `/cmd_vel_gated` | `geometry_msgs/Twist` |
 | Subscribe | `/safety/motion_inhibit` | `std_msgs/Bool` (transient-local) |
 | Subscribe | `/safety/estop` | `std_msgs/Bool` |
 | Publish | `/drivetrain/status` | `lunabot_interfaces/DrivetrainStatus` |
@@ -119,7 +119,8 @@ ros2 launch lunabot_drivetrain drivetrain_bench.launch.py enable_teleop:=true ma
 The joystick path is:
 
 `game_controller_node` → `/joy` → `teleop_twist_joy` → `/cmd_vel_teleop` →
-`twist_mux` → `/cmd_vel_safe` → `drivetrain_bridge` → Sabertooth serial.
+`twist_mux` → `/cmd_vel_safe` → `velocity_gate` → `/cmd_vel_gated` →
+`drivetrain_bridge` → Sabertooth serial.
 
 If the controller is not picked up as device `0`, try:
 

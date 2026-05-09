@@ -49,10 +49,13 @@ setup(
     entry_points={
         "console_scripts": [
             "navigate_to_pose_gate = lunabot_bringup.navigate_to_pose_gate:main",
+            "mission_evidence = lunabot_bringup.mission_evidence:main",
             "mission_dry_run = lunabot_bringup.mission_dry_run:main",
             "mission_manager = lunabot_bringup.mission_manager:main",
             "preflight_check = lunabot_bringup.preflight_check:main",
             "hardware_fault_injector = lunabot_bringup.hardware_fault_injection:main",
+            "runtime_profile = lunabot_bringup.runtime_profile:main",
+            "rover_diagnostics = lunabot_bringup.rover_diagnostics:main",
         ],
     },
 )

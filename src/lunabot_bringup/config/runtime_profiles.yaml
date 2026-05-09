@@ -1,0 +1,290 @@
+profiles:
+  sim_debug:
+    description: Full local simulation debugging with visual tools enabled.
+    budget_kbps: 6000
+    target_kbps: 6000
+    launch_arguments:
+      navigation:
+        use_sim_time: true
+        launch_rviz: true
+        enable_teleop: true
+        lidar_costmap_phase: true
+        enable_apriltag_debug: true
+      moon_yard:
+        use_sim_time: true
+    required_processes:
+      - ros_gz_sim
+      - ros_gz_bridge
+      - nav2
+      - localisation
+    optional_tools:
+      - rviz2
+      - foxglove_bridge
+      - rosbag record --profile debug
+    off_by_default:
+      - hardware motor bridges
+    foxglove_allowlist:
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /excavation/status
+      - /localisation/start_zone_status
+      - /map
+      - /local_costmap/costmap
+      - /global_costmap/costmap
+      - /ouster/points
+      - /camera_front/points
+    telemetry_topics:
+      - name: /mission/state
+        max_hz: 1.0
+        estimated_bytes: 64
+      - name: /mission/autonomy_mode
+        max_hz: 1.0
+        estimated_bytes: 64
+      - name: /mission/time_remaining_s
+        max_hz: 1.0
+        estimated_bytes: 32
+      - name: /mission/cycle_count
+        max_hz: 1.0
+        estimated_bytes: 32
+      - name: /mission/last_failure_reason
+        max_hz: 1.0
+        estimated_bytes: 128
+      - name: /drivetrain/status
+        max_hz: 10.0
+        estimated_bytes: 128
+      - name: /excavation/status
+        max_hz: 10.0
+        estimated_bytes: 128
+      - name: /map
+        max_hz: 1.0
+        estimated_bytes: 320000
+      - name: /local_costmap/costmap
+        max_hz: 2.0
+        estimated_bytes: 80000
+      - name: /global_costmap/costmap
+        max_hz: 1.0
+        estimated_bytes: 160000
+
+  sim_competition:
+    description: Simulation dress rehearsal using competition telemetry rules.
+    budget_kbps: 4000
+    target_kbps: 1000
+    launch_arguments:
+      navigation:
+        use_sim_time: true
+        launch_rviz: false
+        enable_teleop: false
+        lidar_costmap_phase: false
+        enable_apriltag_debug: false
+      moon_yard:
+        use_sim_time: true
+    required_processes:
+      - ros_gz_sim
+      - ros_gz_bridge
+      - nav2
+      - localisation
+      - mission_manager
+    optional_tools:
+      - mission_evidence --profile minimal
+    off_by_default:
+      - rviz2
+      - foxglove raw image panels
+      - raw pointcloud streaming
+      - heavy rosbag profile
+    foxglove_allowlist:
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /excavation/status
+      - /localisation/start_zone_status
+      - /diagnostics
+    telemetry_topics:
+      - name: /mission/state
+        max_hz: 1.0
+        estimated_bytes: 64
+      - name: /mission/autonomy_mode
+        max_hz: 1.0
+        estimated_bytes: 64
+      - name: /mission/time_remaining_s
+        max_hz: 1.0
+        estimated_bytes: 32
+      - name: /mission/cycle_count
+        max_hz: 1.0
+        estimated_bytes: 32
+      - name: /mission/last_failure_reason
+        max_hz: 1.0
+        estimated_bytes: 128
+      - name: /safety/estop
+        max_hz: 2.0
+        estimated_bytes: 24
+      - name: /safety/motion_inhibit
+        max_hz: 2.0
+        estimated_bytes: 24
+      - name: /drivetrain/status
+        max_hz: 5.0
+        estimated_bytes: 128
+      - name: /excavation/status
+        max_hz: 5.0
+        estimated_bytes: 128
+      - name: /localisation/start_zone_status
+        max_hz: 2.0
+        estimated_bytes: 256
+      - name: /diagnostics
+        max_hz: 1.0
+        estimated_bytes: 1024
+
+  hardware_bringup:
+    description: Bench profile for hardware checkout before competition mode.
+    budget_kbps: 4000
+    target_kbps: 1500
+    launch_arguments:
+      navigation:
+        use_sim_time: false
+        launch_rviz: false
+        enable_teleop: true
+        lidar_costmap_phase: false
+        enable_apriltag_debug: false
+      drivetrain_bench:
+        dry_run: false
+      material_actions:
+        use_mock_telemetry: false
+    required_processes:
+      - velocity_gate
+      - drivetrain_bridge
+      - deposition_bridge
+      - excavation_controller
+      - localisation
+    optional_tools:
+      - rviz2 on operator laptop
+      - foxglove_bridge with competition allowlist
+      - mission_evidence --profile minimal
+    off_by_default:
+      - Gazebo
+      - raw image streaming
+      - raw pointcloud streaming
+      - heavy rosbag profile
+    foxglove_allowlist:
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /drivetrain/telemetry
+      - /excavation/status
+      - /excavation/telemetry
+      - /localisation/start_zone_status
+      - /diagnostics
+    telemetry_topics:
+      - name: /drivetrain/status
+        max_hz: 5.0
+        estimated_bytes: 128
+      - name: /drivetrain/telemetry
+        max_hz: 5.0
+        estimated_bytes: 192
+      - name: /excavation/status
+        max_hz: 5.0
+        estimated_bytes: 128
+      - name: /excavation/telemetry
+        max_hz: 5.0
+        estimated_bytes: 192
+      - name: /localisation/start_zone_status
+        max_hz: 2.0
+        estimated_bytes: 256
+      - name: /diagnostics
+        max_hz: 1.0
+        estimated_bytes: 1024
+
+  hardware_competition:
+    description: Lean default for the competition run.
+    budget_kbps: 4000
+    target_kbps: 800
+    launch_arguments:
+      navigation:
+        use_sim_time: false
+        launch_rviz: false
+        enable_teleop: false
+        lidar_costmap_phase: false
+        enable_apriltag_debug: false
+      drivetrain_bench:
+        dry_run: false
+      material_actions:
+        use_mock_telemetry: false
+    required_processes:
+      - velocity_gate
+      - drivetrain_bridge
+      - deposition_bridge
+      - excavation_controller
+      - localisation
+      - nav2
+      - mission_manager
+      - rover_diagnostics
+    optional_tools:
+      - mission_evidence --profile minimal
+    off_by_default:
+      - rviz2
+      - Gazebo
+      - raw image streaming
+      - raw pointcloud streaming
+      - foxglove raw panels
+      - heavy rosbag profile
+      - debug costmap panels
+    foxglove_allowlist:
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /excavation/status
+      - /localisation/start_zone_status
+      - /diagnostics
+    telemetry_topics:
+      - name: /mission/state
+        max_hz: 1.0
+        estimated_bytes: 64
+      - name: /mission/autonomy_mode
+        max_hz: 1.0
+        estimated_bytes: 64
+      - name: /mission/time_remaining_s
+        max_hz: 1.0
+        estimated_bytes: 32
+      - name: /mission/cycle_count
+        max_hz: 1.0
+        estimated_bytes: 32
+      - name: /mission/last_failure_reason
+        max_hz: 1.0
+        estimated_bytes: 128
+      - name: /safety/estop
+        max_hz: 2.0
+        estimated_bytes: 24
+      - name: /safety/motion_inhibit
+        max_hz: 2.0
+        estimated_bytes: 24
+      - name: /drivetrain/status
+        max_hz: 2.0
+        estimated_bytes: 128
+      - name: /excavation/status
+        max_hz: 2.0
+        estimated_bytes: 128
+      - name: /localisation/start_zone_status
+        max_hz: 1.0
+        estimated_bytes: 256
+      - name: /diagnostics
+        max_hz: 1.0
+        estimated_bytes: 1024

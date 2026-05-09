@@ -1,0 +1,75 @@
+profiles:
+  minimal:
+    description: Lean operator and mission-state evidence for normal dry runs.
+    topics:
+      - /clock
+      - /tf
+      - /tf_static
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /localisation/start_zone_status
+      - /excavation/status
+      - /cmd_vel_gated
+      - /cmd_vel_safe
+  debug:
+    description: Mission evidence plus navigation state for failed or borderline runs.
+    topics:
+      - /clock
+      - /tf
+      - /tf_static
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /drivetrain/telemetry
+      - /localisation/start_zone_status
+      - /excavation/status
+      - /excavation/telemetry
+      - /cmd_vel_gated
+      - /cmd_vel_safe
+      - /odom
+      - /scan
+      - /map
+      - /global_costmap/costmap
+      - /local_costmap/costmap
+      - /navigate_to_pose_gate/_action/status
+  heavy:
+    description: Deliberate high-bandwidth capture for short perception investigations only.
+    topics:
+      - /clock
+      - /tf
+      - /tf_static
+      - /mission/state
+      - /mission/autonomy_mode
+      - /mission/time_remaining_s
+      - /mission/cycle_count
+      - /mission/last_failure_reason
+      - /safety/estop
+      - /safety/motion_inhibit
+      - /drivetrain/status
+      - /drivetrain/telemetry
+      - /localisation/start_zone_status
+      - /excavation/status
+      - /excavation/telemetry
+      - /cmd_vel_gated
+      - /cmd_vel_safe
+      - /odom
+      - /scan
+      - /map
+      - /global_costmap/costmap
+      - /local_costmap/costmap
+      - /navigate_to_pose_gate/_action/status
+      - /camera/image_raw
+      - /camera/depth/image_raw
+      - /camera/camera_info
+      - /ouster/points

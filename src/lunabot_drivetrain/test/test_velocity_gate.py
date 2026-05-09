@@ -84,3 +84,38 @@ class TestStallDetection:
         bridge._wheel_velocity_rps = [0.1, 0.1, 0.1, 0.1]
         bridge._check_encoder_stall(1.0, 0.5, 0.5)
         assert bridge._stall_start_time is None
+
+
+class TestDrivetrainBridgeReadiness:
+    """Verify hardware readiness defaults fail closed."""
+
+    def _make_bridge(self, dry_run):
+        from unittest.mock import MagicMock
+
+        from lunabot_drivetrain.drivetrain_bridge import DrivetrainBridge
+
+        bridge = object.__new__(DrivetrainBridge)
+        bridge._dry_run = dry_run
+        bridge._serial_port = "/dev/missing"
+        bridge._fault_code = DrivetrainStatus.FAULT_NONE
+        bridge._state = DrivetrainStatus.STATE_UNINITIALISED
+        bridge.get_logger = MagicMock()
+        return bridge
+
+    def test_missing_serial_faults_when_not_dry_run(self):
+        bridge = self._make_bridge(dry_run=False)
+
+        bridge._handle_serial_unavailable(RuntimeError("missing"))
+
+        assert bridge._state == DrivetrainStatus.STATE_FAULT
+        assert bridge._fault_code == DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
+        bridge.get_logger().error.assert_called_once()
+
+    def test_missing_serial_stays_ready_when_dry_run_is_explicit(self):
+        bridge = self._make_bridge(dry_run=True)
+
+        bridge._handle_serial_unavailable(RuntimeError("missing"))
+
+        assert bridge._state == DrivetrainStatus.STATE_READY
+        assert bridge._fault_code == DrivetrainStatus.FAULT_NONE
+        bridge.get_logger().warn.assert_called_once()
