@@ -204,6 +204,49 @@ Published at the control loop rate. Per-wheel encoder feedback ordered
 - `controller_online[2]` — true if UART heartbeat received per Sabertooth.
 - `estop_active`, `motion_inhibited`, `fault_code` — mirrored safety state.
 
+## Power Telemetry Contract
+
+Added under issue [#277](https://github.com/KJdotIO/innex1-rover/issues/277).
+
+### Operator-Facing Topic
+
+- `/power/telemetry` uses `lunabot_interfaces/msg/PowerTelemetry`
+
+This topic is the rover software view of the main battery bus. During early
+hardware runs it may come from `manual_power_telemetry`, with values entered by
+the operator from the visible power meter. Once the electrical path is settled,
+replace that source with the chosen sensor or logger bridge without changing
+the topic contract.
+
+### PowerTelemetry
+
+Fields:
+
+- `profile` — battery profile used for thresholds, currently `lipo_4s` or
+  `lipo_6s`.
+- `source` — `manual`, `meter_bridge`, `sensor_bridge`, or another short source
+  name.
+- `bus_voltage_v`, `bus_current_a`, `energy_wh` — measured or manually entered
+  bus values.
+- `warning_voltage_v`, `critical_voltage_v` — thresholds used to classify the
+  sample.
+- `low_voltage_warning`, `low_voltage_critical` — explicit operator and safety
+  flags.
+
+State table:
+
+- `STATE_UNAVAILABLE=0`
+- `STATE_OK=1`
+- `STATE_LOW_WARNING=2`
+- `STATE_LOW_CRITICAL=3`
+
+Policy:
+
+- warning means the operator should plan to stop the run;
+- critical means motion should be inhibited before starting another attempt;
+- if the topic is missing or reports unavailable, preflight must show that
+  clearly rather than hiding it.
+
 ## Minimum Hardware Signals for Bridge Nodes
 
 - `estop_active` (latched)

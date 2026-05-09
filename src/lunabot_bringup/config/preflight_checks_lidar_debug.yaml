@@ -50,6 +50,10 @@ preflight:
       type: nav_msgs/msg/Odometry
       min_messages: 1
       critical: true
+    - name: /power/telemetry
+      type: lunabot_interfaces/msg/PowerTelemetry
+      min_messages: 1
+      critical: false
 
   required_tf_links:
     - parent: map

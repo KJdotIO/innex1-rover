@@ -35,6 +35,7 @@ profiles:
       - /drivetrain/status
       - /excavation/status
       - /localisation/start_zone_status
+      - /power/telemetry
       - /map
       - /local_costmap/costmap
       - /global_costmap/costmap
@@ -111,6 +112,7 @@ profiles:
       - /excavation/status
       - /localisation/start_zone_status
       - /diagnostics
+      - /power/telemetry
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0
@@ -148,6 +150,9 @@ profiles:
       - name: /diagnostics
         max_hz: 1.0
         estimated_bytes: 1024
+      - name: /power/telemetry
+        max_hz: 1.0
+        estimated_bytes: 128
 
   hardware_bringup:
     description: Bench profile for hardware checkout before competition mode.
@@ -194,6 +199,7 @@ profiles:
       - /excavation/telemetry
       - /localisation/start_zone_status
       - /diagnostics
+      - /power/telemetry
     telemetry_topics:
       - name: /drivetrain/status
         max_hz: 5.0
@@ -213,6 +219,9 @@ profiles:
       - name: /diagnostics
         max_hz: 1.0
         estimated_bytes: 1024
+      - name: /power/telemetry
+        max_hz: 1.0
+        estimated_bytes: 128
 
   hardware_competition:
     description: Lean default for the competition run.
@@ -261,6 +270,7 @@ profiles:
       - /excavation/status
       - /localisation/start_zone_status
       - /diagnostics
+      - /power/telemetry
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0
@@ -298,3 +308,6 @@ profiles:
       - name: /diagnostics
         max_hz: 1.0
         estimated_bytes: 1024
+      - name: /power/telemetry
+        max_hz: 1.0
+        estimated_bytes: 128

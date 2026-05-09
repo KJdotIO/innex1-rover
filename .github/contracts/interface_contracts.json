@@ -68,6 +68,13 @@
       "kind": "subscription",
       "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
       "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/power/telemetry",
+      "type": "lunabot_interfaces/msg/PowerTelemetry",
+      "kind": "publisher",
+      "source": "src/lunabot_bringup/lunabot_bringup/power_telemetry.py",
+      "phases": ["runtime", "hardware"]
     }
   ],
   "tf_links": [

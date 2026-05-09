@@ -218,9 +218,17 @@ It publishes `diagnostic_msgs/DiagnosticArray` on `/diagnostics` for:
 - drivetrain status
 - start-zone localisation readiness
 - excavation status
+- power telemetry
 
 Each item uses standard `OK`, `WARN`, `ERROR`, and `STALE` levels so Foxglove,
 bags, and future preflight tooling can show health without scraping logs.
+
+Until the real power bridge exists, publish manual power telemetry from the
+visible meter:
+
+```bash
+ros2 run lunabot_bringup manual_power_telemetry --ros-args -p profile:=lipo_6s -p bus_voltage_v:=22.2
+```
 
 ## Common failure modes
 

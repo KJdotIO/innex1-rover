@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ExcavationStatus.msg"
   "msg/ExcavationTelemetry.msg"
   "msg/LocalisationStartZoneStatus.msg"
+  "msg/PowerTelemetry.msg"
   "srv/ExcavationJog.srv"
   DEPENDENCIES builtin_interfaces std_msgs
 )

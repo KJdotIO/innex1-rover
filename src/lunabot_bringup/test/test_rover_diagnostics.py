@@ -11,12 +11,14 @@ from lunabot_bringup.rover_diagnostics import (
     drivetrain_diagnostic,
     excavation_diagnostic,
     localisation_diagnostic,
+    power_diagnostic,
     safety_diagnostic,
 )
 from lunabot_interfaces.msg import (
     DrivetrainStatus,
     ExcavationStatus,
     LocalisationStartZoneStatus,
+    PowerTelemetry,
 )
 
 
@@ -126,3 +128,58 @@ def test_excavation_diagnostic_reports_fault_as_error():
     )
 
     assert status.level == LEVEL_ERROR
+
+
+def test_power_diagnostic_reports_stale_without_telemetry():
+    status = power_diagnostic(TopicSample(), now_s=20.0, timeout_s=2.5)
+
+    assert status.level == LEVEL_STALE
+    assert status.message == "No fresh power telemetry"
+
+
+def test_power_diagnostic_reports_nominal_voltage_ok():
+    msg = PowerTelemetry()
+    msg.state = PowerTelemetry.STATE_OK
+    msg.profile = "lipo_6s"
+    msg.source = "manual"
+    msg.bus_voltage_v = 22.2
+    msg.warning_voltage_v = 21.0
+    msg.critical_voltage_v = 19.8
+
+    status = power_diagnostic(_sample(msg), now_s=10.1, timeout_s=2.5)
+
+    assert status.level == LEVEL_OK
+    assert status.message == "Power telemetry OK"
+
+
+def test_power_diagnostic_reports_low_voltage_warning():
+    msg = PowerTelemetry()
+    msg.state = PowerTelemetry.STATE_LOW_WARNING
+    msg.profile = "lipo_6s"
+    msg.source = "manual"
+    msg.bus_voltage_v = 20.7
+    msg.warning_voltage_v = 21.0
+    msg.critical_voltage_v = 19.8
+    msg.low_voltage_warning = True
+
+    status = power_diagnostic(_sample(msg), now_s=10.1, timeout_s=2.5)
+
+    assert status.level == LEVEL_WARN
+    assert status.message == "Power voltage low"
+
+
+def test_power_diagnostic_reports_low_voltage_critical():
+    msg = PowerTelemetry()
+    msg.state = PowerTelemetry.STATE_LOW_CRITICAL
+    msg.profile = "lipo_6s"
+    msg.source = "manual"
+    msg.bus_voltage_v = 19.5
+    msg.warning_voltage_v = 21.0
+    msg.critical_voltage_v = 19.8
+    msg.low_voltage_warning = True
+    msg.low_voltage_critical = True
+
+    status = power_diagnostic(_sample(msg), now_s=10.1, timeout_s=2.5)
+
+    assert status.level == LEVEL_ERROR
+    assert status.message == "Power voltage critical"
