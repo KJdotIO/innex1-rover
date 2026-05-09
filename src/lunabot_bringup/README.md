@@ -18,6 +18,8 @@ Use bring-up launches when validating end-to-end behaviour. Avoid debugging subs
 - `launch/`: stack launch entrypoints (navigation and related orchestration paths).
 - `launch/mission_manager.launch.py`: starts the standalone mission supervisor node.
 - `launch/mission_dry_run.launch.py`: one-command sim dry run for travel, excavate, and deposit.
+- `launch/rover_diagnostics.launch.py`: publishes standard `/diagnostics`
+  summaries for operator and bag review.
 
 ## Mission Manager
 
@@ -58,6 +60,21 @@ The mission manager subscribes to `/safety/estop` and `/safety/motion_inhibit`
 (transient-local QoS). Before every action attempt, `_is_safe()` checks both
 signals — if either is active the attempt is short-circuited with a safety-stop
 failure, and no action goal is sent.
+
+### Passive operator telemetry
+
+The mission manager publishes a small Foxglove-friendly state contract:
+
+| Topic | Type | Meaning |
+|-------|------|---------|
+| `/mission/state` | `std_msgs/String` | Current FSM state, lower-case |
+| `/mission/autonomy_mode` | `std_msgs/String` | `idle`, `autonomous`, `motion_inhibited`, `estop`, `safe_fail`, or `halted` |
+| `/mission/time_remaining_s` | `std_msgs/Float32` | Remaining time from the 1200 s mission budget |
+| `/mission/cycle_count` | `std_msgs/Int32` | Completed excavation/deposition cycles |
+| `/mission/last_failure_reason` | `std_msgs/String` | Last terminal or safety failure reason |
+
+These topics are passive telemetry only. They are safe to show in Foxglove
+during autonomy because they do not provide a command path back into the rover.
 
 ## Mission Dry Run
 
@@ -124,6 +141,24 @@ The helper passes `--max-bag-duration` and `--max-bag-size` to rosbag2 so long
 runs split cleanly instead of producing one awkward file. On the Jetson Humble
 image the available storage backend is `sqlite3`; keep that as the default
 unless `ros2 bag record --help` shows MCAP has been installed.
+
+## Runtime Diagnostics
+
+Start the diagnostics aggregator with:
+
+```bash
+ros2 launch lunabot_bringup rover_diagnostics.launch.py
+```
+
+It publishes `diagnostic_msgs/DiagnosticArray` on `/diagnostics` for:
+
+- safety command state
+- drivetrain status
+- start-zone localisation readiness
+- excavation status
+
+Each item uses standard `OK`, `WARN`, `ERROR`, and `STALE` levels so Foxglove,
+bags, and future preflight tooling can show health without scraping logs.
 
 ## Common failure modes
 

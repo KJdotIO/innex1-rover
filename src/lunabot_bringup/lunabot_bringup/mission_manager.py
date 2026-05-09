@@ -16,7 +16,7 @@ from rclpy.qos import (
     QoSProfile,
     ReliabilityPolicy,
 )
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float32, Int32, String
 
 from lunabot_bringup.mission_timer import MissionTimer
 from lunabot_interfaces.action import Deposit, Excavate
@@ -27,6 +27,15 @@ _INHIBIT_QOS = QoSProfile(
     reliability=ReliabilityPolicy.RELIABLE,
     durability=DurabilityPolicy.TRANSIENT_LOCAL,
 )
+
+_OPERATOR_STATE_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+)
+
+MISSION_LIMIT_S = 1200.0
 
 
 class MissionState(IntEnum):
@@ -64,7 +73,6 @@ class MissionManager(Node):
         """Initialise the node, declare parameters, and create action clients."""
         super().__init__("mission_manager")
 
-        self.declare_parameter("use_sim_time", False)
         self.declare_parameter("prehoc_v_estimated_mps", 0.3)
         self.declare_parameter("prehoc_t_margin_s", 60.0)
         self.declare_parameter("prehoc_s_start_exc_m", 5.0)
@@ -101,6 +109,8 @@ class MissionManager(Node):
         self._cycle_count = 0
         self._estop_active = False
         self._motion_inhibited = False
+        self._last_failure_reason = ""
+        self._mission_active = False
 
         self._state: MissionState = MissionState.INITIALIZE_MISSION
         self._timer: MissionTimer | None = None
@@ -130,6 +140,25 @@ class MissionManager(Node):
         self._estop_sub = self.create_subscription(
             Bool, "/safety/estop", self._estop_cb, 10
         )
+        self._mission_state_pub = self.create_publisher(
+            String, "/mission/state", _OPERATOR_STATE_QOS
+        )
+        self._autonomy_mode_pub = self.create_publisher(
+            String, "/mission/autonomy_mode", _OPERATOR_STATE_QOS
+        )
+        self._time_remaining_pub = self.create_publisher(
+            Float32, "/mission/time_remaining_s", _OPERATOR_STATE_QOS
+        )
+        self._cycle_count_pub = self.create_publisher(
+            Int32, "/mission/cycle_count", _OPERATOR_STATE_QOS
+        )
+        self._failure_reason_pub = self.create_publisher(
+            String, "/mission/last_failure_reason", _OPERATOR_STATE_QOS
+        )
+        self._operator_state_timer = self.create_timer(
+            1.0, self._publish_operator_state
+        )
+        self._publish_operator_state()
 
     def _inhibit_cb(self, msg: Bool) -> None:
         """Track motion inhibit for safety gating."""
@@ -142,6 +171,64 @@ class MissionManager(Node):
     def _is_safe(self) -> bool:
         """Return True if the rover is safe to operate."""
         return not self._estop_active and not self._motion_inhibited
+
+    def _state_text(self) -> str:
+        """Return the current mission state as lower-case operator text."""
+        return self._state.name.lower()
+
+    def _autonomy_mode_text(self) -> str:
+        """Return a passive operator-facing autonomy mode."""
+        if self._estop_active:
+            return "estop"
+        if self._motion_inhibited:
+            return "motion_inhibited"
+        if self._state == MissionState.HALT_MISSION:
+            return "halted"
+        if self._state == MissionState.SAFE_FAIL:
+            return "safe_fail"
+        if self._mission_active:
+            return "autonomous"
+        return "idle"
+
+    def _time_remaining_s(self) -> float:
+        """Return remaining competition mission time in seconds."""
+        if self._timer is None:
+            return MISSION_LIMIT_S
+        try:
+            elapsed = float(self._timer.elapsedMissionTime())
+        except (AttributeError, TypeError, ValueError):
+            return MISSION_LIMIT_S
+        if not math.isfinite(elapsed):
+            return MISSION_LIMIT_S
+        elapsed = max(0.0, elapsed)
+        return max(0.0, MISSION_LIMIT_S - elapsed)
+
+    def _publish_operator_state(self) -> None:
+        """Publish passive mission telemetry for Foxglove and bags."""
+        state_msg = String()
+        state_msg.data = self._state_text()
+        self._mission_state_pub.publish(state_msg)
+
+        mode_msg = String()
+        mode_msg.data = self._autonomy_mode_text()
+        self._autonomy_mode_pub.publish(mode_msg)
+
+        time_msg = Float32()
+        time_msg.data = float(self._time_remaining_s())
+        self._time_remaining_pub.publish(time_msg)
+
+        cycle_msg = Int32()
+        cycle_msg.data = int(self._cycle_count)
+        self._cycle_count_pub.publish(cycle_msg)
+
+        failure_msg = String()
+        failure_msg.data = self._last_failure_reason
+        self._failure_reason_pub.publish(failure_msg)
+
+    def _set_failure_reason(self, reason: str) -> None:
+        """Record the latest mission failure reason and publish it."""
+        self._last_failure_reason = reason
+        self._publish_operator_state()
 
     def _retry_action(
         self,
@@ -168,15 +255,20 @@ class MissionManager(Node):
 
     def run_mission(self) -> None:
         """Advance the FSM until HALT_MISSION is reached."""
+        self._mission_active = True
+        self._publish_operator_state()
         while self._state != MissionState.HALT_MISSION:
             if not self._is_safe():
-                self.get_logger().error(
-                    "Safety stop during mission — halting"
-                )
+                reason = "Safety stop during mission"
+                self.get_logger().error(f"{reason} — halting")
+                self._set_failure_reason(reason)
                 self._state = MissionState.HALT_MISSION
+                self._publish_operator_state()
                 break
             self._step()
 
+        self._mission_active = False
+        self._publish_operator_state()
         self.get_logger().info(
             f"Mission halted after {self._cycle_count} cycles."
         )
@@ -208,7 +300,10 @@ class MissionManager(Node):
             self._state = MissionState.HALT_MISSION
             return
 
-        self._state = handler()
+        next_state = handler()
+        if next_state != self._state:
+            self._state = next_state
+            self._publish_operator_state()
 
     # ------------------------------------------------------------------
     # State handlers
@@ -282,13 +377,16 @@ class MissionManager(Node):
             or s_start_exc is None
             or s_exc_dep is None
         ):
+            self._set_failure_reason("Invalid pre-hoc traversal parameters")
             return MissionState.HALT_MISSION
 
         if not math.isfinite(v) or v <= 0.0:
-            self.get_logger().error(
+            reason = (
                 "Invalid pre-hoc traversal parameter "
                 "'prehoc_v_estimated_mps'; expected a finite value > 0.0."
             )
+            self.get_logger().error(reason)
+            self._set_failure_reason(reason)
             return MissionState.HALT_MISSION
 
         invalid_non_negative_params = []
@@ -301,10 +399,12 @@ class MissionManager(Node):
 
         if invalid_non_negative_params:
             invalid_param_names = ", ".join(invalid_non_negative_params)
-            self.get_logger().error(
+            reason = (
                 "Invalid pre-hoc traversal parameter(s) "
                 f"{invalid_param_names}; expected finite values >= 0.0."
             )
+            self.get_logger().error(reason)
+            self._set_failure_reason(reason)
             return MissionState.HALT_MISSION
 
         t_prehoc = (s_start_exc / v) + (s_exc_dep / v) + t_margin
@@ -319,6 +419,9 @@ class MissionManager(Node):
 
         self.get_logger().info(
             f"Pre-hoc estimate {t_prehoc:.1f}s would exceed budget; halting."
+        )
+        self._set_failure_reason(
+            f"Pre-hoc estimate {t_prehoc:.1f}s would exceed mission budget"
         )
         return MissionState.HALT_MISSION
 
@@ -336,9 +439,9 @@ class MissionManager(Node):
             self._max_nav_retries,
         )
         if not success:
-            self.get_logger().error(
-                f"Navigation to excavation failed: {detail}"
-            )
+            reason = f"Navigation to excavation failed: {detail}"
+            self.get_logger().error(reason)
+            self._set_failure_reason(reason)
             return MissionState.SAFE_FAIL
         return MissionState.EXCAVATE
 
@@ -351,9 +454,9 @@ class MissionManager(Node):
             self._max_exc_retries,
         )
         if not success:
-            self.get_logger().error(
-                f"Excavation failed: {detail}"
-            )
+            reason = f"Excavation failed: {detail}"
+            self.get_logger().error(reason)
+            self._set_failure_reason(reason)
             return MissionState.SAFE_FAIL
         return MissionState.TURN_TO_DEPOSITION
 
@@ -371,9 +474,9 @@ class MissionManager(Node):
             self._max_nav_retries,
         )
         if not success:
-            self.get_logger().error(
-                f"Navigation to deposition failed: {detail}"
-            )
+            reason = f"Navigation to deposition failed: {detail}"
+            self.get_logger().error(reason)
+            self._set_failure_reason(reason)
             return MissionState.SAFE_FAIL
         return MissionState.DEPOSIT
 
@@ -386,9 +489,9 @@ class MissionManager(Node):
             self._max_dep_retries,
         )
         if not success:
-            self.get_logger().error(
-                f"Deposit failed: {detail}"
-            )
+            reason = f"Deposit failed: {detail}"
+            self.get_logger().error(reason)
+            self._set_failure_reason(reason)
             return MissionState.SAFE_FAIL
         return MissionState.CHECK_NEXT_CYCLE_TIME
 
