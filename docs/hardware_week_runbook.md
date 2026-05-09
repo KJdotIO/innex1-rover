@@ -77,6 +77,10 @@ localisation status, diagnostics, and the minimum camera view needed for the
 run. Do not stream raw point clouds or every debug costmap during a scored run
 unless the team has a specific reason to spend the bandwidth.
 
+Use the shared layout in `docs/foxglove/mission_control.layout.json` for normal
+operation. RViz is still the better tool for TF, robot model, costmap, and
+planner debugging.
+
 The useful telemetry set is:
 
 ```text
