@@ -39,6 +39,10 @@ class MissionTimer:
         self.completedCycles += 1
         return duration
 
+    def elapsedMissionTime(self) -> float:
+        """Return elapsed mission time in seconds."""
+        return time.monotonic() - self.missionStartTime
+
     def canStartCycle(self, pre_hoc_time_s: float | None = None) -> bool:
         """
         Return whether there is enough time budget to start another cycle.
@@ -53,7 +57,7 @@ class MissionTimer:
         cycle time is used as the budget estimate and ``pre_hoc_time_s`` is
         ignored.
         """
-        elapsed_mission_time: float = time.monotonic() - self.missionStartTime
+        elapsed_mission_time: float = self.elapsedMissionTime()
 
         if self.completedCycles == 0:
             if pre_hoc_time_s is None:

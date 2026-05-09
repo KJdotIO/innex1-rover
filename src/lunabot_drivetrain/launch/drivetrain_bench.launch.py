@@ -80,6 +80,7 @@ def generate_launch_description():
     baud_rate = LaunchConfiguration("baud_rate")
     serial_protocol = LaunchConfiguration("serial_protocol")
     max_throttle = LaunchConfiguration("max_throttle")
+    dry_run = LaunchConfiguration("dry_run")
 
     drivetrain_bridge = Node(
         package="lunabot_drivetrain",
@@ -95,8 +96,16 @@ def generate_launch_description():
                     serial_protocol, value_type=str
                 ),
                 "max_throttle": ParameterValue(max_throttle, value_type=float),
+                "dry_run": ParameterValue(dry_run, value_type=bool),
             },
         ],
+    )
+
+    velocity_gate = Node(
+        package="lunabot_drivetrain",
+        executable="velocity_gate",
+        name="velocity_gate",
+        output="screen",
     )
 
     return LaunchDescription(
@@ -124,9 +133,17 @@ def generate_launch_description():
                 description="Temporary throttle cap for first-motion tests.",
             ),
             DeclareLaunchArgument(
+                "dry_run",
+                default_value="false",
+                description=(
+                    "Allow launch without a serial controller. Keep false for "
+                    "real first-motion tests so missing hardware fails closed."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "enable_teleop",
                 default_value="false",
-                description="Start joystick teleop and route it to cmd_vel_safe.",
+                description="Start joystick teleop and route it through the safety gate.",
             ),
             DeclareLaunchArgument(
                 "joy_device_id",
@@ -138,6 +155,7 @@ def generate_launch_description():
                 default_value="",
                 description="Optional SDL controller name to match.",
             ),
+            velocity_gate,
             drivetrain_bridge,
             OpaqueFunction(function=_create_optional_teleop_nodes),
         ]

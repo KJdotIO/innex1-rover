@@ -18,6 +18,14 @@ drivetrain_bridge:
     # Use "packetized" only if the Sabertooths are set for Packet Serial.
     serial_protocol: "legacy_simplified"
 
+    # Real hardware should fail closed if the serial controller is missing.
+    # Set true only for explicit desktop/Jetson dry-runs with no motor output.
+    dry_run: false
+
+    # Consume the safety-gated command stream, not the raw collision-monitor
+    # output. The velocity_gate publishes zero when drivetrain health is bad.
+    cmd_vel_topic: "/cmd_vel_gated"
+
     # Packet Serial addresses. Used only when serial_protocol is "packetized".
     sabertooth_addresses: [128, 129]
 
