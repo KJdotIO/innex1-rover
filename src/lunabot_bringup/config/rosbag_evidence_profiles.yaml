@@ -11,6 +11,7 @@ profiles:
       - /mission/cycle_count
       - /mission/last_failure_reason
       - /diagnostics
+      - /power/telemetry
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
@@ -31,6 +32,7 @@ profiles:
       - /mission/cycle_count
       - /mission/last_failure_reason
       - /diagnostics
+      - /power/telemetry
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
@@ -59,6 +61,7 @@ profiles:
       - /mission/cycle_count
       - /mission/last_failure_reason
       - /diagnostics
+      - /power/telemetry
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit

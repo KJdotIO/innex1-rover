@@ -1,0 +1,9 @@
+profiles:
+  lipo_4s:
+    cells: 4
+    warning_voltage_v: 14.0
+    critical_voltage_v: 13.2
+  lipo_6s:
+    cells: 6
+    warning_voltage_v: 21.0
+    critical_voltage_v: 19.8

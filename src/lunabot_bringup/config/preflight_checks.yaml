@@ -54,6 +54,10 @@ preflight:
       type: lunabot_interfaces/msg/LocalisationStartZoneStatus
       min_messages: 1
       critical: false
+    - name: /power/telemetry
+      type: lunabot_interfaces/msg/PowerTelemetry
+      min_messages: 1
+      critical: false
 
   required_tf_links:
     - parent: map

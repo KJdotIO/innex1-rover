@@ -91,6 +91,7 @@ The useful telemetry set is:
 /excavation/status
 /localisation/start_zone_status
 /diagnostics
+/power/telemetry
 ```
 
 Check bandwidth at the network edge as well as in ROS:
@@ -125,6 +126,7 @@ Watch these while doing it:
 ```bash
 ros2 topic echo /drivetrain/status
 ros2 topic echo /drivetrain/telemetry
+ros2 topic echo /power/telemetry
 ros2 topic echo /safety/motion_inhibit
 ```
 
@@ -141,6 +143,22 @@ ros2 topic echo /safety/motion_inhibit --once
 ```
 
 Only continue when `/safety/motion_inhibit` reports `data: false`.
+
+For early runs without a wired battery sensor, publish the value from the
+visible power meter manually:
+
+```bash
+ros2 run lunabot_bringup manual_power_telemetry \
+  --ros-args \
+  -p profile:=lipo_6s \
+  -p bus_voltage_v:=22.2 \
+  -p bus_current_a:=0.0 \
+  -p energy_wh:=0.0
+```
+
+Use `lipo_4s` if the rover is on a 4S pack. The default voltage is unavailable,
+so diagnostics will say power telemetry is missing until someone enters a real
+value.
 
 ## Before Autonomy
 
@@ -217,6 +235,7 @@ ros2 topic echo /mission/state --once
 ros2 topic echo /mission/autonomy_mode --once
 ros2 topic echo /mission/last_failure_reason --once
 ros2 topic echo /diagnostics --once
+ros2 topic echo /power/telemetry --once
 ```
 
 If the rover does not move:

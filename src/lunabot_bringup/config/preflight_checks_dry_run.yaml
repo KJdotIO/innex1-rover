@@ -65,6 +65,11 @@ preflight:
       min_messages: 1
       critical: true
       phases: [runtime]
+    - name: /power/telemetry
+      type: lunabot_interfaces/msg/PowerTelemetry
+      min_messages: 1
+      critical: false
+      phases: [runtime]
 
   required_tf_links:
     - parent: map

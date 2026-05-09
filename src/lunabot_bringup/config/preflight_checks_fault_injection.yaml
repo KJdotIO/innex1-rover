@@ -48,6 +48,11 @@ preflight:
       expected_fields:
         ready: true
         state: ready
+    - name: /power/telemetry
+      type: lunabot_interfaces/msg/PowerTelemetry
+      min_messages: 1
+      critical: false
+      reliability: reliable
 
   required_tf_links: []
   required_actions: []

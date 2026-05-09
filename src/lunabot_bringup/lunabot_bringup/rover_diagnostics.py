@@ -29,6 +29,7 @@ ExcavationStatus: Any = lunabot_msgs.__dict__["ExcavationStatus"]
 LocalisationStartZoneStatus: Any = lunabot_msgs.__dict__[
     "LocalisationStartZoneStatus"
 ]
+PowerTelemetry: Any = lunabot_msgs.__dict__["PowerTelemetry"]
 
 
 @dataclass
@@ -314,6 +315,71 @@ def excavation_diagnostic(
     )
 
 
+def power_diagnostic(
+    sample: TopicSample,
+    *,
+    now_s: float,
+    timeout_s: float,
+) -> DiagnosticStatus:
+    """Build power health from the latest power telemetry sample."""
+    age_s = _sample_age_s(sample, now_s)
+    if _is_stale(sample, now_s, timeout_s):
+        return _status(
+            "power/telemetry",
+            LEVEL_STALE,
+            "No fresh power telemetry",
+            values={"age_s": age_s if age_s is not None else "never"},
+        )
+
+    msg = sample.msg
+    if msg is None:
+        return _status(
+            "power/telemetry",
+            LEVEL_STALE,
+            "No fresh power telemetry",
+            values={"age_s": age_s if age_s is not None else "never"},
+        )
+
+    values = {
+        "profile": msg.profile,
+        "source": msg.source,
+        "state": msg.state,
+        "bus_voltage_v": f"{msg.bus_voltage_v:.2f}",
+        "bus_current_a": f"{msg.bus_current_a:.2f}",
+        "energy_wh": f"{msg.energy_wh:.2f}",
+        "warning_voltage_v": f"{msg.warning_voltage_v:.2f}",
+        "critical_voltage_v": f"{msg.critical_voltage_v:.2f}",
+        "age_s": f"{age_s:.2f}",
+    }
+    if msg.state == PowerTelemetry.STATE_UNAVAILABLE:
+        return _status(
+            "power/telemetry",
+            LEVEL_STALE,
+            "Power telemetry unavailable",
+            values=values,
+        )
+    if msg.low_voltage_critical:
+        return _status(
+            "power/telemetry",
+            LEVEL_ERROR,
+            "Power voltage critical",
+            values=values,
+        )
+    if msg.low_voltage_warning:
+        return _status(
+            "power/telemetry",
+            LEVEL_WARN,
+            "Power voltage low",
+            values=values,
+        )
+    return _status(
+        "power/telemetry",
+        LEVEL_OK,
+        "Power telemetry OK",
+        values=values,
+    )
+
+
 class RoverDiagnostics(Node):
     """Aggregate rover health into `/diagnostics`."""
 
@@ -336,6 +402,7 @@ class RoverDiagnostics(Node):
         self._motion_inhibit = TopicSample()
         self._localisation = TopicSample()
         self._excavation = TopicSample()
+        self._power = TopicSample()
 
         self.create_subscription(
             DrivetrainStatus,
@@ -365,6 +432,12 @@ class RoverDiagnostics(Node):
             ExcavationStatus,
             "/excavation/status",
             lambda msg: self._store(self._excavation, msg),
+            10,
+        )
+        self.create_subscription(
+            PowerTelemetry,
+            "/power/telemetry",
+            lambda msg: self._store(self._power, msg),
             10,
         )
         self._publisher = self.create_publisher(
@@ -400,6 +473,11 @@ class RoverDiagnostics(Node):
             ),
             excavation_diagnostic(
                 self._excavation,
+                now_s=now_s,
+                timeout_s=self._stale_timeout_s,
+            ),
+            power_diagnostic(
+                self._power,
                 now_s=now_s,
                 timeout_s=self._stale_timeout_s,
             ),

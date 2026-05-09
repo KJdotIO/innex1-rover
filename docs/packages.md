@@ -5,7 +5,7 @@
 | Package | Build | Owns |
 |---|---|---|
 | `lunabot_interfaces` | ament_cmake (ROSIDL) | All shared ROS contracts — actions, msgs, srvs. Edit here for new interfaces. |
-| `lunabot_bringup` | ament_python | Top-level launch, mission execution, preflight system, dry-run harness |
+| `lunabot_bringup` | ament_python | Top-level launch, mission execution, preflight system, dry-run harness, manual power telemetry |
 | `lunabot_control` | ament_python | `material_action_server`, `material_action_client` — material movement |
 | `lunabot_excavation` | ament_python | `excavation_action_server`, `excavation_controller`, sim proxy, telemetry mock |
 | `lunabot_localisation` | ament_python | `start_zone_localiser`, `stereo_camera_info_publisher`, `tag_pose_publisher` |
