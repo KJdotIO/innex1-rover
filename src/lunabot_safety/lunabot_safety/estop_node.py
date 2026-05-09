@@ -1,4 +1,4 @@
-"""E-stop node: bridges /safety/estop hardware signal to /safety/motion_inhibit."""
+"""E-stop node: latches /safety/estop into /safety/motion_inhibit."""
 
 import rclpy
 from rclpy.node import Node
@@ -22,7 +22,9 @@ class EstopNode(Node):
         """Initialise publishers, subscribers, and internal state."""
         super().__init__("estop_node")
 
+        self._estop_active = False
         self._inhibited = False
+        self._reset_required = False
 
         self._motion_inhibit_pub = self.create_publisher(
             Bool,
@@ -37,10 +39,17 @@ class EstopNode(Node):
             10,
         )
 
+        self._reset_sub = self.create_subscription(
+            Bool,
+            "/safety/reset_motion_inhibit",
+            self._reset_callback,
+            10,
+        )
+
         # Publish initial state so subscribers joining before any e-stop event
         # receive a well-defined value.
         self._publish_inhibit()
-        self.get_logger().info("estop_node started — waiting for /safety/estop")
+        self.get_logger().info("estop_node started; waiting for /safety/estop")
 
     def _publish_inhibit(self) -> None:
         """Publish the current motion-inhibit state."""
@@ -49,16 +58,48 @@ class EstopNode(Node):
         self._motion_inhibit_pub.publish(out)
 
     def _estop_callback(self, msg: Bool) -> None:
-        """Handle incoming e-stop signal and propagate motion-inhibit state."""
-        new_state = msg.data
+        """Handle incoming e-stop signal and latch motion inhibit until reset."""
+        new_state = bool(msg.data)
 
-        if new_state != self._inhibited:
-            if new_state:
-                self.get_logger().info("E-stop ACTIVE — motion inhibited")
+        if new_state == self._estop_active:
+            self._publish_inhibit()
+            return
+
+        self._estop_active = new_state
+        if self._estop_active:
+            self._reset_required = True
+            self._inhibited = True
+            self.get_logger().warn(
+                "E-stop active; motion inhibited until reset"
+            )
+        else:
+            if self._reset_required:
+                self.get_logger().info(
+                    "E-stop cleared; publish /safety/reset_motion_inhibit "
+                    "before motion is allowed"
+                )
             else:
-                self.get_logger().info("E-stop cleared — motion allowed")
-            self._inhibited = new_state
+                self._inhibited = False
 
+        self._publish_inhibit()
+
+    def _reset_callback(self, msg: Bool) -> None:
+        """Clear a latched motion inhibit once the E-stop input is clear."""
+        if not msg.data:
+            return
+
+        if self._estop_active:
+            self.get_logger().warn(
+                "Motion-inhibit reset ignored while E-stop is active"
+            )
+            self._publish_inhibit()
+            return
+
+        if self._reset_required or self._inhibited:
+            self.get_logger().info("Motion inhibit reset; motion allowed")
+
+        self._reset_required = False
+        self._inhibited = False
         self._publish_inhibit()
 
     def destroy_node(self):

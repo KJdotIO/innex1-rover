@@ -131,6 +131,17 @@ ros2 topic echo /safety/motion_inhibit
 If the rover is on the ground, agree the stop command and operator before any
 motion test starts.
 
+After an E-stop event, releasing the physical E-stop does not re-enable motion
+by itself. Confirm `/safety/estop` is false, then clear the software inhibit:
+
+```bash
+ros2 topic echo /safety/estop --once
+ros2 topic pub --once /safety/reset_motion_inhibit std_msgs/msg/Bool "{data: true}"
+ros2 topic echo /safety/motion_inhibit --once
+```
+
+Only continue when `/safety/motion_inhibit` reports `data: false`.
+
 ## Before Autonomy
 
 The minimum useful checks are:
@@ -211,6 +222,8 @@ ros2 topic echo /diagnostics --once
 If the rover does not move:
 
 - check `/safety/estop` and `/safety/motion_inhibit`;
+- if E-stop was used, reset `/safety/motion_inhibit` after `/safety/estop`
+  is false;
 - check `/drivetrain/status`;
 - check whether `/cmd_vel_safe` is being produced;
 - check whether `/cmd_vel_gated` is blocked;

@@ -31,6 +31,7 @@ profiles:
       - /mission/last_failure_reason
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /excavation/status
       - /localisation/start_zone_status
@@ -105,6 +106,7 @@ profiles:
       - /mission/last_failure_reason
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /excavation/status
       - /localisation/start_zone_status
@@ -130,6 +132,9 @@ profiles:
         estimated_bytes: 24
       - name: /safety/motion_inhibit
         max_hz: 2.0
+        estimated_bytes: 24
+      - name: /safety/reset_motion_inhibit
+        max_hz: 1.0
         estimated_bytes: 24
       - name: /drivetrain/status
         max_hz: 5.0
@@ -182,6 +187,7 @@ profiles:
       - /mission/last_failure_reason
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /drivetrain/telemetry
       - /excavation/status
@@ -250,6 +256,7 @@ profiles:
       - /mission/last_failure_reason
       - /safety/estop
       - /safety/motion_inhibit
+      - /safety/reset_motion_inhibit
       - /drivetrain/status
       - /excavation/status
       - /localisation/start_zone_status
@@ -275,6 +282,9 @@ profiles:
         estimated_bytes: 24
       - name: /safety/motion_inhibit
         max_hz: 2.0
+        estimated_bytes: 24
+      - name: /safety/reset_motion_inhibit
+        max_hz: 1.0
         estimated_bytes: 24
       - name: /drivetrain/status
         max_hz: 2.0
