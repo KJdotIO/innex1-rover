@@ -238,6 +238,51 @@ profiles:
         max_hz: 5.0
         estimated_bytes: 37500
 
+  hardware_camera_debug:
+    description: Bench profile for OAK-D camera visual checks through Foxglove.
+    budget_kbps: 20000
+    target_kbps: 18000
+    launch_arguments:
+      camera:
+        use_sim_time: false
+        enable_pointcloud: true
+      foxglove:
+        use_sim_time: false
+        enable_front_camera: true
+        enable_rear_camera: false
+    required_processes:
+      - depthai_ros_driver
+      - foxglove_bridge
+    optional_tools:
+      - Foxglove on operator laptop
+    off_by_default:
+      - RViz on the Jetson
+      - rear camera
+      - full rover stack
+    foxglove_allowlist:
+      - /camera_front/image/compressed
+      - /camera_front/depth_image/compressedDepth
+      - /camera_front/camera_info
+      - /camera_front/points
+      - /camera_front/imu/data
+      - /diagnostics
+    telemetry_topics:
+      - name: /camera_front/image/compressed
+        max_hz: 10.0
+        estimated_bytes: 37500
+      - name: /camera_front/depth_image/compressedDepth
+        max_hz: 10.0
+        estimated_bytes: 20000
+      - name: /camera_front/camera_info
+        max_hz: 1.0
+        estimated_bytes: 512
+      - name: /camera_front/points
+        max_hz: 5.0
+        estimated_bytes: 250000
+      - name: /camera_front/imu/data
+        max_hz: 90.0
+        estimated_bytes: 128
+
   hardware_competition:
     description: Lean default for the competition run.
     budget_kbps: 4000

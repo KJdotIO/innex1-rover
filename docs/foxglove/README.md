@@ -32,6 +32,16 @@ The launch file republishes `/camera_front/image` to
 to the compressed topic. Do not point the operator layout at raw
 `/camera_front/image`.
 
+On the Jetson bench test, the usable live view was the lean path: throttle the
+front RGB image to about 8 Hz, compress that stream, and keep Foxglove to the
+camera plus small telemetry. Full-rate RGB, compressed depth and point clouds
+made Foxglove fall several seconds behind.
+
+For a camera-only operator check, use `oak_camera_lean.layout.json`. It shows
+the front compressed image, camera info and diagnostics. Keep only one Foxglove
+tab connected while testing, otherwise the bridge sends the same video stream to
+each client.
+
 Rear camera streaming is available when needed, but is off by default:
 
 ```bash
@@ -55,6 +65,9 @@ Use RViz, or a separate Foxglove debug profile, for navigation and perception
 debugging. If you need TF, robot model, costmap layers, point clouds, local
 planner behaviour, or camera geometry, keep that out of the scored-run operator
 layout.
+
+`oak_camera_debug.layout.json` is intentionally heavy. It exists for short bench
+checks only. Do not use it as the normal driving view.
 
 The layout includes `/power/telemetry`. If the power telemetry PR has not
 merged yet, that panel will simply be empty.

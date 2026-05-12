@@ -1,0 +1,44 @@
+{
+  "configById": {
+    "Image!rgb": {
+      "cameraTopic": "/camera_front/image/compressed",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": false,
+      "zoom": 1
+    },
+    "RawMessages!camera_info": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/camera_front/camera_info"
+    },
+    "RawMessages!diagnostics": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/diagnostics"
+    }
+  },
+  "globalVariables": {},
+  "layout": {
+    "direction": "row",
+    "first": "Image!rgb",
+    "second": {
+      "direction": "column",
+      "first": "RawMessages!camera_info",
+      "second": "RawMessages!diagnostics",
+      "splitPercentage": 55
+    },
+    "splitPercentage": 72
+  },
+  "playbackConfig": {
+    "speed": 1
+  },
+  "userNodes": {}
+}

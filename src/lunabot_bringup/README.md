@@ -22,6 +22,11 @@ Use bring-up launches when validating end-to-end behaviour. Avoid debugging subs
   golden rosbag evidence.
 - `launch/rover_diagnostics.launch.py`: publishes standard `/diagnostics`
   summaries for operator and bag review.
+- `launch/oak_front_camera.launch.py`: starts the OAK-D front camera through
+  `depthai_ros_driver` and standard `topic_tools` relays for the rover topic
+  names.
+- `launch/depth_camera_debug.launch.py`: opens the OAK-D depth camera RViz
+  profile and can run crater detection once point cloud TF is available.
 
 ## Mission Manager
 
