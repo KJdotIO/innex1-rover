@@ -31,7 +31,7 @@ from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points_numpy
 from std_msgs.msg import Header
-from tf2_ros import TransformException
+from tf2_ros import ExtrapolationException, TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
@@ -137,19 +137,8 @@ class CraterDetectionNode(Node):
 
     def _cloud_callback(self, msg: PointCloud2):
         """Transform incoming cloud to odom frame and accumulate elevation."""
-        try:
-            tf = self.tf_buffer.lookup_transform(
-                self.target_frame,
-                msg.header.frame_id,
-                Time.from_msg(msg.header.stamp),
-                timeout=Duration(seconds=0.2),
-            )
-        except TransformException as e:
-            self.get_logger().warning(
-                f"TF lookup {msg.header.frame_id} -> {self.target_frame} "
-                f"failed: {e}",
-                throttle_duration_sec=5.0,
-            )
+        tf = self._lookup_cloud_transform(msg)
+        if tf is None:
             return
 
         points = read_points_numpy(msg, field_names=["x", "y", "z"], skip_nans=True)
@@ -185,6 +174,52 @@ class CraterDetectionNode(Node):
 
         np.add.at(self._z_sum, (row, col), z)
         np.add.at(self._z_count, (row, col), 1.0)
+
+    def _lookup_cloud_transform(self, msg: PointCloud2):
+        """Return the transform for a cloud, tolerating small future TF offsets."""
+        cloud_time = Time.from_msg(msg.header.stamp)
+        try:
+            return self.tf_buffer.lookup_transform(
+                self.target_frame,
+                msg.header.frame_id,
+                cloud_time,
+                timeout=Duration(seconds=0.0),
+            )
+        except ExtrapolationException as e:
+            if "future" not in str(e).lower():
+                self._log_tf_lookup_failure(msg, e)
+                return None
+
+            try:
+                latest_tf = self.tf_buffer.lookup_transform(
+                    self.target_frame,
+                    msg.header.frame_id,
+                    Time(),
+                    timeout=Duration(seconds=0.0),
+                )
+            except TransformException as latest_error:
+                self._log_tf_lookup_failure(msg, latest_error)
+                return None
+
+            self.get_logger().warning(
+                f"TF lookup {msg.header.frame_id} -> {self.target_frame} "
+                f"needed a future transform; using latest available transform: {e}",
+                throttle_duration_sec=5.0,
+            )
+            return latest_tf
+        except TransformException as e:
+            self._log_tf_lookup_failure(msg, e)
+            return None
+
+    def _log_tf_lookup_failure(
+        self, msg: PointCloud2, error: TransformException
+    ) -> None:
+        """Log a throttled TF lookup failure for an incoming cloud."""
+        self.get_logger().warning(
+            f"TF lookup {msg.header.frame_id} -> {self.target_frame} "
+            f"failed: {error}",
+            throttle_duration_sec=5.0,
+        )
 
     def _publish_grid(self):
         """Compute crater grid and publish OccupancyGrid."""
