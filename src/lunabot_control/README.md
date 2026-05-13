@@ -42,8 +42,7 @@ actuators stop and the goal aborts with `REASON_ESTOP`.
 
 ### `material_action_server` / `material_action_client`
 
-Stub nodes from the original material-handling scaffold. Not yet connected to
-real hardware.
+Bench nodes for mission and integration tests. These are not hardware-backed.
 
 ## Key files
 

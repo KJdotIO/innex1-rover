@@ -17,7 +17,7 @@ setup(
     zip_safe=True,
     maintainer="Leicester Lunabotics Team",
     maintainer_email="lunabotics@le.ac.uk",
-    description="Reserved package shell for future perception nodes",
+    description="Perception nodes for crater detection and Nav2 costmap integration",
     license="Apache-2.0",
     extras_require={
         "test": [

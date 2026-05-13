@@ -1,6 +1,6 @@
 # lunabot_safety
 
-Scaffolding package for centralised safety logic on the INNEX-1 rover.
+Safety package for the E-stop to motion-inhibit bridge on the INNEX-1 rover.
 
 ## Current state
 

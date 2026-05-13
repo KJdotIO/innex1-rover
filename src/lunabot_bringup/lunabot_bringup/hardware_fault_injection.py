@@ -168,7 +168,6 @@ class HardwareFaultInjector(Node):
     def __init__(self, scenario: FaultScenario) -> None:
         """Create publishers and periodic timers for a scenario."""
         super().__init__("hardware_fault_injector")
-        self._scenario = scenario
         for topic in scenario.topics:
             self._add_topic(topic)
         self.get_logger().info(

@@ -1,1 +1,1 @@
-"""Control nodes and action stubs for Lunabot."""
+"""Control nodes and bench action servers for Lunabot."""
