@@ -103,12 +103,13 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     context.launch_configurations["lidar_costmap_phase"] = "treu"
     context.launch_configurations["use_sim_time"] = "true"
     context.launch_configurations["enable_apriltag_debug"] = "false"
+    context.launch_configurations["sync_sim_camera_info"] = "false"
 
     with pytest.raises(ValueError, match="lidar_costmap_phase"):
         launch_module._validate_boolean_launch_arguments(context)
 
 
-def test_generate_launch_description_has_validation_and_one_tag_pose_node(
+def test_generate_launch_description_has_validation_and_sim_camera_info_aligner(
     monkeypatch: pytest.MonkeyPatch,
 ):
     launch_module = _load_launch_module()
@@ -128,9 +129,16 @@ def test_generate_launch_description_has_validation_and_one_tag_pose_node(
         if isinstance(entity, Node)
         and entity.__dict__.get("_Node__node_name") == "tag_pose_publisher"
     ]
+    camera_info_aligners = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__node_name") == "camera_info_stamp_aligner"
+    ]
 
     assert len(validators) == 1
     assert len(tag_pose_publishers) == 1
+    assert len(camera_info_aligners) == 1
 
 
 def test_no_global_ekf_in_launch_description(

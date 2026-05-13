@@ -73,6 +73,8 @@ def generate_launch_description():
             "launch_rviz": launch_rviz,
             "enforce_preflight": enforce_preflight,
             "disable_nav_gate": disable_nav_gate,
+            "camera_info_topic": "/camera_front/camera_info_synced",
+            "sync_sim_camera_info": "true",
         }.items(),
     )
 

@@ -39,6 +39,8 @@ setup(
     extras_require={"test": ["pytest"]},
     entry_points={
         "console_scripts": [
+            "camera_info_stamp_aligner = "
+            "lunabot_localisation.camera_info_stamp_aligner:main",
             "start_zone_localiser = lunabot_localisation.start_zone_localiser:main",
             "tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main",
         ],

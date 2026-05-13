@@ -170,6 +170,8 @@ def generate_launch_description():
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    camera_info_topic = LaunchConfiguration("camera_info_topic")
+    sync_sim_camera_info = LaunchConfiguration("sync_sim_camera_info")
     enable_teleop = LaunchConfiguration("enable_teleop")
     enforce_preflight = LaunchConfiguration("enforce_preflight")
     preflight_config = LaunchConfiguration("preflight_config")
@@ -186,6 +188,8 @@ def generate_launch_description():
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
             "cmd_vel_topic": localiser_cmd_vel_topic,
+            "camera_info_topic": camera_info_topic,
+            "sync_sim_camera_info": sync_sim_camera_info,
         }.items(),
     )
 
@@ -377,6 +381,21 @@ def generate_launch_description():
                 description=(
                     "Launch the apriltag_draw overlay for annotated front "
                     "camera debugging."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_info_topic",
+                default_value="/camera_front/camera_info",
+                description=(
+                    "Front RGB CameraInfo topic used by localisation consumers."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "sync_sim_camera_info",
+                default_value="false",
+                description=(
+                    "Enable the sim-only CameraInfo stamp aligner before "
+                    "localisation consumers."
                 ),
             ),
             DeclareLaunchArgument(
