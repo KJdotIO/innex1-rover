@@ -83,6 +83,7 @@ def _validate_boolean_launch_arguments(context):
         "lidar_costmap_phase",
         "use_sim_time",
         "enable_apriltag_debug",
+        "sync_sim_camera_info",
     ):
         _normalise_bool_text(
             LaunchConfiguration(argument_name).perform(context),
@@ -113,6 +114,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
+    camera_info_topic = LaunchConfiguration("camera_info_topic")
+    sync_sim_camera_info = LaunchConfiguration("sync_sim_camera_info")
     tag_map_x = LaunchConfiguration("tag_map_x")
     tag_map_y = LaunchConfiguration("tag_map_y")
     tag_map_z = LaunchConfiguration("tag_map_z")
@@ -132,7 +135,7 @@ def generate_launch_description():
     camera_remappings = [
         ("rgb/image", "/camera_front/image"),
         ("depth/image", "/camera_front/depth_image"),
-        ("rgb/camera_info", "/camera_front/camera_info"),
+        ("rgb/camera_info", camera_info_topic),
     ]
 
     return LaunchDescription(
@@ -162,6 +165,21 @@ def generate_launch_description():
                 default_value="cmd_vel",
                 description=(
                     "Velocity command topic used by the start-zone localiser."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "camera_info_topic",
+                default_value="/camera_front/camera_info",
+                description=(
+                    "Front RGB CameraInfo topic used by AprilTag and RTAB-Map."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "sync_sim_camera_info",
+                default_value="false",
+                description=(
+                    "Republish sim CameraInfo with image timestamps before "
+                    "feeding image-sync consumers."
                 ),
             ),
             DeclareLaunchArgument(
@@ -254,10 +272,33 @@ def generate_launch_description():
                 ],
                 remappings=[
                     ("image_rect", "/camera_front/image"),
-                    ("camera_info", "/camera_front/camera_info"),
+                    ("camera_info", camera_info_topic),
                     ("detections", "/camera_front/tags"),
                 ],
                 condition=normal_mode,
+            ),
+            Node(
+                package="lunabot_localisation",
+                executable="camera_info_stamp_aligner",
+                name="camera_info_stamp_aligner",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {
+                        "image_topic": "/camera_front/image",
+                        "camera_info_topic": "/camera_front/camera_info",
+                        "aligned_camera_info_topic": "/camera_front/camera_info_synced",
+                    },
+                ],
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            _is_falsey(lidar_costmap_phase),
+                            " and ",
+                            _is_truthy(sync_sim_camera_info),
+                        ]
+                    )
+                ),
             ),
             # --- AprilTag debug overlay (optional) ---
             IncludeLaunchDescription(
