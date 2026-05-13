@@ -28,6 +28,7 @@ from rclpy.utilities import remove_ros_args
 from rosidl_runtime_py.utilities import get_message
 from tf2_ros import Buffer, TransformListener
 
+from lunabot_bringup.message_fields import read_message_field
 from lunabot_bringup.preflight_profiles import (
     PHASE_FULL,
     VALID_PHASES,
@@ -57,37 +58,11 @@ DURABILITY_MAP = {
 }
 
 
-def _field_tokens(path: str) -> list[str | int]:
-    """Split a message field path into attribute and list-index tokens."""
-    tokens: list[str | int] = []
-    for part in path.split("."):
-        if not part:
-            raise ValueError(f"Invalid empty field in path '{path}'")
-        name, bracket, rest = part.partition("[")
-        if name:
-            tokens.append(name)
-        while bracket:
-            index_text, close, rest = rest.partition("]")
-            if not close or not index_text.isdigit():
-                raise ValueError(f"Invalid list index in field path '{path}'")
-            tokens.append(int(index_text))
-            bracket, rest = rest[:1], rest[1:]
-    return tokens
-
-
-def _read_field(message: Any, path: str) -> Any:
-    """Read a possibly nested message field such as controller_online[0]."""
-    value: Any = message
-    for token in _field_tokens(path):
-        value = value[token] if isinstance(token, int) else getattr(value, token)
-    return value
-
-
 def _fields_match(message: Any, expected_fields: dict[str, Any]) -> tuple[bool, str]:
     """Return whether a message satisfies the configured field expectations."""
     for path, expected in expected_fields.items():
         try:
-            actual = _read_field(message, path)
+            actual = read_message_field(message, path)
         except (AttributeError, IndexError, TypeError, ValueError) as exc:
             return False, f"{path} unreadable: {exc}"
         if actual != expected:
