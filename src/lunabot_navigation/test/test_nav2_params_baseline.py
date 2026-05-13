@@ -10,7 +10,7 @@ def test_uses_bounded_recovery_bt():
         Path(__file__).resolve().parents[1] / "config" / "nav2_params.yaml"
     )
     config = yaml.safe_load(nav2_params_path.read_text())
-    bt_xml = config["bt_navigator"]["ros__parameters"]["default_bt_xml_filename"]
+    bt_xml = config["bt_navigator"]["ros__parameters"]["default_nav_to_pose_bt_xml"]
 
     assert "navigate_to_pose_bounded_recovery" in bt_xml
 
