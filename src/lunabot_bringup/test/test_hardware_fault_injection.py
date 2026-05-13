@@ -7,11 +7,11 @@ from rosidl_runtime_py.utilities import get_message
 
 from lunabot_bringup.hardware_fault_injection import (
     _message_from_config,
-    _set_field,
     load_scenarios,
     scenario_needs_live_topic_ack,
     validate_live_topic_ack,
 )
+from lunabot_bringup.message_fields import write_message_field
 
 
 def _config_path() -> Path:
@@ -82,8 +82,8 @@ def test_set_field_supports_indexed_arrays():
     status_type = get_message("lunabot_interfaces/msg/DrivetrainStatus")
     message = status_type()
 
-    _set_field(message, "controller_online[0]", True)
-    _set_field(message, "controller_online[1]", False)
+    write_message_field(message, "controller_online[0]", True)
+    write_message_field(message, "controller_online[1]", False)
 
     assert list(message.controller_online) == [True, False]
 

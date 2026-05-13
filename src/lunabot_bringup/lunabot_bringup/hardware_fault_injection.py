@@ -20,6 +20,8 @@ from rclpy.qos import (
 )
 from rosidl_runtime_py.utilities import get_message
 
+from lunabot_bringup.message_fields import write_message_field
+
 
 @dataclass(frozen=True)
 class TopicInjection:
@@ -49,47 +51,12 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def _field_tokens(path: str) -> list[str | int]:
-    """Split a field path such as controller_online[0]."""
-    tokens: list[str | int] = []
-    for part in path.split("."):
-        if not part:
-            raise ValueError(f"Invalid empty field in path '{path}'")
-        name, bracket, rest = part.partition("[")
-        if name:
-            tokens.append(name)
-        while bracket:
-            index_text, close, rest = rest.partition("]")
-            if not close or not index_text.isdigit():
-                raise ValueError(f"Invalid list index in field path '{path}'")
-            tokens.append(int(index_text))
-            bracket, rest = rest[:1], rest[1:]
-    return tokens
-
-
-def _set_field(message: Any, path: str, value: Any) -> None:
-    """Set a simple or indexed message field."""
-    tokens = _field_tokens(path)
-    if not tokens:
-        raise ValueError("field path must not be empty")
-
-    target = message
-    for token in tokens[:-1]:
-        target = target[token] if isinstance(token, int) else getattr(target, token)
-
-    last = tokens[-1]
-    if isinstance(last, int):
-        target[last] = value
-    else:
-        setattr(target, last, value)
-
-
 def _message_from_config(type_name: str, fields: dict[str, Any]):
     """Build a ROS message from a type name and field mapping."""
     message_type = get_message(type_name)
     message = message_type()
     for path, value in fields.items():
-        _set_field(message, path, value)
+        write_message_field(message, path, value)
     return message
 
 

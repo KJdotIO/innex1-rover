@@ -17,10 +17,10 @@ from lunabot_bringup.preflight_check import (
     _merge_contract_requirements,
     _parse_bool_text,
     _parse_qos_policy,
-    _read_field,
     _strip_ros_cli_args,
 )
 from lunabot_bringup.preflight_profiles import filter_preflight_config, validate_phase
+from lunabot_bringup.message_fields import read_message_field
 
 
 def test_filter_preflight_config_keeps_all_checks_in_full_phase():
@@ -237,9 +237,9 @@ def test_read_field_supports_indexed_message_fields():
         nested=SimpleNamespace(state="ready"),
     )
 
-    assert _read_field(message, "controller_online[0]") is True
-    assert _read_field(message, "controller_online[1]") is False
-    assert _read_field(message, "nested.state") == "ready"
+    assert read_message_field(message, "controller_online[0]") is True
+    assert read_message_field(message, "controller_online[1]") is False
+    assert read_message_field(message, "nested.state") == "ready"
 
 
 def test_fields_match_reports_first_mismatch():
