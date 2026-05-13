@@ -74,6 +74,7 @@ class DepositionBridge(Node):
         self.declare_parameter("bed_lower_duration_s", 5.0)
         self.declare_parameter("dump_hold_duration_s", 3.0)
         self.declare_parameter("feedback_hz", 5.0)
+        self.declare_parameter("dry_run", False)
 
     def _validate_parameters(self) -> None:
         """Read and validate parameters."""
@@ -119,6 +120,7 @@ class DepositionBridge(Node):
         self._fb_period = 1.0 / self.get_parameter(
             "feedback_hz"
         ).value
+        self._dry_run = bool(self.get_parameter("dry_run").value)
 
         if not 0.0 < self._duty <= 100.0:
             raise ValueError(
@@ -131,6 +133,7 @@ class DepositionBridge(Node):
         self._estop_active = False
         self._motion_inhibited = False
         self._gpio_available = False
+        self._hardware_fault_reason = ""
         self._door_pwm: Any = None
         self._bed_l_pwm_obj: Any = None
         self._bed_r_pwm_obj: Any = None
@@ -140,11 +143,19 @@ class DepositionBridge(Node):
         try:
             import Jetson.GPIO as GPIO
         except (ImportError, RuntimeError) as exc:
-            self.get_logger().warn(
-                f"GPIO unavailable: {exc}. "
-                f"Running in dry-run mode."
-            )
             self._gpio_available = False
+            self._hardware_fault_reason = f"GPIO unavailable: {exc}"
+            if self._dry_run:
+                self.get_logger().warn(
+                    f"{self._hardware_fault_reason}. "
+                    "Explicit dry-run enabled, so actuator output is disabled "
+                    "but ROS interfaces stay active."
+                )
+            else:
+                self.get_logger().error(
+                    f"{self._hardware_fault_reason}. "
+                    "dry_run is false, so deposit goals will be rejected."
+                )
             return
 
         GPIO.setmode(GPIO.BOARD)
@@ -177,6 +188,7 @@ class DepositionBridge(Node):
         self._bed_r_pwm_obj.start(0)
 
         self._gpio_available = True
+        self._hardware_fault_reason = ""
         self.get_logger().info("GPIO initialised for Cytron control")
 
     def _init_ros(self) -> None:
@@ -216,6 +228,11 @@ class DepositionBridge(Node):
         if self._estop_active or self._motion_inhibited:
             self.get_logger().warn(
                 "Deposit goal rejected: safety active"
+            )
+            return GoalResponse.REJECT
+        if not self._gpio_available and not self._dry_run:
+            self.get_logger().error(
+                "Deposit goal rejected: actuator hardware unavailable"
             )
             return GoalResponse.REJECT
         return GoalResponse.ACCEPT
@@ -258,6 +275,8 @@ class DepositionBridge(Node):
             return "E-stop active during deposition"
         if self._motion_inhibited:
             return "Motion inhibited during deposition"
+        if not self._gpio_available and not self._dry_run:
+            return self._hardware_fault_reason or "Actuator hardware unavailable"
         return None
 
     def _wait_phase(
@@ -332,6 +351,14 @@ class DepositionBridge(Node):
         """Run the full dump sequence: open → raise → hold → lower → close."""
         start = time.monotonic()
         self.get_logger().info("Deposit sequence starting")
+        if not self._gpio_available and not self._dry_run:
+            goal_handle.abort()
+            return self._result(
+                False,
+                Deposit.Result.REASON_DRIVER_FAULT,
+                self._hardware_fault_reason or "Actuator hardware unavailable",
+                time.monotonic() - start,
+            )
 
         # Phase 1: Open door
         self._set_actuator(

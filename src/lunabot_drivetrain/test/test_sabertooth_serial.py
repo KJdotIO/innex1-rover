@@ -180,12 +180,18 @@ class TestDrivetrainBridgeSerialDispatch:
     """Verify the bridge chooses the configured Sabertooth protocol."""
 
     def _make_bridge(self, protocol):
+        from unittest.mock import MagicMock
+
         from lunabot_drivetrain.drivetrain_bridge import DrivetrainBridge
 
         bridge = object.__new__(DrivetrainBridge)
         bridge._serial = object()
         bridge._serial_protocol = protocol
         bridge._addresses = [128, 129]
+        bridge._controller_online = [True, True]
+        bridge._fault_code = DrivetrainStatus.FAULT_NONE
+        bridge._state = DrivetrainStatus.STATE_READY
+        bridge.get_logger = MagicMock()
         return bridge
 
     def test_legacy_simplified_throttle_path(self, monkeypatch):
@@ -268,3 +274,39 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._send_stop()
 
         assert calls == [(bridge._serial, 128), (bridge._serial, 129)]
+
+    def test_throttle_write_failure_faults_controller(self, monkeypatch):
+        def raise_io_error(*_args):
+            raise OSError("serial disconnected")
+
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_throttle",
+            raise_io_error,
+        )
+
+        bridge = self._make_bridge("legacy_simplified")
+        bridge._send_wheel_throttles(0.2, -0.1)
+
+        assert bridge._state == DrivetrainStatus.STATE_FAULT
+        assert bridge._fault_code == DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
+        assert bridge._controller_online == [False, False]
+        bridge.get_logger().error.assert_called_once()
+
+    def test_stop_write_failure_faults_controller(self, monkeypatch):
+        def raise_io_error(*_args):
+            raise OSError("serial disconnected")
+
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_stop",
+            raise_io_error,
+        )
+
+        bridge = self._make_bridge("legacy_simplified")
+        bridge._send_stop()
+
+        assert bridge._state == DrivetrainStatus.STATE_FAULT
+        assert bridge._fault_code == DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
+        assert bridge._controller_online == [False, False]
+        bridge.get_logger().error.assert_called_once()
