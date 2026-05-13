@@ -38,7 +38,6 @@ class CameraModel:
 class ExperimentState:
     phase: str = "baseline"
     event: str = ""
-    last_key: str = ""
 
 
 def _gray_from_bgr(frame: np.ndarray) -> np.ndarray:
@@ -268,11 +267,9 @@ def _set_phase_from_key(key: int, state: ExperimentState) -> None:
     if key in phase_keys:
         state.phase = phase_keys[key]
         state.event = f"phase:{state.phase}"
-        state.last_key = chr(key)
         print(f"phase -> {state.phase}")
     elif key in event_keys:
         state.event = event_keys[key]
-        state.last_key = chr(key)
         print(f"event -> {state.event} in phase {state.phase}")
 
 

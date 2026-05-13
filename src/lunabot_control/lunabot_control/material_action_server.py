@@ -1,4 +1,4 @@
-"""Stub action server for the deposition mission phase."""
+"""Bench action server for the deposition mission phase."""
 
 from math import isfinite
 from time import monotonic, sleep
@@ -13,7 +13,7 @@ from lunabot_interfaces.action import Deposit
 
 
 class MaterialActionServer(Node):
-    """Provide a deposition action stub for mission and integration testing."""
+    """Provide a bench deposition action server for integration testing."""
 
     def __init__(self):
         """Initialise action servers and simulation parameters."""
@@ -35,7 +35,7 @@ class MaterialActionServer(Node):
             callback_group=self._callback_group,
         )
 
-        self.get_logger().info("Deposition action stub ready")
+        self.get_logger().info("Bench deposition action server ready")
 
     def destroy_node(self):
         """Destroy action server handles before node teardown."""
@@ -202,7 +202,7 @@ class MaterialActionServer(Node):
         return None
 
     def execute_deposit(self, goal_handle):
-        """Run deposition stub with success, timeout, and failure paths."""
+        """Run bench deposition with success, timeout, and failure paths."""
         nominal_duration = self._deposit_nominal_duration(goal_handle)
         timeout_s = float(goal_handle.request.timeout_s)
         start = monotonic()

@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Reserved package shell for future perception nodes."""
+"""Perception nodes for crater detection and Nav2 costmap integration."""

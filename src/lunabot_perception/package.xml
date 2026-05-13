@@ -3,7 +3,7 @@
 <package format="3">
   <name>lunabot_perception</name>
   <version>0.1.0</version>
-  <description>Reserved package shell for future perception nodes</description>
+  <description>Perception nodes for crater detection and Nav2 costmap integration</description>
   <maintainer email="lunabotics@le.ac.uk">Leicester Lunabotics Team</maintainer>
   <license>Apache-2.0</license>
 
