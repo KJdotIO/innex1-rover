@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
+from lunabot_bringup.message_fields import read_message_field
 from lunabot_bringup.preflight_check import (
     ACTION_TYPE_MAP,
     DURABILITY_MAP,
@@ -20,7 +21,6 @@ from lunabot_bringup.preflight_check import (
     _strip_ros_cli_args,
 )
 from lunabot_bringup.preflight_profiles import filter_preflight_config, validate_phase
-from lunabot_bringup.message_fields import read_message_field
 
 
 def test_filter_preflight_config_keeps_all_checks_in_full_phase():
