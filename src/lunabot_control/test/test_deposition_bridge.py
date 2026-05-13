@@ -14,6 +14,10 @@
 
 """Unit tests for the deposition bridge logic."""
 
+from unittest.mock import MagicMock
+
+from rclpy.action import GoalResponse
+
 from lunabot_interfaces.action import Deposit
 
 
@@ -61,3 +65,45 @@ class TestDepositPhases:
         ]
         for i in range(len(phases) - 1):
             assert phases[i] < phases[i + 1]
+
+
+class TestDepositHardwareAvailability:
+    """Verify deposit goals fail closed when actuator hardware is unavailable."""
+
+    def _make_bridge(self, *, dry_run=False):
+        from lunabot_control.deposition_bridge import DepositionBridge
+
+        bridge = object.__new__(DepositionBridge)
+        bridge._estop_active = False
+        bridge._motion_inhibited = False
+        bridge._gpio_available = False
+        bridge._dry_run = dry_run
+        bridge._hardware_fault_reason = "GPIO unavailable"
+        bridge.get_logger = MagicMock()
+        return bridge
+
+    def test_goal_rejected_when_gpio_missing_and_not_dry_run(self):
+        bridge = self._make_bridge(dry_run=False)
+
+        response = bridge._goal_cb(object())
+
+        assert response == GoalResponse.REJECT
+        bridge.get_logger().error.assert_called_once()
+
+    def test_goal_accepted_when_gpio_missing_but_dry_run_explicit(self):
+        bridge = self._make_bridge(dry_run=True)
+
+        response = bridge._goal_cb(object())
+
+        assert response == GoalResponse.ACCEPT
+
+    def test_execute_aborts_when_hardware_unavailable(self):
+        bridge = self._make_bridge(dry_run=False)
+        goal_handle = MagicMock()
+
+        result = bridge._execute_deposit(goal_handle)
+
+        goal_handle.abort.assert_called_once()
+        assert result.success is False
+        assert result.reason_code == Deposit.Result.REASON_DRIVER_FAULT
+        assert result.failure_reason == "GPIO unavailable"

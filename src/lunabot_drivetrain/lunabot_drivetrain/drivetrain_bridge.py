@@ -33,6 +33,7 @@ from rclpy.qos import (
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool
 
+from lunabot_drivetrain import sabertooth_serial
 from lunabot_interfaces.msg import (
     DrivetrainStatus,
     DrivetrainTelemetry,
@@ -133,6 +134,11 @@ class DrivetrainBridge(Node):
             raise ValueError(
                 f"Expected 2 Sabertooth addresses, got {len(self._addresses)}"
             )
+        for address in self._addresses:
+            if not 0 <= int(address) <= 255:
+                raise ValueError(
+                    f"Sabertooth address out of range: {address}"
+                )
         if self._serial_protocol not in _SUPPORTED_PROTOCOLS:
             raise ValueError(
                 "serial_protocol must be one of "
@@ -210,6 +216,13 @@ class DrivetrainBridge(Node):
         """Open the UART serial port, failing closed unless dry-run is explicit."""
         try:
             import serial as pyserial
+        except ImportError as exc:
+            self._serial = None
+            self._controller_online = [False, False]
+            self._handle_serial_unavailable(exc)
+            return
+
+        try:
             self._serial = pyserial.Serial(
                 self._serial_port,
                 self._baud_rate,
@@ -218,7 +231,7 @@ class DrivetrainBridge(Node):
             self._controller_online = [True, True]
             self._state = DrivetrainStatus.STATE_READY
             self.get_logger().info(f"Serial port {self._serial_port} opened")
-        except Exception as exc:
+        except (OSError, pyserial.SerialException) as exc:
             self._serial = None
             self._controller_online = [False, False]
             self._handle_serial_unavailable(exc)
@@ -241,6 +254,13 @@ class DrivetrainBridge(Node):
         )
         self._fault_code = DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
         self._state = DrivetrainStatus.STATE_FAULT
+
+    def _mark_controller_offline(self, reason: str) -> None:
+        """Record a controller IO failure and fail closed."""
+        self.get_logger().error(reason)
+        self._controller_online = [False, False]
+        self._fault_code = DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
+        self._transition_to(DrivetrainStatus.STATE_FAULT)
 
     def _init_ros(self) -> None:
         """Set up publishers, subscribers, and timers."""
@@ -406,36 +426,32 @@ class DrivetrainBridge(Node):
         if self._serial is None:
             return
         try:
-            from lunabot_drivetrain.sabertooth_serial import (
-                send_simplified_throttle,
-                send_throttle,
-            )
             if self._serial_protocol in _LEGACY_SIMPLIFIED_PROTOCOLS:
-                send_simplified_throttle(self._serial, left, right)
+                sabertooth_serial.send_simplified_throttle(
+                    self._serial, left, right
+                )
                 return
-            send_throttle(self._serial, self._addresses[0], left, right)
-            send_throttle(self._serial, self._addresses[1], left, right)
-        except Exception as exc:
-            self.get_logger().error(f"Serial write failed: {exc}")
-            self._fault_code = DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
-            self._transition_to(DrivetrainStatus.STATE_FAULT)
+            sabertooth_serial.send_throttle(
+                self._serial, self._addresses[0], left, right
+            )
+            sabertooth_serial.send_throttle(
+                self._serial, self._addresses[1], left, right
+            )
+        except OSError as exc:
+            self._mark_controller_offline(f"Serial write failed: {exc}")
 
     def _send_stop(self) -> None:
         """Command zero throttle to all motors."""
         if self._serial is None:
             return
         try:
-            from lunabot_drivetrain.sabertooth_serial import (
-                send_simplified_stop,
-                send_stop,
-            )
             if self._serial_protocol in _LEGACY_SIMPLIFIED_PROTOCOLS:
-                send_simplified_stop(self._serial)
+                sabertooth_serial.send_simplified_stop(self._serial)
                 return
             for addr in self._addresses:
-                send_stop(self._serial, addr)
-        except Exception as exc:
-            self.get_logger().error(f"Serial stop failed: {exc}")
+                sabertooth_serial.send_stop(self._serial, addr)
+        except OSError as exc:
+            self._mark_controller_offline(f"Serial stop failed: {exc}")
 
     def _transition_to(self, new_state: int) -> None:
         """Update the state machine, only logging on actual transitions."""
@@ -489,8 +505,8 @@ class DrivetrainBridge(Node):
         if self._serial is not None:
             try:
                 self._serial.close()
-            except Exception:
-                pass
+            except OSError as exc:
+                self.get_logger().warn(f"Serial close failed: {exc}")
         super().destroy_node()
 
 
