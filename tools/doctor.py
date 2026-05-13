@@ -476,8 +476,9 @@ def main() -> int:
             "Nav2 config",
         ),
         lambda: check_path_exists(
-            ROOT / "src/lunabot_navigation/behavior_trees/mission_navigate_to_pose_bt.xml",
-            "Mission BT XML",
+            ROOT
+            / "src/lunabot_navigation/behavior_trees/navigate_to_pose_bounded_recovery.xml",
+            "Nav2 bounded-recovery BT XML",
         ),
         lambda: check_path_exists(
             PREFLIGHT_CONFIG_PATH,

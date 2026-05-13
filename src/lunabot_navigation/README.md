@@ -6,9 +6,9 @@ rover navigation stack.
 ## What this package is responsible for
 
 `lunabot_navigation` defines how Nav2 plans and follows paths in this project.
-It does not estimate localisation and it does not detect hazards directly. In
-the June baseline it consumes localisation outputs plus direct sensor
-observation topics used by the costmaps.
+It does not estimate localisation and it does not detect hazards directly. It
+consumes localisation outputs plus direct sensor observation topics used by the
+costmaps.
 
 ## Inputs this package depends on
 
@@ -21,15 +21,13 @@ At runtime, navigation expects:
 ## Key files
 
 - `config/nav2_params.yaml`: Nav2 planners, controller, costmaps, and BT navigator config.
-- `behavior_trees/mission_navigate_to_pose_bt.xml`: scaffold for future
-  mission-level orchestration work; it is not the active June runtime tree.
+- `behavior_trees/navigate_to_pose_bounded_recovery.xml`: active navigate-to-pose tree with bounded recovery.
 
 ## Current status
 
-The June baseline still uses the stock Nav2 `navigate_to_pose` tree from
-`nav2_bt_navigator`. The custom mission BT in this package is only a scaffold
-for future work under issue `#107`, so it is not part of the current runtime
-path.
+The runtime uses the bounded-recovery navigate-to-pose tree configured in
+`nav2_params.yaml`. Higher-level mission sequencing lives outside Nav2 and
+sends goals into this package through the standard navigation action path.
 
 ## Common failure modes
 
@@ -41,4 +39,3 @@ path.
 ## Where to read next
 
 - Wiki: [SoftwareArchitecture](https://github.com/KJdotIO/innex1-rover/wiki/SoftwareArchitecture), [Planning](https://github.com/KJdotIO/innex1-rover/wiki/Planning), [StateManagement](https://github.com/KJdotIO/innex1-rover/wiki/StateManagement), [Design-decisions](https://github.com/KJdotIO/innex1-rover/wiki/Design-decisions), [Contracts](https://github.com/KJdotIO/innex1-rover/wiki/Contracts)
-- Issue tracker epic for BT orchestration: https://github.com/KJdotIO/innex1-rover/issues/107
