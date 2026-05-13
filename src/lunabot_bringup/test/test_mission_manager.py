@@ -107,6 +107,37 @@ def test_set_failure_reason_updates_operator_topic(monkeypatch):
     assert manager._failure_reason_pub.messages[-1].data == "Navigation failed"
 
 
+def test_run_mission_services_callbacks_before_safety_check(monkeypatch):
+    """Mission loop must process safety subscriptions before each FSM step."""
+    manager = _make_manager(monkeypatch)
+
+    def _trip_motion_inhibit():
+        manager._motion_inhibited = True
+
+    monkeypatch.setattr(manager, "_service_callbacks", _trip_motion_inhibit)
+    manager._step = MagicMock()
+
+    manager.run_mission()
+
+    manager._step.assert_not_called()
+    assert manager._state == MissionState.HALT_MISSION
+    assert manager._last_failure_reason == "Safety stop during mission"
+    assert manager._failure_reason_pub.messages[-1].data == (
+        "Safety stop during mission"
+    )
+
+
+def test_service_callbacks_spins_node_without_blocking(monkeypatch):
+    """Mission callback service point should use the normal rclpy executor API."""
+    manager = _make_manager(monkeypatch)
+    spin_once = MagicMock()
+    monkeypatch.setattr("rclpy.spin_once", spin_once)
+
+    manager._service_callbacks()
+
+    spin_once.assert_called_once_with(manager, timeout_sec=0.0)
+
+
 # ------------------------------------------------------------------
 # INITIALIZE_MISSION
 # ------------------------------------------------------------------

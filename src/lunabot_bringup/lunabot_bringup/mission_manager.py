@@ -259,6 +259,7 @@ class MissionManager(Node):
         self._mission_active = True
         self._publish_operator_state()
         while self._state != MissionState.HALT_MISSION:
+            self._service_callbacks()
             if not self._is_safe():
                 reason = "Safety stop during mission"
                 self.get_logger().error(f"{reason} — halting")
@@ -273,6 +274,10 @@ class MissionManager(Node):
         self.get_logger().info(
             f"Mission halted after {self._cycle_count} cycles."
         )
+
+    def _service_callbacks(self) -> None:
+        """Service timers and subscriptions while the FSM owns the thread."""
+        rclpy.spin_once(self, timeout_sec=0.0)
 
     # ------------------------------------------------------------------
     # FSM dispatcher
