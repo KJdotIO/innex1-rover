@@ -14,6 +14,9 @@ The rulebook constraints that shape this are simple:
 - average comms use must stay at or below 4,000 Kbps;
 - only mission-critical electronics come into Mission Control.
 
+For inspection and competition-day paperwork, keep
+`docs/competition_inspection_packet.md` with the rover.
+
 ## Before You Leave The Pit
 
 Run these checks before the rover is in the arena.
@@ -108,6 +111,25 @@ sar -n DEV 1 10
 If `sar` is not installed, use the router dashboard, `ifstat`, or `nload`. The
 limit applies to the robot comms link, not to an individual ROS topic.
 
+## Comms And MCC Compliance
+
+Before entering comm check or Mission Control, confirm:
+
+- the rover is using the assigned visible SSID;
+- encryption is enabled;
+- hidden network mode is off;
+- 2.4 GHz channel width is `20 MHz`;
+- the router is on the organiser's required channel when instructed;
+- 5 GHz is disabled unless an approved fallback is being tested;
+- phone hotspots, tethering and spare backchannels are off;
+- Bluetooth or non-Wi-Fi radio parts have printed manufacturer evidence;
+- only mission-critical electronics are going into the MCC.
+
+Do not take phones, tablets, spare laptops, smart watches or personal radios
+into Mission Control. During the run, do not use external communications. The
+only exception is the organiser-provided setup radio path when the rules allow
+it.
+
 ## First Motion
 
 Do not start with full autonomy. Start with something you can stop.
@@ -164,6 +186,10 @@ Use `lipo_4s` if the rover is on a 4S pack. The default voltage is unavailable,
 so diagnostics will say power telemetry is missing until someone enters a real
 value.
 
+The physical COTS power logger is still required for inspection. Treat
+`/power/telemetry` as the operator and evidence view of that power story, not as
+a substitute for the logger itself.
+
 ## Before Autonomy
 
 The minimum useful checks are:
@@ -196,6 +222,9 @@ For autonomy scoring, use explicit callouts:
 
 Do this every time. The judge needs to know when autonomy starts, when it ends,
 and whether manual control has resumed.
+
+Do not enter obstacle locations into the rover after seeing the arena. Evidence
+bags are for review and proof, not for creating a later autonomy route.
 
 ## Evidence Bags
 
@@ -282,6 +311,10 @@ When the run ends, stop the rover first:
 ```bash
 ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"
 ```
+
+If an autonomy attempt is still active, inhibit further action immediately. The
+repo should grow a dedicated end-of-run inhibit command, but the operating rule
+is already fixed: stop first, preserve comms and evidence, then wait.
 
 Do not disconnect the robot or pack Mission Control until the judge says so.
 The rulebook allows the robot to need relocation or unloading after the timer.

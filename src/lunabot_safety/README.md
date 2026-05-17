@@ -4,8 +4,8 @@ Safety package for the E-stop to motion-inhibit bridge on the INNEX-1 rover.
 
 ## Current state
 
-This package contains a single node. The bulk of the rover's safety behaviour
-is currently distributed across other packages:
+One node lives here. The rest of the rover's safety behaviour is currently
+distributed across other packages:
 
 | Safety function | Where it lives |
 |-----------------|----------------|

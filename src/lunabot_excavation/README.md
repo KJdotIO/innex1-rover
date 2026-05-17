@@ -1,6 +1,6 @@
 # Excavation Bench Tooling
 
-This package includes a small bench-facing path for the excavation subsystem.
+`lunabot_excavation` provides the bench-facing path for the excavation subsystem.
 
 The important bit is that the bench path still goes through the excavation controller. It does
 not bypass the controller and poke raw hardware commands directly.

@@ -13,6 +13,10 @@ UK Lunabotics arena (7.9 m x 4.4 m).
 Both worlds include arena boundary walls and an AprilTag beacon for
 start-zone localisation.
 
+The boundary walls are simulation geometry only. Do not treat them as legal
+localisation, mapping, autonomous navigation or collision-avoidance cues for
+competition autonomy.
+
 ## Launch
 
 ```bash

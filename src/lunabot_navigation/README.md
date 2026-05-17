@@ -1,7 +1,7 @@
 # lunabot_navigation
 
-This package contains Nav2 configuration and behaviour tree assets used by the
-rover navigation stack.
+`lunabot_navigation` holds the Nav2 configuration and behaviour tree assets used
+by the rover navigation stack.
 
 ## What this package is responsible for
 
@@ -36,6 +36,6 @@ sends goals into this package through the standard navigation action path.
 - TF mismatch between localisation outputs and Nav2 frame config.
 - Controller/planner parameters tuned for a different environment.
 
-## Where to read next
+## Related docs
 
 - Wiki: [SoftwareArchitecture](https://github.com/KJdotIO/innex1-rover/wiki/SoftwareArchitecture), [Planning](https://github.com/KJdotIO/innex1-rover/wiki/Planning), [StateManagement](https://github.com/KJdotIO/innex1-rover/wiki/StateManagement), [Design-decisions](https://github.com/KJdotIO/innex1-rover/wiki/Design-decisions), [Contracts](https://github.com/KJdotIO/innex1-rover/wiki/Contracts)

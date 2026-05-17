@@ -2,8 +2,9 @@
 
 The competition communications rule that matters most for software is simple:
 average data utilisation must stay at or below **4,000 Kbps**. There is no peak
-limit. We still keep the average low because the operator link needs to stay
-stable.
+limit. Older NASA/UCF public material has used **5,000 Kbps**, but the UK
+rulebook is stricter, so this repo uses **4,000 Kbps**. We still keep the
+average low because the operator link needs to stay stable.
 
 The default competition posture is:
 
@@ -14,6 +15,11 @@ The default competition posture is:
   default;
 - record evidence locally with the minimal rosbag profile unless debugging
   requires more.
+
+This profile is also part of the comm-check story: Mission Control should show
+only robot-originating telemetry/video and the official competition monitors.
+Raw debug streams are useful in the lab, but they are not the scored-run
+operator view.
 
 The machine-readable source of truth is:
 
@@ -54,6 +60,10 @@ Do not expose raw camera images, depth images, point clouds, debug costmap
 panels or the heavy rosbag profile during a scored run. If a raw stream is
 needed for diagnosis, use `hardware_bringup` or `sim_debug`, say why, and turn
 it back off before the run.
+
+Do not add phone hotspots, tethering, spare laptops or browser-based
+backchannels to work around this allowlist. If the operator cannot see enough
+through the competition profile, fix the profile deliberately before the run.
 
 Start Foxglove through the project launch file so the allowlist and camera
 compression stay consistent:
@@ -117,7 +127,7 @@ ros2 launch lunabot_bringup navigation.launch.py \
   enable_apriltag_debug:=false
 ```
 
-Evidence capture should stay lean:
+Keep evidence capture lean:
 
 ```bash
 ros2 run lunabot_bringup mission_evidence \

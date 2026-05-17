@@ -1,8 +1,8 @@
 # Active Runtime Paths
 
-This page lists the launch paths that are current enough to use for hardware
-week work. If a launch file is not listed here, treat it as package-local
-debugging or implementation detail until it is added deliberately.
+The launch paths below are current enough for hardware-week work. If a launch
+file is not listed here, treat it as package-local debugging or implementation
+detail until it is added deliberately.
 
 The map follows the current repo shape rather than an ideal ROS 2 layout. The
 aim is to make the active paths obvious before adding more hardware-facing code.
@@ -85,9 +85,9 @@ The command path is:
   -> drivetrain_bridge
 ```
 
-The velocity gate should stay in this path for hardware work. Do not command
-the drivetrain directly unless you are running a controlled bench test and have
-a stop plan.
+Keep the velocity gate in this path for hardware work. Do not command the
+drivetrain directly unless you are running a controlled bench test and have a
+stop plan.
 
 ## Excavation And Deposition Bring-Up
 

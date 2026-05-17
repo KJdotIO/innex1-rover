@@ -58,7 +58,7 @@ stack (obstacle layer + crater layer + inflation layer).
   "Can't update static costmap layer, no map received" and craters will not
   appear in the costmap.
 
-## Where to read next
+## Related docs
 
 - Wiki: [Perception](https://github.com/KJdotIO/innex1-rover/wiki/Perception), [Sensors](https://github.com/KJdotIO/innex1-rover/wiki/Sensors), [SoftwareArchitecture](https://github.com/KJdotIO/innex1-rover/wiki/SoftwareArchitecture), [Contracts](https://github.com/KJdotIO/innex1-rover/wiki/Contracts)
 - [Nav2 Costmap2D configuration](https://docs.nav2.org/configuration/packages/configuring-costmaps.html)

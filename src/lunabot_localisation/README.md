@@ -16,6 +16,16 @@ The global EKF has been removed. RTAB-Map handles drift correction directly
 through its pose graph optimiser, which is the same pattern used by multiple
 Lunabotics teams (College of DuPage, Chicago Robotics/EDT).
 
+## Competition legality
+
+The localisation path must be explainable to inspection judges. It uses wheel
+odometry, IMU data, front RGB-D data, AprilTags and TF. Future LiDAR-inertial
+work may use the OS1-128 after wall-region filtering is in place.
+
+It must not use GPS, compass heading, ultrasonic proximity sensing, touch
+sensors for obstacle avoidance, arena walls as localisation features, or
+uploaded obstacle locations.
+
 ## Start-zone localisation
 
 The `start_zone_localiser` node spins in the start zone to acquire a stable
@@ -37,9 +47,10 @@ landmarks, aligning the map frame with the known tag position.
 - Covariances set unrealistically low, making the filter overconfident.
 - RTAB-Map not receiving depth images (check topic names and QoS).
 - Missing `map -> tag36h11:0` static TF preventing landmark alignment.
+- Wall points or simulation boundary geometry reaching a localisation backend
+  that will later be claimed as competition-legal.
 
-## Where to read next
+## Related docs
 
 - Wiki: [Localisation](https://github.com/KJdotIO/innex1-rover/wiki/Localisation), [Design-decisions](https://github.com/KJdotIO/innex1-rover/wiki/Design-decisions)
 - External: [RTAB-Map ROS2](https://github.com/introlab/rtabmap_ros), [robot_localization](https://index.ros.org/p/robot_localization/), [REP-105](https://www.ros.org/reps/rep-0105.html)
-

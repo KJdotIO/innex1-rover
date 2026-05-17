@@ -1,6 +1,6 @@
 # lunabot_bringup
 
-This package contains launch entrypoints that start integrated stack configurations.
+`lunabot_bringup` provides the launch entrypoints for integrated stack configurations.
 
 ## What this package is responsible for
 
@@ -77,6 +77,9 @@ The mission manager publishes a small Foxglove-friendly state contract:
 
 These topics are passive telemetry only. They are safe to show in Foxglove
 during autonomy because they do not provide a command path back into the rover.
+They also keep Mission Control inside the rulebook posture: robot-originating
+state only, no backchannel instructions, and no obstacle-location upload path
+during hands-free autonomy.
 
 ## Mission Dry Run
 
@@ -230,12 +233,16 @@ visible meter:
 ros2 run lunabot_bringup manual_power_telemetry --ros-args -p profile:=lipo_6s -p bus_voltage_v:=22.2
 ```
 
+The physical COTS power logger remains the inspection artefact. `/power/telemetry`
+is the operator and evidence topic that should mirror the logger or bridge once
+electrical integration is final.
+
 ## Common failure modes
 
 - Launch starts successfully but one critical node crashes shortly after (dependency mismatch).
 - Lifecycle nodes stay unconfigured due to invalid params in one server config.
 - Nodes appear alive but key topic links fail due to QoS incompatibility.
 
-## Where to read next
+## Related docs
 
 - Wiki: [Operations](https://github.com/KJdotIO/innex1-rover/wiki/Operations), [SoftwareArchitecture](https://github.com/KJdotIO/innex1-rover/wiki/SoftwareArchitecture), [Autonomy-cycle-walkthrough](https://github.com/KJdotIO/innex1-rover/wiki/Autonomy-cycle-walkthrough), [Contracts](https://github.com/KJdotIO/innex1-rover/wiki/Contracts)

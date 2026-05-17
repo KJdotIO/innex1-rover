@@ -1,6 +1,6 @@
 # Material Handling Interface Notes
 
-This package contains mechanism-agnostic action contracts for excavation and deposition.
+Mechanism-agnostic action contracts define how mission code requests excavation and deposition.
 
 ## Actions
 
@@ -212,10 +212,12 @@ Added under issue [#277](https://github.com/KJdotIO/innex1-rover/issues/277).
 
 - `/power/telemetry` uses `lunabot_interfaces/msg/PowerTelemetry`
 
-This topic is the rover software view of the main battery bus. During early
-hardware runs it may come from `manual_power_telemetry`, with values entered by
-the operator from the visible power meter. Once the electrical path is settled,
-replace that source with the chosen sensor or logger bridge without changing
+This topic is the rover software view of the main battery bus. The physical
+COTS power logger remains the inspection record; `/power/telemetry` is the ROS
+view used by operators, diagnostics and evidence bags. During early hardware
+runs it may come from `manual_power_telemetry`, with values entered by the
+operator from the visible power meter. Once the electrical path is settled,
+replace that source with the chosen logger or sensor bridge without changing
 the topic contract.
 
 ### PowerTelemetry
@@ -224,8 +226,8 @@ Fields:
 
 - `profile` — battery profile used for thresholds, currently `lipo_4s` or
   `lipo_6s`.
-- `source` — `manual`, `meter_bridge`, `sensor_bridge`, or another short source
-  name.
+- `source` — `manual`, `cots_logger_bridge`, `meter_bridge`, `sensor_bridge`,
+  or another short source name.
 - `bus_voltage_v`, `bus_current_a`, `energy_wh` — measured or manually entered
   bus values.
 - `warning_voltage_v`, `critical_voltage_v` — thresholds used to classify the
