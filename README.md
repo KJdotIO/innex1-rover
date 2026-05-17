@@ -215,6 +215,7 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Architecture: https://github.com/KJdotIO/innex1-rover/wiki/SoftwareArchitecture
 - Operations: https://github.com/KJdotIO/innex1-rover/wiki/Operations
 - Contracts: https://github.com/KJdotIO/innex1-rover/wiki/Contracts
+- Local inspection packet: [docs/competition_inspection_packet.md](docs/competition_inspection_packet.md)
 
 ## Contributing and licence
 

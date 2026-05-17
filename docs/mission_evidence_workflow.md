@@ -1,10 +1,15 @@
 # Mission evidence workflow
 
-Use this workflow to record runs that should be reviewed later.
+Mission evidence records runs that need later review.
 
 Do not keep every run as evidence. If the stack was half-launched, the rover was
 already in an unusual pose, or parameters were changing mid-run, keep the bag
 only when it explains a specific fault.
+
+Evidence bags are not autonomy inputs. Do not use a bag, replay, screenshot or
+operator observation to upload judged obstacle locations into a later autonomy
+attempt. A bag can prove what the rover saw and did; it must not become a route
+planning shortcut after the field has been seen.
 
 ## Golden shuttle bag
 
@@ -39,7 +44,7 @@ ros2 run lunabot_bringup mission_evidence \
     max_shuttle_cycles:=1
 ```
 
-The pack lands under `~/innex1_mission_evidence/`. It should contain:
+A complete pack lands under `~/innex1_mission_evidence/` and contains:
 
 - `bag/`
 - `logs/mission_command.log`
@@ -93,3 +98,18 @@ scan, map, costmaps, and action status.
 
 Use `heavy` only for short perception investigations. It records raw image and
 point-cloud topics and can use disk space quickly.
+
+## Sensor Claims
+
+Each competition evidence pack should be understandable without a long verbal
+explanation. The manifest should make these claims clear, either directly or in
+the run note:
+
+- autonomy used onboard sensor data and onboard software;
+- arena walls were not used for mapping, localisation, autonomous navigation or
+  collision avoidance;
+- no GPS, compass heading, ultrasonic proximity sensing or touch sensing for
+  obstacle avoidance was used;
+- no obstacle-location upload was made after seeing the arena;
+- Mission Control telemetry was passive and did not create an extra command
+  path during hands-free autonomy.

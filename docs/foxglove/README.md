@@ -43,7 +43,7 @@ ros2 launch lunabot_bringup foxglove_ground_control.launch.py \
 
 ## Foxglove or RViz
 
-Use Foxglove for operating the rover. It should answer the basic questions:
+Use Foxglove for operating the rover. The operator view answers the basic questions:
 
 - What state is the mission in?
 - Is motion inhibited or E-stop active?
