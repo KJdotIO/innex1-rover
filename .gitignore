@@ -11,6 +11,13 @@ frames_*.gv
 frames_*.pdf
 __pycache__/
 *.pyc
+Debug/
+Release/
+*.elf
+*.map
+*.list
+*.o
+*.d
 research/
 .firecrawl/
 wiki/
