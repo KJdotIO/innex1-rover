@@ -32,7 +32,7 @@ setup(
             _relative_matches("config/*.yaml"),
         ),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "pygame"],
     zip_safe=True,
     maintainer="Leicester Lunabotics Team",
     maintainer_email="ko129@student.le.ac.uk",
