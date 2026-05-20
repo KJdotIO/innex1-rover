@@ -357,7 +357,12 @@ void Handle_Command(char command)
     {
         Door_Stop();
     }
-    else if (command == 't' || command == 'T')
+    else if (
+        command == 't'
+        || command == 'T'
+        || command == 'b'
+        || command == 'B'
+    )
     {
         Door_Toggle();
     }
@@ -387,7 +392,9 @@ int main(void)
     door_state = DOOR_STOPPED;
 
     USART2_SendString("\r\nDoor actuator controller ready\r\n");
-    USART2_SendString("Commands: o=open, c=close, s=stop, t=toggle\r\n");
+    USART2_SendString(
+        "Commands: o=open, c=close, s=stop, t/b=toggle\r\n"
+    );
 
     while (1)
     {
