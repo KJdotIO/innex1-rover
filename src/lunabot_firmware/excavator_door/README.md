@@ -32,3 +32,16 @@ The DIR value controls actuator direction.
 - The actuator is clear and safe to move
 
 > Refer to Circuit Diagram
+
+## Xbox Controller Toggle
+
+The STM32 firmware now treats `b` the same as `t` for the toggle command.
+
+To send that command from an Xbox controller connected to your PC:
+
+1. Install Python dependencies:
+   `pip install -r requirements.txt`
+2. Connect the Nucleo serial port to your PC and note its COM port.
+3. Run:
+   `python xbox_toggle_bridge.py --port COM3`
+4. Press `B` on the Xbox controller to send a toggle command.
