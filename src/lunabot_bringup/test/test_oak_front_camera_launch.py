@@ -1,10 +1,12 @@
 from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = PACKAGE_ROOT.parents[1]
 LAUNCH_PATH = PACKAGE_ROOT / "launch" / "oak_front_camera.launch.py"
 CONFIG_PATH = PACKAGE_ROOT / "config" / "oak_front_rgbd.yaml"
 SETUP_PATH = PACKAGE_ROOT / "setup.py"
 PACKAGE_XML_PATH = PACKAGE_ROOT / "package.xml"
+BRINGUP_DOC_PATH = REPO_ROOT / "docs" / "depth_camera_bringup.md"
 
 
 def test_oak_front_camera_launch_uses_depthai_driver_with_remaps():
@@ -53,3 +55,10 @@ def test_oak_front_config_disables_neural_network_pipeline():
     assert "/camera_front:" in config_text
     assert "i_nn_type: none" in config_text
     assert "i_subpixel: true" in config_text
+
+
+def test_depth_camera_bringup_doc_uses_current_native_apriltag_cli():
+    doc_text = BRINGUP_DOC_PATH.read_text(encoding="utf-8")
+
+    assert "tools/oakd_apriltag_test.py --enable-depth --tag-size 0.27" in doc_text
+    assert "--show-depth" not in doc_text

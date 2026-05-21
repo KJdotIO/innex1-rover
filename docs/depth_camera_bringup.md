@@ -57,10 +57,13 @@ Use this before ROS:
 
 ```bash
 cd ~/innex1-rover
-python3 tools/oakd_apriltag_test.py --show-depth
+python3 tools/oakd_apriltag_test.py --enable-depth --tag-size 0.27
 ```
 
-This proves USB, camera power, DepthAI Python, RGB and stereo depth. If this does not work, don't debug Nav2 yet.
+Use `--tag-size 0.27` with the generated A3 tag because its black outer square
+is 270 mm when printed at 100 percent. Use `--tag-size 0.19` with the A4 tag.
+This proves USB, camera power, DepthAI Python, RGB, stereo depth and tag36h11
+ID 0 detection. If this does not work, don't debug Nav2 yet.
 
 ## ROS camera test
 
