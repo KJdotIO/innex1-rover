@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 LAUNCH_PATH = PACKAGE_ROOT / "launch" / "ouster_lidar_foxglove_debug.launch.py"
