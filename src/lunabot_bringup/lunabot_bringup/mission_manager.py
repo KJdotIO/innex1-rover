@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import math
+import time
 from enum import IntEnum
 
 import rclpy
 from action_msgs.msg import GoalStatus
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
+from rclpy.executors import (
+    ShutdownException,
+    SingleThreadedExecutor,
+    TimeoutException,
+)
 from rclpy.node import Node
 from rclpy.qos import (
     DurabilityPolicy,
@@ -277,7 +283,26 @@ class MissionManager(Node):
 
     def _service_callbacks(self) -> None:
         """Service timers and subscriptions while the FSM owns the thread."""
-        rclpy.spin_once(self, timeout_sec=0.0)
+        executor = SingleThreadedExecutor(context=self.context)
+        node_was_added = executor.add_node(self)
+        if not node_was_added:
+            return
+
+        try:
+            while True:
+                try:
+                    handler, _, _ = executor.wait_for_ready_callbacks(
+                        timeout_sec=0.0,
+                        nodes=[self],
+                    )
+                except (ShutdownException, TimeoutException):
+                    return
+
+                handler()
+                if handler.exception() is not None:
+                    raise handler.exception()
+        finally:
+            executor.remove_node(self)
 
     # ------------------------------------------------------------------
     # FSM dispatcher
@@ -552,8 +577,18 @@ class MissionManager(Node):
         timeout_s: float = 30.0,
     ) -> tuple[bool, str]:
         """Block until an action server is available."""
-        if client.wait_for_server(timeout_sec=timeout_s):
-            return True, f"{action_name} server available"
+        deadline = time.monotonic() + timeout_s
+        while True:
+            self._service_callbacks()
+            if not self._is_safe():
+                return False, f"{action_name}: safety stop active while waiting"
+            if client.server_is_ready():
+                return True, f"{action_name} server available"
+            remaining_s = deadline - time.monotonic()
+            if remaining_s <= 0.0:
+                break
+            time.sleep(min(0.05, remaining_s))
+
         return False, f"{action_name} server unavailable after {timeout_s}s"
 
     def _build_nav_goal(self, x: float, y: float, yaw: float) -> NavigateToPose.Goal:
