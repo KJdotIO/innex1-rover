@@ -26,14 +26,61 @@ from rclpy.qos import (
     qos_profile_sensor_data,
 )
 from rclpy.time import Time
-from scipy.ndimage import binary_dilation
-from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points_numpy
 from std_msgs.msg import Header
 from tf2_ros import ExtrapolationException, TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+
+
+def _rotation_matrix_from_quaternion(
+    x: float, y: float, z: float, w: float
+) -> np.ndarray:
+    """Return a 3x3 rotation matrix from a normalised or unnormalised quaternion."""
+    norm = np.sqrt((x * x) + (y * y) + (z * z) + (w * w))
+    if norm == 0.0:
+        raise ValueError("quaternion must be non-zero")
+    x /= norm
+    y /= norm
+    z /= norm
+    w /= norm
+    return np.array(
+        [
+            [
+                1.0 - 2.0 * (y * y + z * z),
+                2.0 * (x * y - z * w),
+                2.0 * (x * z + y * w),
+            ],
+            [
+                2.0 * (x * y + z * w),
+                1.0 - 2.0 * (x * x + z * z),
+                2.0 * (y * z - x * w),
+            ],
+            [
+                2.0 * (x * z - y * w),
+                2.0 * (y * z + x * w),
+                1.0 - 2.0 * (x * x + y * y),
+            ],
+        ],
+        dtype=np.float64,
+    )
+
+
+def _binary_dilation(mask: np.ndarray, radius_cells: int) -> np.ndarray:
+    """Dilate a 2D boolean mask without adding a SciPy runtime dependency."""
+    if radius_cells <= 0 or not np.any(mask):
+        return mask
+
+    padded = np.pad(mask, radius_cells, mode="constant", constant_values=False)
+    dilated = np.zeros_like(mask, dtype=bool)
+    kernel_width = (2 * radius_cells) + 1
+    for row_offset in range(kernel_width):
+        for col_offset in range(kernel_width):
+            row_stop = row_offset + mask.shape[0]
+            col_stop = col_offset + mask.shape[1]
+            dilated |= padded[row_offset:row_stop, col_offset:col_stop]
+    return dilated
 
 
 class CraterDetectionNode(Node):
@@ -56,6 +103,10 @@ class CraterDetectionNode(Node):
         self.declare_parameter("ground_percentile", 80.0)
         self.declare_parameter("inflation_cells", 2)
         self.declare_parameter("accumulator_decay", 0.95)
+        self.declare_parameter(
+            "input_cloud_topic",
+            "/perception/arena_boundary/camera_front/points",
+        )
         # Fixed ground Z for competition arenas with known flat floor
         # Set to NaN to use automatic percentile-based estimation
         self.declare_parameter("fixed_ground_z", float("nan"))
@@ -72,6 +123,7 @@ class CraterDetectionNode(Node):
         self.ground_percentile = self.get_parameter("ground_percentile").value
         self.inflation_cells = self.get_parameter("inflation_cells").value
         self.decay = self.get_parameter("accumulator_decay").value
+        self.input_cloud_topic = self.get_parameter("input_cloud_topic").value
         self.fixed_ground_z = self.get_parameter("fixed_ground_z").value
 
         if self.resolution <= 0.0:
@@ -92,11 +144,7 @@ class CraterDetectionNode(Node):
         self._z_count = np.zeros((self.grid_h, self.grid_w), dtype=np.float64)
 
         # Pre-build dilation kernel for crater inflation
-        if self.inflation_cells > 0:
-            k = self.inflation_cells
-            self._inflate_kernel = np.ones((2 * k + 1, 2 * k + 1), dtype=bool)
-        else:
-            self._inflate_kernel = None
+        self._inflation_radius_cells = max(0, int(self.inflation_cells))
 
         # --- TF2 ---
         self.tf_buffer = Buffer()
@@ -105,7 +153,7 @@ class CraterDetectionNode(Node):
         # --- Subscriber ---
         self.create_subscription(
             PointCloud2,
-            "/camera_front/points",
+            self.input_cloud_topic,
             self._cloud_callback,
             qos_profile_sensor_data,
         )
@@ -132,7 +180,8 @@ class CraterDetectionNode(Node):
         self.get_logger().info(
             f"Crater detection: {self.grid_w}x{self.grid_h} grid "
             f"@ {self.resolution}m, depth_threshold={self.depth_threshold}m, "
-            f"decay={self.decay}, inflation={self.inflation_cells} cells"
+            f"decay={self.decay}, inflation={self.inflation_cells} cells, "
+            f"input={self.input_cloud_topic}"
         )
 
     def _cloud_callback(self, msg: PointCloud2):
@@ -152,7 +201,7 @@ class CraterDetectionNode(Node):
 
         q = tf.transform.rotation
         t = tf.transform.translation
-        rot = Rotation.from_quat([q.x, q.y, q.z, q.w]).as_matrix()
+        rot = _rotation_matrix_from_quaternion(q.x, q.y, q.z, q.w)
         trans = np.array([t.x, t.y, t.z])
         points_odom = (rot @ points.T).T + trans
 
@@ -216,8 +265,7 @@ class CraterDetectionNode(Node):
     ) -> None:
         """Log a throttled TF lookup failure for an incoming cloud."""
         self.get_logger().warning(
-            f"TF lookup {msg.header.frame_id} -> {self.target_frame} "
-            f"failed: {error}",
+            f"TF lookup {msg.header.frame_id} -> {self.target_frame} failed: {error}",
             throttle_duration_sec=5.0,
         )
 
@@ -241,8 +289,7 @@ class CraterDetectionNode(Node):
         crater_mask = observed & (elevation < (ground_z - self.depth_threshold))
 
         # Inflate using proper dilation (no wraparound)
-        if self._inflate_kernel is not None and np.any(crater_mask):
-            crater_mask = binary_dilation(crater_mask, structure=self._inflate_kernel)
+        crater_mask = _binary_dilation(crater_mask, self._inflation_radius_cells)
 
         # Build OccupancyGrid
         grid_msg = OccupancyGrid()

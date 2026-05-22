@@ -16,11 +16,16 @@
 
 from unittest.mock import Mock
 
+import numpy as np
 from rclpy.time import Time
 from sensor_msgs.msg import PointCloud2
 from tf2_ros import ExtrapolationException, LookupException
 
-from lunabot_perception.crater_detection import CraterDetectionNode
+from lunabot_perception.crater_detection import (
+    CraterDetectionNode,
+    _binary_dilation,
+    _rotation_matrix_from_quaternion,
+)
 
 
 def _node_with_buffer(tf_buffer: Mock) -> CraterDetectionNode:
@@ -37,6 +42,29 @@ def _point_cloud() -> PointCloud2:
     msg.header.stamp.sec = 42
     msg.header.stamp.nanosec = 123
     return msg
+
+
+def test_rotation_matrix_from_quaternion_applies_yaw():
+    """Quaternion transforms do not depend on SciPy at runtime."""
+    rot = _rotation_matrix_from_quaternion(0.0, 0.0, 2**0.5 / 2.0, 2**0.5 / 2.0)
+
+    np.testing.assert_allclose(
+        rot @ np.array([1.0, 0.0, 0.0]), [0.0, 1.0, 0.0], atol=1e-6
+    )
+
+
+def test_binary_dilation_expands_without_wrapping_edges():
+    """Inflation expands into neighbours without wrapping across the grid."""
+    mask = np.zeros((3, 3), dtype=bool)
+    mask[0, 0] = True
+
+    dilated = _binary_dilation(mask, 1)
+
+    assert dilated.tolist() == [
+        [True, True, False],
+        [True, True, False],
+        [False, False, False],
+    ]
 
 
 def test_lookup_cloud_transform_uses_cloud_stamp_first():

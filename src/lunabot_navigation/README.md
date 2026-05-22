@@ -13,10 +13,14 @@ costmaps.
 ## Inputs this package depends on
 
 At runtime, navigation expects:
-- fused odometry from localisation (`/odometry/filtered`),
+- fused odometry from localisation (`/odometry/local`),
 - TF chain including `map`, `odom`, `base_footprint`,
-- direct sensor observation sources used by costmaps,
+- wall-excluded sensor observation sources under `/perception/arena_boundary/`,
 - configured mission or operator navigation goals.
+
+Raw camera and LiDAR point clouds are not autonomy inputs. The boundary filter
+in `lunabot_perception` republishes legal arena-interior clouds before Nav2
+costmaps and collision monitor consume them.
 
 ## Key files
 

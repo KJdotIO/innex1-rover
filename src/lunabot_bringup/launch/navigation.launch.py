@@ -96,6 +96,30 @@ def _select_localiser_cmd_vel_topic(enable_teleop):
     )
 
 
+def _arena_boundary_filter_node(source_name, input_topic, output_topic, use_sim_time):
+    """Return one wall-exclusion filter for an autonomy sensor stream."""
+    return Node(
+        package="lunabot_perception",
+        executable="arena_boundary_filter",
+        name=f"arena_boundary_filter_{source_name}",
+        output="screen",
+        parameters=[
+            {"use_sim_time": use_sim_time},
+            {
+                "source_name": source_name,
+                "input_topic": input_topic,
+                "output_topic": output_topic,
+                "target_frame": "odom",
+                "arena_min_x": -1.0,
+                "arena_max_x": 6.9,
+                "arena_min_y": -3.3,
+                "arena_max_y": 1.1,
+                "wall_exclusion_margin_m": 0.35,
+            },
+        ],
+    )
+
+
 def _handle_preflight_exit(
     event,
     _context,
@@ -198,8 +222,34 @@ def generate_launch_description():
         executable="crater_detection",
         name="crater_detection",
         output="screen",
-        parameters=[{"use_sim_time": use_sim_time}],
+        parameters=[
+            {"use_sim_time": use_sim_time},
+            {
+                "input_cloud_topic": ("/perception/arena_boundary/camera_front/points"),
+            },
+        ],
     )
+
+    arena_boundary_filters = [
+        _arena_boundary_filter_node(
+            "camera_front",
+            "/camera_front/points",
+            "/perception/arena_boundary/camera_front/points",
+            use_sim_time,
+        ),
+        _arena_boundary_filter_node(
+            "camera_rear",
+            "/camera_rear/points",
+            "/perception/arena_boundary/camera_rear/points",
+            use_sim_time,
+        ),
+        _arena_boundary_filter_node(
+            "ouster",
+            "/ouster/points",
+            "/perception/arena_boundary/ouster/points",
+            use_sim_time,
+        ),
+    ]
 
     navigate_to_pose_gate = Node(
         package="lunabot_bringup",
@@ -437,6 +487,7 @@ def generate_launch_description():
                 ),
             ),
             localisation_launch,
+            *arena_boundary_filters,
             crater_detection,
             navigate_to_pose_gate,
             teleop_launch,

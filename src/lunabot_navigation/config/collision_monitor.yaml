@@ -1,8 +1,8 @@
 # Nav2 Collision Monitor — last-resort velocity safety layer
 #
 # Sits between the Nav2 velocity output and the robot/bridge. If obstacle
-# points from the front depth camera appear inside the stop or slowdown
-# polygons, the commanded velocity is reduced or zeroed.
+# points from the wall-excluded depth camera topics appear inside the stop or
+# slowdown polygons, the commanded velocity is reduced or zeroed.
 #
 # Polygon coordinates are in base_footprint frame (X forward, Y left).
 # Robot approximate envelope: ~0.40m long, ~0.36m wide (wheel-to-wheel).
@@ -44,14 +44,14 @@ collision_monitor:
 
     front_camera:
       type: "pointcloud"
-      topic: "/camera_front/points"
+      topic: "/perception/arena_boundary/camera_front/points"
       min_height: 0.10
       max_height: 0.60
       enabled: true
 
     rear_camera:
       type: "pointcloud"
-      topic: "/camera_rear/points"
+      topic: "/perception/arena_boundary/camera_rear/points"
       min_height: 0.10
       max_height: 0.60
       enabled: true

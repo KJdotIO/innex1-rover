@@ -36,7 +36,19 @@ preflight:
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: false
+    - name: /perception/arena_boundary/camera_front/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: true
+    - name: /perception/arena_boundary/camera_rear/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: false
     - name: /ouster/points
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: false
+    - name: /perception/arena_boundary/ouster/points
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: false
@@ -92,6 +104,12 @@ preflight:
     - name: controller_server
       critical: true
       phases: [runtime]
+    - name: arena_boundary_filter_camera_front
+      critical: true
+    - name: arena_boundary_filter_camera_rear
+      critical: false
+    - name: arena_boundary_filter_ouster
+      critical: false
     - name: rtabmap
       critical: false
     - name: start_zone_localiser

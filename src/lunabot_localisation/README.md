@@ -8,18 +8,21 @@ The localisation pipeline has two layers:
 
 1. **Local EKF** (`robot_localization`): fuses wheel odometry + IMU to produce
   a smooth `odom -> base_footprint` transform and `/odometry/local`.
-2. **RTAB-Map SLAM** (`rtabmap_slam`): subscribes to RGB-D images from the
-  front depth camera and `/odometry/local`. Publishes the `map -> odom`
-  correction via visual loop closure and AprilTag landmark constraints.
+2. **Optional RTAB-Map SLAM** (`rtabmap_slam`): when
+  `enable_visual_slam:=true`, subscribes to RGB-D images from the front depth
+  camera and `/odometry/local`. It publishes the `map -> odom` correction via
+  visual loop closure and AprilTag landmark constraints.
 
-The global EKF has been removed. RTAB-Map handles drift correction directly
-through its pose graph optimiser, which is the same pattern used by multiple
-Lunabotics teams (College of DuPage, Chicago Robotics/EDT).
+The competition default keeps `enable_visual_slam:=false` and publishes an
+identity `map -> odom` transform. That avoids using arena wall features for
+localisation while the local EKF, start-zone AprilTag gate, and odometry frame
+remain available.
 
 ## Competition legality
 
 The localisation path must be explainable to inspection judges. It uses wheel
-odometry, IMU data, front RGB-D data, AprilTags and TF. Future LiDAR-inertial
+odometry, IMU data, AprilTags and TF. Experimental visual SLAM is opt-in until
+we can prove its inputs do not use arena-wall features. Future LiDAR-inertial
 work may use the OS1-128 after wall-region filtering is in place.
 
 It must not use GPS, compass heading, ultrasonic proximity sensing, touch
@@ -30,8 +33,9 @@ uploaded obstacle locations.
 
 The `start_zone_localiser` node spins in the start zone to acquire a stable
 AprilTag lock. Once the lock is stable, it publishes a READY status so that
-travel autonomy may begin. RTAB-Map receives the same AprilTag detections as
-landmarks, aligning the map frame with the known tag position.
+travel autonomy may begin. When visual SLAM is enabled for experiments,
+RTAB-Map receives the same AprilTag detections as landmarks, aligning the map
+frame with the known tag position.
 
 ## Key files
 
