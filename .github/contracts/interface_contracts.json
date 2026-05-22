@@ -75,6 +75,13 @@
       "kind": "publisher",
       "source": "src/lunabot_bringup/lunabot_bringup/power_telemetry.py",
       "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/mission/movement_watchdog/armed",
+      "type": "std_srvs/srv/SetBool",
+      "kind": "service_server",
+      "source": "src/lunabot_bringup/lunabot_bringup/movement_watchdog.py",
+      "phases": ["runtime", "hardware"]
     }
   ],
   "tf_links": [
