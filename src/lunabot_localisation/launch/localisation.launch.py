@@ -81,6 +81,7 @@ def _validate_boolean_launch_arguments(context):
     """Reject invalid boolean-style launch argument values early."""
     for argument_name in (
         "lidar_costmap_phase",
+        "enable_visual_slam",
         "use_sim_time",
         "enable_apriltag_debug",
         "sync_sim_camera_info",
@@ -111,6 +112,7 @@ def generate_launch_description():
         "start_zone_localisation.yaml",
     )
     lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
+    enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
@@ -122,6 +124,24 @@ def generate_launch_description():
     tag_map_yaw = LaunchConfiguration("tag_map_yaw")
 
     normal_mode = IfCondition(_is_falsey(lidar_costmap_phase))
+    visual_slam_condition = IfCondition(
+        PythonExpression(
+            [
+                _is_falsey(lidar_costmap_phase),
+                " and ",
+                _is_truthy(enable_visual_slam),
+            ]
+        )
+    )
+    identity_map_to_odom_condition = IfCondition(
+        PythonExpression(
+            [
+                _is_truthy(lidar_costmap_phase),
+                " or ",
+                _is_falsey(enable_visual_slam),
+            ]
+        )
+    )
     apriltag_debug_condition = IfCondition(
         PythonExpression(
             [
@@ -151,6 +171,14 @@ def generate_launch_description():
                 "use_sim_time",
                 default_value="true",
                 description=("Use /clock instead of wall time for all launched nodes."),
+            ),
+            DeclareLaunchArgument(
+                "enable_visual_slam",
+                default_value="false",
+                description=(
+                    "Enable RTAB-Map RGB-D SLAM. Keep false for the "
+                    "wall-excluded competition autonomy path."
+                ),
             ),
             DeclareLaunchArgument(
                 "enable_apriltag_debug",
@@ -240,7 +268,7 @@ def generate_launch_description():
                     "--child-frame-id",
                     "odom",
                 ],
-                condition=IfCondition(_is_truthy(lidar_costmap_phase)),
+                condition=identity_map_to_odom_condition,
             ),
             # --- RTAB-Map SLAM: map -> odom via loop closure ---
             Node(
@@ -258,7 +286,7 @@ def generate_launch_description():
                     ("tag_detections", "/camera_front/tags"),
                 ],
                 arguments=["-d"],
-                condition=normal_mode,
+                condition=visual_slam_condition,
             ),
             # --- AprilTag detector ---
             Node(

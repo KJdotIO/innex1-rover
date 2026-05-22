@@ -26,6 +26,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
+            "arena_boundary_filter = lunabot_perception.arena_boundary_filter:main",
             "crater_detection = lunabot_perception.crater_detection:main",
         ],
     },

@@ -21,6 +21,8 @@ ros2 launch lunabot_bringup navigation.launch.py
 
 - `lunabot_bringup/localisation.launch.py`
 - `lunabot_bringup/nav2_navigation.launch.py`
+- `lunabot_perception/arena_boundary_filter` for front/rear camera clouds and
+  Ouster clouds
 - `lunabot_perception/crater_detection`
 - `lunabot_bringup/navigate_to_pose_gate`
 - optional joystick teleop and `twist_mux`
@@ -135,8 +137,8 @@ These are still useful, but they are not the default hardware-week path:
 
 ## Current Simplification Notes
 
-- `lunabot_perception` is active because `navigation.launch.py` starts
-  `crater_detection`.
+- `lunabot_perception` is active because `navigation.launch.py` starts the
+  arena boundary filters and `crater_detection`.
 - `lunabot_safety` is active because mission evidence and hardware motion use
   the E-stop to motion-inhibit bridge.
 - `lunabot_navigation` owns Nav2 config and behaviour tree assets, not custom

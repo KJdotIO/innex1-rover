@@ -52,6 +52,9 @@ profiles:
       - /global_costmap/costmap
       - /local_costmap/costmap
       - /navigate_to_pose_gate/_action/status
+      - /perception/arena_boundary/camera_front/points
+      - /perception/arena_boundary/camera_rear/points
+      - /perception/arena_boundary/ouster/points
   heavy:
     description: Deliberate high-bandwidth capture for short perception investigations only.
     topics:
@@ -83,6 +86,9 @@ profiles:
       - /global_costmap/costmap
       - /local_costmap/costmap
       - /navigate_to_pose_gate/_action/status
+      - /perception/arena_boundary/camera_front/points
+      - /perception/arena_boundary/camera_rear/points
+      - /perception/arena_boundary/ouster/points
       - /camera/image_raw
       - /camera/depth/image_raw
       - /camera/camera_info
