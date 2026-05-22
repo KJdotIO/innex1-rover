@@ -16,6 +16,7 @@ profiles:
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
       - /drivetrain/status
+      - /odometry/local
       - /localisation/start_zone_status
       - /excavation/status
       - /cmd_vel_gated
@@ -43,7 +44,9 @@ profiles:
       - /excavation/telemetry
       - /cmd_vel_gated
       - /cmd_vel_safe
+      - /odometry/local
       - /odom
+      - /odom_wheels
       - /scan
       - /map
       - /global_costmap/costmap
@@ -72,7 +75,9 @@ profiles:
       - /excavation/telemetry
       - /cmd_vel_gated
       - /cmd_vel_safe
+      - /odometry/local
       - /odom
+      - /odom_wheels
       - /scan
       - /map
       - /global_costmap/costmap
