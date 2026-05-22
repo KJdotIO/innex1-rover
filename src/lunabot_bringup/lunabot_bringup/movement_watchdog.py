@@ -131,6 +131,10 @@ class MovementWatchdog:
         self.armed_at_s = now_s if armed else None
         for source in self.sources.values():
             source.reset_motion_window(now_s)
+            source.last_received_s = None
+            source.last_position = None
+            source.last_yaw = None
+            source.last_encoder_ticks = None
 
     def update_drivetrain_status(self, msg: Any) -> None:
         """Store command-derived drivetrain state only as diagnostic context."""
@@ -193,7 +197,9 @@ class MovementWatchdog:
 
         encoder_delta = sum(
             abs(current - previous)
-            for current, previous in zip(encoder_ticks, source.last_encoder_ticks)
+            for current, previous in zip(
+                encoder_ticks, source.last_encoder_ticks, strict=False
+            )
         )
         source.last_encoder_ticks = encoder_ticks
         source.last_received_s = now_s

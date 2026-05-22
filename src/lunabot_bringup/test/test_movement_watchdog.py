@@ -1,5 +1,6 @@
 """Unit tests for the advisory movement watchdog."""
 
+import importlib
 import math
 import sys
 import types
@@ -107,18 +108,17 @@ except ModuleNotFoundError:
     _install_ros_stubs()
     from nav_msgs.msg import Odometry
 
-from lunabot_bringup.movement_watchdog import (  # noqa: E402
-    LEVEL_ERROR,
-    LEVEL_OK,
-    LEVEL_STALE,
-    LEVEL_WARN,
-    MovementWatchdog,
-    MovementWatchdogConfig,
-)
-from lunabot_interfaces.msg import (  # noqa: E402
-    DrivetrainStatus,
-    DrivetrainTelemetry,
-)
+movement_watchdog = importlib.import_module("lunabot_bringup.movement_watchdog")
+lunabot_interface_msgs = importlib.import_module("lunabot_interfaces.msg")
+
+LEVEL_ERROR = movement_watchdog.LEVEL_ERROR
+LEVEL_OK = movement_watchdog.LEVEL_OK
+LEVEL_STALE = movement_watchdog.LEVEL_STALE
+LEVEL_WARN = movement_watchdog.LEVEL_WARN
+MovementWatchdog = movement_watchdog.MovementWatchdog
+MovementWatchdogConfig = movement_watchdog.MovementWatchdogConfig
+DrivetrainStatus = lunabot_interface_msgs.DrivetrainStatus
+DrivetrainTelemetry = lunabot_interface_msgs.DrivetrainTelemetry
 
 
 def _watchdog(**config_overrides):
@@ -199,6 +199,20 @@ def test_sustained_odom_translation_confirms_movement_before_timeout():
     assert watchdog.ever_moved is True
     assert _values(status)["last_motion_source"] == "/odometry/local"
     assert _values(status)["seconds_since_confirmed_motion"] == "5.90"
+
+
+def test_pre_arm_motion_is_not_counted_after_arming():
+    watchdog = _watchdog()
+    watchdog.update_odom("/odometry/local", _odom(x=0.00), now_s=0.0)
+    watchdog.update_odom("/odometry/local", _odom(x=0.20), now_s=2.0)
+
+    watchdog.set_armed(True, now_s=3.0)
+    watchdog.update_odom("/odometry/local", _odom(x=0.20), now_s=3.1)
+    status = watchdog.diagnostic(now_s=3.2)
+
+    assert watchdog.ever_moved is False
+    assert status.level == LEVEL_OK
+    assert status.message == "Awaiting confirmed rover movement"
 
 
 def test_sustained_rotation_counts_as_movement():
