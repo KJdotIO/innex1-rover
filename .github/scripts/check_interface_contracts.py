@@ -50,6 +50,9 @@ def _extract_python_interfaces(path: Path) -> list[dict[str, str]]:
                 elif module.endswith(".action"):
                     package = module.rsplit(".", 1)[0]
                     import_aliases[local_name] = f"{package}/action/{alias.name}"
+                elif module.endswith(".srv"):
+                    package = module.rsplit(".", 1)[0]
+                    import_aliases[local_name] = f"{package}/srv/{alias.name}"
                 else:
                     import_aliases[local_name] = f"{module}.{alias.name}"
 
@@ -76,6 +79,17 @@ def _extract_python_interfaces(path: Path) -> list[dict[str, str]]:
                         if func_name == "create_publisher"
                         else "subscription",
                         "name": topic,
+                        "type": _resolve_type(node.args[0], import_aliases),
+                    }
+                )
+
+        if func_name == "create_service" and len(node.args) >= 2:
+            service_name = _constant_string(node.args[1])
+            if service_name:
+                interfaces.append(
+                    {
+                        "kind": "service_server",
+                        "name": service_name,
                         "type": _resolve_type(node.args[0], import_aliases),
                     }
                 )

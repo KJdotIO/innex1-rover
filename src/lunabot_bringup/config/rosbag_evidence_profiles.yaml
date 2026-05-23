@@ -16,6 +16,7 @@ profiles:
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
       - /drivetrain/status
+      - /odometry/local
       - /localisation/start_zone_status
       - /excavation/status
       - /cmd_vel_gated
@@ -43,12 +44,17 @@ profiles:
       - /excavation/telemetry
       - /cmd_vel_gated
       - /cmd_vel_safe
+      - /odometry/local
       - /odom
+      - /odom_wheels
       - /scan
       - /map
       - /global_costmap/costmap
       - /local_costmap/costmap
       - /navigate_to_pose_gate/_action/status
+      - /perception/arena_boundary/camera_front/points
+      - /perception/arena_boundary/camera_rear/points
+      - /perception/arena_boundary/ouster/points
   heavy:
     description: Deliberate high-bandwidth capture for short perception investigations only.
     topics:
@@ -72,12 +78,17 @@ profiles:
       - /excavation/telemetry
       - /cmd_vel_gated
       - /cmd_vel_safe
+      - /odometry/local
       - /odom
+      - /odom_wheels
       - /scan
       - /map
       - /global_costmap/costmap
       - /local_costmap/costmap
       - /navigate_to_pose_gate/_action/status
+      - /perception/arena_boundary/camera_front/points
+      - /perception/arena_boundary/camera_rear/points
+      - /perception/arena_boundary/ouster/points
       - /camera/image_raw
       - /camera/depth/image_raw
       - /camera/camera_info

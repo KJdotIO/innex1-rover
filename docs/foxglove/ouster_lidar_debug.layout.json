@@ -1,0 +1,127 @@
+{
+  "configById": {
+    "3D!ouster_lidar": {
+      "cameraState": {
+        "distance": 12,
+        "perspective": true,
+        "phi": 0.9,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 0,
+        "fovy": 0.7853981633974483,
+        "near": 0.01,
+        "far": 1000
+      },
+      "followTf": "os_lidar",
+      "scene": {
+        "labelScaleFactor": 1
+      },
+      "transforms": {
+        "os_sensor": {
+          "visible": true
+        },
+        "os_lidar": {
+          "visible": true
+        },
+        "os_imu": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/ouster/points": {
+          "visible": true
+        },
+        "/ouster/scan": {
+          "visible": false
+        }
+      },
+      "layers": {
+        "ouster-grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "ouster-grid",
+          "layerId": "foxglove.Grid",
+          "frameId": "os_lidar",
+          "divisions": 10,
+          "lineWidth": 0.02,
+          "color": "#808080",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1,
+          "size": 20
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      }
+    },
+    "RawMessages!imu": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/ouster/imu"
+    },
+    "RawMessages!telemetry": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/ouster/telemetry"
+    },
+    "RawMessages!metadata": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/ouster/metadata"
+    }
+  },
+  "globalVariables": {},
+  "layout": {
+    "direction": "row",
+    "first": "3D!ouster_lidar",
+    "second": {
+      "direction": "column",
+      "first": "RawMessages!imu",
+      "second": {
+        "direction": "column",
+        "first": "RawMessages!telemetry",
+        "second": "RawMessages!metadata",
+        "splitPercentage": 50
+      },
+      "splitPercentage": 45
+    },
+    "splitPercentage": 72
+  },
+  "playbackConfig": {
+    "speed": 1
+  },
+  "userNodes": {}
+}

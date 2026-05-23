@@ -69,6 +69,37 @@ layout.
 `oak_camera_debug.layout.json` is intentionally heavy. It exists for short bench
 checks only. Do not use it as the normal driving view.
 
+## Ouster LiDAR Debug
+
+Use `ouster_lidar_debug.layout.json` for a live Ouster-only debug view. This is
+for bring-up and mapping checks, not for the scored-run operator layout.
+
+Connect the Ouster to the Jetson Ethernet port, then check the Jetson Ethernet
+address:
+
+```bash
+ip -br addr show
+```
+
+If the Ethernet address is not `169.254.86.134`, edit `udp_dest` in
+`src/lunabot_bringup/config/ouster_lidar_debug.yaml` or pass a copied parameter
+file with the correct address. Then start the debug stack:
+
+```bash
+ros2 launch lunabot_bringup ouster_lidar_foxglove_debug.launch.py
+```
+
+Open Foxglove on the ground-control laptop and connect to:
+
+```text
+ws://<jetson-tailscale-or-router-ip>:8765
+```
+
+The debug launch exposes `/ouster/points`, `/ouster/imu`, `/ouster/scan`,
+`/ouster/metadata`, `/ouster/telemetry`, and TF. Keep this separate from the
+competition layout because point clouds are too heavy for the 4,000 Kbps
+telemetry budget.
+
 The layout includes `/power/telemetry`. If the power telemetry PR has not
 merged yet, that panel will simply be empty.
 

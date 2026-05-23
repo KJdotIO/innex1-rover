@@ -242,6 +242,11 @@ The physical COTS power logger remains the inspection artefact. `/power/telemetr
 is the operator and evidence topic that should mirror the logger or bridge once
 electrical integration is final.
 
+When `/power/telemetry` reports `STATE_LOW_CRITICAL` or
+`low_voltage_critical: true`, `lunabot_safety/estop_node` latches
+`/safety/motion_inhibit`. Motion is allowed again only after the voltage has
+recovered and the operator publishes `/safety/reset_motion_inhibit`.
+
 ## Common failure modes
 
 - Launch starts successfully but one critical node crashes shortly after (dependency mismatch).

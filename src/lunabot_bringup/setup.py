@@ -56,6 +56,7 @@ setup(
             "hardware_fault_injector = lunabot_bringup.hardware_fault_injection:main",
             "runtime_profile = lunabot_bringup.runtime_profile:main",
             "rover_diagnostics = lunabot_bringup.rover_diagnostics:main",
+            "movement_watchdog = lunabot_bringup.movement_watchdog:main",
             "manual_power_telemetry = lunabot_bringup.power_telemetry:main",
         ],
     },

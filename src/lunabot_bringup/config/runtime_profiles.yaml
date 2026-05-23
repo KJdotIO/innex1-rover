@@ -39,8 +39,8 @@ profiles:
       - /map
       - /local_costmap/costmap
       - /global_costmap/costmap
-      - /ouster/points
-      - /camera_front/points
+      - /perception/arena_boundary/ouster/points
+      - /perception/arena_boundary/camera_front/points
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0

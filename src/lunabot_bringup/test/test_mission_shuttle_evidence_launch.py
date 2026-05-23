@@ -58,6 +58,7 @@ def test_mission_shuttle_evidence_launch_composes_one_cycle_stack():
         "estop_node",
         "material_action_server",
         "rover_diagnostics",
+        "movement_watchdog",
     ]
     assert len(timers) == 1
     assert timers[0].period == 45.0

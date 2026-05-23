@@ -23,6 +23,26 @@ def _load_launch_module():
     return module
 
 
+def _condition_text(condition) -> str:
+    """Return launch condition substitutions as a readable string."""
+    return _substitution_text(
+        condition.__dict__.get("_IfCondition__predicate_expression", [])
+    )
+
+
+def _substitution_text(value) -> str:
+    """Return nested launch substitution internals as readable text."""
+    if isinstance(value, list):
+        return "".join(_substitution_text(part) for part in value)
+    if "_TextSubstitution__text" in value.__dict__:
+        return value.__dict__["_TextSubstitution__text"]
+    if "_LaunchConfiguration__variable_name" in value.__dict__:
+        return _substitution_text(value.__dict__["_LaunchConfiguration__variable_name"])
+    if "_PythonExpression__expression" in value.__dict__:
+        return _substitution_text(value.__dict__["_PythonExpression__expression"])
+    return str(value)
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
@@ -101,6 +121,7 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     launch_module = _load_launch_module()
     context = LaunchContext()
     context.launch_configurations["lidar_costmap_phase"] = "treu"
+    context.launch_configurations["enable_visual_slam"] = "false"
     context.launch_configurations["use_sim_time"] = "true"
     context.launch_configurations["enable_apriltag_debug"] = "false"
     context.launch_configurations["sync_sim_camera_info"] = "false"
@@ -183,6 +204,32 @@ def test_rtabmap_node_present_in_launch_description(
     ]
 
     assert len(rtabmap_nodes) == 1
+    assert "enable_visual_slam" in _condition_text(rtabmap_nodes[0].condition)
+
+
+def test_identity_map_to_odom_runs_when_visual_slam_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The default competition path still has a map->odom TF without RTAB-Map."""
+    launch_module = _load_launch_module()
+    monkeypatch.setattr(
+        launch_module,
+        "get_package_share_directory",
+        lambda _package: "/tmp/lunabot_localisation",
+    )
+    description = launch_module.generate_launch_description()
+
+    static_tf_nodes = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__package") == "tf2_ros"
+        and "--child-frame-id" in entity.__dict__.get("_Node__arguments", [])
+        and "odom" in entity.__dict__.get("_Node__arguments", [])
+    ]
+
+    assert len(static_tf_nodes) == 1
+    assert "enable_visual_slam" in _condition_text(static_tf_nodes[0].condition)
 
 
 @pytest.mark.parametrize("config_name", ["ekf.yaml", "ekf_lidar_phase.yaml"])

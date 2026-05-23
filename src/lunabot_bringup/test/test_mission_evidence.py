@@ -41,6 +41,7 @@ def test_load_profiles_reads_minimal_topic_allowlist():
 
     assert "/mission/state" in minimal.topics
     assert "/diagnostics" in minimal.topics
+    assert "/odometry/local" in minimal.topics
     assert "/power/telemetry" in minimal.topics
     assert "/ouster/points" not in minimal.topics
     assert profiles["heavy"].topics[-1] == "/ouster/points"

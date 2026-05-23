@@ -7,6 +7,14 @@ import yaml
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 NAV2_PARAMS_PATH = CONFIG_DIR / "nav2_params.yaml"
 COLLISION_MONITOR_PATH = CONFIG_DIR / "collision_monitor.yaml"
+FILTERED_FRONT_TOPIC = "/perception/arena_boundary/camera_front/points"
+FILTERED_REAR_TOPIC = "/perception/arena_boundary/camera_rear/points"
+FILTERED_OUSTER_TOPIC = "/perception/arena_boundary/ouster/points"
+RAW_AUTONOMY_TOPICS = {
+    "/camera_front/points",
+    "/camera_rear/points",
+    "/ouster/points",
+}
 
 
 def _load_yaml(path: Path) -> dict:
@@ -68,13 +76,13 @@ class TestObstacleLayerConfig:
 
     def test_front_depth_camera_topic(self):
         for costmap_key, layer in self.layers:
-            assert layer["camera_front_points"]["topic"] == "/camera_front/points", (
+            assert layer["camera_front_points"]["topic"] == FILTERED_FRONT_TOPIC, (
                 f"{costmap_key}: unexpected front camera topic"
             )
 
     def test_rear_depth_camera_topic(self):
         for costmap_key, layer in self.layers:
-            assert layer["camera_rear_points"]["topic"] == "/camera_rear/points", (
+            assert layer["camera_rear_points"]["topic"] == FILTERED_REAR_TOPIC, (
                 f"{costmap_key}: unexpected rear camera topic"
             )
 
@@ -91,6 +99,40 @@ class TestObstacleLayerConfig:
                 pts = layer[source]
                 assert pts["marking"] is True
                 assert pts["clearing"] is True
+
+
+class TestWallExcludedAutonomyInputs:
+    """Verify autonomy consumers use wall-excluded point-cloud topics."""
+
+    def setup_method(self):
+        self.nav2_config = _load_yaml(NAV2_PARAMS_PATH)
+        self.collision_params = _load_yaml(COLLISION_MONITOR_PATH)["collision_monitor"][
+            "ros__parameters"
+        ]
+
+    def test_nav2_costmaps_do_not_subscribe_to_raw_wall_capable_clouds(self):
+        for key in ("global_costmap", "local_costmap"):
+            params = _costmap_params(self.nav2_config, key)
+            obstacle_layer = params["obstacle_layer"]
+            voxel_layer = params["voxel_layer"]
+            topics = {
+                obstacle_layer["camera_front_points"]["topic"],
+                obstacle_layer["camera_rear_points"]["topic"],
+                voxel_layer["lidar_points"]["topic"],
+            }
+
+            assert topics.isdisjoint(RAW_AUTONOMY_TOPICS)
+            assert FILTERED_FRONT_TOPIC in topics
+            assert FILTERED_REAR_TOPIC in topics
+            assert FILTERED_OUSTER_TOPIC in topics
+
+    def test_collision_monitor_uses_wall_excluded_clouds(self):
+        topics = {
+            self.collision_params[source_name]["topic"]
+            for source_name in self.collision_params["observation_sources"]
+        }
+
+        assert topics == {FILTERED_FRONT_TOPIC, FILTERED_REAR_TOPIC}
 
 
 class TestCraterLayerConfig:
@@ -118,12 +160,12 @@ class TestInflationLayerConfig:
 
     def setup_method(self):
         config = _load_yaml(NAV2_PARAMS_PATH)
-        self.global_inflation = _costmap_params(
-            config, "global_costmap"
-        )["inflation_layer"]
-        self.local_inflation = _costmap_params(
-            config, "local_costmap"
-        )["inflation_layer"]
+        self.global_inflation = _costmap_params(config, "global_costmap")[
+            "inflation_layer"
+        ]
+        self.local_inflation = _costmap_params(config, "local_costmap")[
+            "inflation_layer"
+        ]
 
     def test_inflation_radius_positive(self):
         assert self.global_inflation["inflation_radius"] > 0.0
@@ -142,9 +184,9 @@ class TestInflationLayerConfig:
     def test_local_inflation_matches_controller_scaling_band(self):
         config = _load_yaml(NAV2_PARAMS_PATH)
         controller = config["controller_server"]["ros__parameters"]["FollowPath"]
-        assert controller["cost_scaling_dist"] <= self.local_inflation[
-            "inflation_radius"
-        ]
+        assert (
+            controller["cost_scaling_dist"] <= self.local_inflation["inflation_radius"]
+        )
 
 
 class TestControllerGoalConfig:

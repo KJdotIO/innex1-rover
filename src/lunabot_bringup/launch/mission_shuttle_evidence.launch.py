@@ -113,6 +113,19 @@ def generate_launch_description():
         parameters=[{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}],
     )
 
+    movement_watchdog = Node(
+        package="lunabot_bringup",
+        executable="movement_watchdog",
+        name="movement_watchdog",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
+                "auto_arm": False,
+            }
+        ],
+    )
+
     mission_manager = Node(
         package="lunabot_bringup",
         executable="mission_manager",
@@ -162,6 +175,7 @@ def generate_launch_description():
             estop_node,
             deposit_action_server,
             rover_diagnostics,
+            movement_watchdog,
             TimerAction(period=45.0, actions=[mission_manager]),
             mission_exit_handler,
         ]

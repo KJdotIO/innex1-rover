@@ -56,7 +56,7 @@ Visualization Manager:
         Value: /local_costmap/costmap
     - Class: rviz_default_plugins/PointCloud2
       Enabled: true
-      Name: Ouster Points
+      Name: Filtered Ouster Points
       Position Transformer: XYZ
       Size (Pixels): 2
       Style: Flat Squares
@@ -64,7 +64,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /ouster/points
+        Value: /perception/arena_boundary/ouster/points
       Use Fixed Frame: true
     - Class: rviz_default_plugins/Image
       Enabled: true

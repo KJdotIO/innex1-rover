@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import lunabot_bringup.mission_manager as mission_manager
 from lunabot_bringup.mission_manager import MissionManager, MissionState
 from lunabot_bringup.mission_timer import MissionTimer
 
@@ -48,6 +49,7 @@ def _make_manager(monkeypatch):
     manager._motion_inhibited = False
     manager._last_failure_reason = ""
     manager._mission_active = False
+    manager._context = MagicMock()
     manager._mission_state_pub = _fake_publisher()
     manager._autonomy_mode_pub = _fake_publisher()
     manager._time_remaining_pub = _fake_publisher()
@@ -105,6 +107,72 @@ def test_set_failure_reason_updates_operator_topic(monkeypatch):
 
     assert manager._last_failure_reason == "Navigation failed"
     assert manager._failure_reason_pub.messages[-1].data == "Navigation failed"
+
+
+def test_run_mission_services_callbacks_before_safety_check(monkeypatch):
+    """Mission loop must process safety subscriptions before each FSM step."""
+    manager = _make_manager(monkeypatch)
+
+    def _trip_motion_inhibit():
+        manager._motion_inhibited = True
+
+    monkeypatch.setattr(manager, "_service_callbacks", _trip_motion_inhibit)
+    manager._step = MagicMock()
+
+    manager.run_mission()
+
+    manager._step.assert_not_called()
+    assert manager._state == MissionState.HALT_MISSION
+    assert manager._last_failure_reason == "Safety stop during mission"
+    assert manager._failure_reason_pub.messages[-1].data == (
+        "Safety stop during mission"
+    )
+
+
+def test_service_callbacks_drains_ready_callbacks_without_blocking(monkeypatch):
+    """Mission callback service point should drain all currently ready callbacks."""
+    manager = _make_manager(monkeypatch)
+    call_order = []
+
+    class ReadyHandler:
+        def __init__(self, callback):
+            self._callback = callback
+
+        def __call__(self):
+            self._callback()
+
+        def exception(self):
+            return None
+
+    class FakeExecutor:
+        def __init__(self, *, context):
+            self.context = context
+            self.handlers = [
+                ReadyHandler(lambda: call_order.append("operator_timer")),
+                ReadyHandler(lambda: manager._inhibit_cb(SimpleNamespace(data=True))),
+            ]
+            self.removed_node = None
+
+        def add_node(self, node):
+            assert node is manager
+            return True
+
+        def wait_for_ready_callbacks(self, *, timeout_sec, nodes):
+            assert timeout_sec == 0.0
+            assert nodes == [manager]
+            if self.handlers:
+                return self.handlers.pop(0), None, manager
+            raise mission_manager.TimeoutException()
+
+        def remove_node(self, node):
+            self.removed_node = node
+
+    monkeypatch.setattr(mission_manager, "SingleThreadedExecutor", FakeExecutor)
+
+    manager._service_callbacks()
+
+    assert call_order == ["operator_timer"]
+    assert manager._motion_inhibited is True
 
 
 # ------------------------------------------------------------------
@@ -381,6 +449,42 @@ def test_nav_sequence_stops_when_safety_trips_between_legs(monkeypatch):
         "navigate_to_excavation: safety stop active before navigate_to_excavation"
     )
     assert sent == [("navigate_to_mid_obstacle", first_goal)]
+
+
+def test_wait_for_server_services_callbacks_while_waiting(monkeypatch):
+    """Server waits must keep timers and subscriptions moving."""
+    manager = _make_manager(monkeypatch)
+    client = MagicMock()
+    client.server_is_ready.side_effect = [False, False, True]
+    service_callbacks = MagicMock()
+    monkeypatch.setattr(manager, "_service_callbacks", service_callbacks)
+    monkeypatch.setattr(mission_manager.time, "sleep", lambda _duration: None)
+
+    success, detail = manager._wait_for_server(client, "navigate")
+
+    assert success
+    assert detail == "navigate server available"
+    assert service_callbacks.call_count == 3
+
+
+def test_wait_for_server_stops_when_safety_callback_trips(monkeypatch):
+    """Server waits should not ignore a queued safety stop."""
+    manager = _make_manager(monkeypatch)
+    client = MagicMock()
+    client.server_is_ready.return_value = False
+
+    def _trip_estop():
+        manager._estop_cb(SimpleNamespace(data=True))
+
+    monkeypatch.setattr(manager, "_service_callbacks", _trip_estop)
+    sleep = MagicMock()
+    monkeypatch.setattr(mission_manager.time, "sleep", sleep)
+
+    success, detail = manager._wait_for_server(client, "navigate")
+
+    assert not success
+    assert detail == "navigate: safety stop active while waiting"
+    sleep.assert_not_called()
 
 
 def test_deposit_success_transitions_to_check_next_cycle_time(monkeypatch):
