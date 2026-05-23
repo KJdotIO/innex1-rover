@@ -12,9 +12,12 @@ def test_foxglove_ground_control_launch_uses_compressed_camera_republishers():
 
     assert 'package="image_transport"' in launch_text
     assert '"compressed"' in launch_text
+    assert '"compressedDepth"' in launch_text
     assert "out.jpeg_quality" in launch_text
     assert "/camera_front/image" in launch_text
+    assert "/camera_front/depth_image" in launch_text
     assert "/camera_rear/image" in launch_text
+    assert "enable_front_depth" in launch_text
 
 
 def test_foxglove_ground_control_launch_uses_runtime_profile_allowlist():
