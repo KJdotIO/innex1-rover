@@ -19,6 +19,7 @@ from launch_ros.substitutions import FindPackageShare
 
 TRUTHY_VALUES = ("1", "true", "yes", "on")
 FALSEY_VALUES = ("0", "false", "no", "off")
+LIDAR_ODOMETRY_BACKENDS = ("none", "kiss_icp", "rko_lio")
 
 
 def _config_path(*parts: str) -> str:
@@ -62,6 +63,19 @@ def _is_falsey(value):
     )
 
 
+def _is_lidar_backend(value, backend):
+    """Return a launch expression matching a LiDAR odometry backend name."""
+    return PythonExpression(
+        [
+            "'",
+            value,
+            "'.strip().lower() == '",
+            backend,
+            "'",
+        ]
+    )
+
+
 def _tag_pose_bridge_config(use_sim_time, sim_config, hardware_config):
     """Return the correct tag-pose bridge config for the selected clock mode."""
     return PythonExpression(
@@ -90,6 +104,12 @@ def _validate_boolean_launch_arguments(context):
             LaunchConfiguration(argument_name).perform(context),
             argument_name=argument_name,
         )
+    backend = LaunchConfiguration("lidar_odometry_backend").perform(context)
+    if backend.strip().lower() not in LIDAR_ODOMETRY_BACKENDS:
+        raise ValueError(
+            "Expected lidar_odometry_backend to be one of "
+            f"{LIDAR_ODOMETRY_BACKENDS}, got '{backend}'."
+        )
     return []
 
 
@@ -104,6 +124,8 @@ def generate_launch_description():
     """
     rtabmap_yaml = _config_path("config", "rtabmap.yaml")
     ekf_lidar_phase_yaml = _config_path("config", "ekf_lidar_phase.yaml")
+    kiss_icp_yaml = _config_path("config", "kiss_icp_lunabot.yaml")
+    rko_lio_yaml = _config_path("config", "rko_lio_lunabot.yaml")
     apriltag_yaml = _config_path("config", "apriltag.yaml")
     tag_pose_bridge_yaml = _config_path("config", "tag_pose_bridge.yaml")
     tag_pose_bridge_sim_yaml = _config_path("config", "tag_pose_bridge_sim.yaml")
@@ -115,6 +137,10 @@ def generate_launch_description():
     enable_visual_slam = LaunchConfiguration("enable_visual_slam")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    lidar_odometry_backend = LaunchConfiguration("lidar_odometry_backend")
+    legal_lidar_input_topic = LaunchConfiguration("legal_lidar_input_topic")
+    legal_lidar_output_topic = LaunchConfiguration("legal_lidar_output_topic")
+    legal_lidar_mask_frame = LaunchConfiguration("legal_lidar_mask_frame")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     camera_info_topic = LaunchConfiguration("camera_info_topic")
     sync_sim_camera_info = LaunchConfiguration("sync_sim_camera_info")
@@ -151,6 +177,17 @@ def generate_launch_description():
             ]
         )
     )
+    lidar_filter_condition = IfCondition(
+        PythonExpression(
+            [
+                "'",
+                lidar_odometry_backend,
+                "'.strip().lower() != 'none'",
+            ]
+        )
+    )
+    kiss_icp_condition = IfCondition(_is_lidar_backend(lidar_odometry_backend, "kiss_icp"))
+    rko_lio_condition = IfCondition(_is_lidar_backend(lidar_odometry_backend, "rko_lio"))
 
     camera_remappings = [
         ("rgb/image", "/camera_front/image"),
@@ -187,6 +224,28 @@ def generate_launch_description():
                     "Launch the apriltag_draw overlay for annotated front "
                     "camera debugging."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "lidar_odometry_backend",
+                default_value="none",
+                description=(
+                    "Legal LiDAR odometry backend: none, kiss_icp, or rko_lio."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "legal_lidar_input_topic",
+                default_value="/ouster/points",
+                description="Raw OS1 point cloud before legal wall filtering.",
+            ),
+            DeclareLaunchArgument(
+                "legal_lidar_output_topic",
+                default_value="/localisation/lidar/points_legal",
+                description="Field-preserved, wall-excluded cloud for LiDAR odometry.",
+            ),
+            DeclareLaunchArgument(
+                "legal_lidar_mask_frame",
+                default_value="odom",
+                description="Arena frame used only for deciding legal point membership.",
             ),
             DeclareLaunchArgument(
                 "cmd_vel_topic",
@@ -231,6 +290,70 @@ def generate_launch_description():
                 description=("Configured map-frame yaw of the start-zone tag."),
             ),
             OpaqueFunction(function=_validate_boolean_launch_arguments),
+            # --- Legal LiDAR filter: preserves Ouster point fields for odometry ---
+            Node(
+                package="lunabot_localisation",
+                executable="legal_lidar_filter",
+                name="legal_lidar_filter_ouster",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {
+                        "input_topic": legal_lidar_input_topic,
+                        "output_topic": legal_lidar_output_topic,
+                        "source_name": "ouster",
+                        "mask_frame": legal_lidar_mask_frame,
+                    },
+                ],
+                condition=lidar_filter_condition,
+            ),
+            # --- KISS-ICP: first legal LiDAR odometry baseline ---
+            Node(
+                package="kiss_icp",
+                executable="kiss_icp_node",
+                name="kiss_icp_node",
+                output="screen",
+                remappings=[
+                    ("pointcloud_topic", legal_lidar_output_topic),
+                    ("kiss/odometry", "/localisation/lidar/odometry"),
+                ],
+                parameters=[
+                    {
+                        "use_sim_time": use_sim_time,
+                        "base_frame": "base_footprint",
+                        "lidar_odom_frame": "odom",
+                        "publish_odom_tf": False,
+                        "invert_odom_tf": False,
+                        "publish_debug_clouds": False,
+                        "position_covariance": 0.08,
+                        "orientation_covariance": 0.08,
+                    },
+                    kiss_icp_yaml,
+                ],
+                condition=kiss_icp_condition,
+            ),
+            # --- RKO-LIO: promoted only after filtered-bag compatibility tests ---
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [
+                            FindPackageShare("rko_lio"),
+                            "launch",
+                            "odometry.launch.py",
+                        ]
+                    )
+                ),
+                launch_arguments={
+                    "config_file": rko_lio_yaml,
+                    "lidar_topic": legal_lidar_output_topic,
+                    "imu_topic": "/imu/data_raw",
+                    "odom_topic": "/localisation/lidar/odometry",
+                    "odom_frame": "odom",
+                    "base_frame": "base_footprint",
+                    "use_sim_time": use_sim_time,
+                }.items(),
+                condition=rko_lio_condition,
+            ),
             # --- Local EKF: odom -> base_footprint ---
             Node(
                 package="robot_localization",

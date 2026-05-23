@@ -742,6 +742,7 @@ class MissionManager(Node):
             result_future, result_timeout_s, f"{action_name} result timed out"
         )
         if isinstance(result, str):
+            self._cancel_timed_out_goal(goal_handle, action_name)
             return False, result
         if result is None:
             return False, f"{action_name} result unavailable"
@@ -749,6 +750,24 @@ class MissionManager(Node):
             return False, f"{action_name} finished with status {result.status}"
 
         return True, f"{action_name} succeeded"
+
+    def _cancel_timed_out_goal(self, goal_handle, action_name: str) -> None:
+        """Best-effort cancellation so retries do not overlap stale goals."""
+        try:
+            cancel_future = goal_handle.cancel_goal_async()
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().warn(
+                f"{action_name} timed out; cancellation request failed: {e}"
+            )
+            return
+
+        cancel_result = self._wait_for_future(
+            cancel_future,
+            2.0,
+            f"{action_name} cancellation timed out",
+        )
+        if isinstance(cancel_result, str):
+            self.get_logger().warn(cancel_result)
 
 
 def main(args=None) -> None:

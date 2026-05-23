@@ -83,14 +83,20 @@ def _resolve_world(context):
     ]
 
 
-def generate_launch_description():
+def _robot_entities(context):
+    """Create robot description and spawn actions from resolved launch arguments."""
     pkg_lunabot_description = _package_path("lunabot_description")
-    pkg_lunabot_simulation = _package_path("lunabot_simulation")
-
-    _prepend_resource_path(pkg_lunabot_simulation / "models")
 
     robot_description = xacro.process(
-        str(pkg_lunabot_description / "urdf" / "lunabot.urdf.xacro")
+        str(pkg_lunabot_description / "urdf" / "lunabot.urdf.xacro"),
+        mappings={
+            "ouster_horizontal_samples": LaunchConfiguration(
+                "ouster_horizontal_samples"
+            ).perform(context),
+            "ouster_vertical_samples": LaunchConfiguration(
+                "ouster_vertical_samples"
+            ).perform(context),
+        },
     )
 
     # Spawn position - surface mesh is at z=0, rover spawns above and drops
@@ -127,6 +133,14 @@ def generate_launch_description():
             spawn_z,
         ],
     )
+
+    return [robot_state_publisher, spawn_robot]
+
+
+def generate_launch_description():
+    pkg_lunabot_simulation = _package_path("lunabot_simulation")
+
+    _prepend_resource_path(pkg_lunabot_simulation / "models")
 
     clock_bridge = Node(
         package="ros_gz_bridge",
@@ -211,9 +225,18 @@ def generate_launch_description():
                     "moon_yard_craters (with craters)."
                 ),
             ),
+            DeclareLaunchArgument(
+                "ouster_horizontal_samples",
+                default_value="1024",
+                description="Simulated Ouster horizontal samples per scan.",
+            ),
+            DeclareLaunchArgument(
+                "ouster_vertical_samples",
+                default_value="32",
+                description="Simulated Ouster vertical samples per scan.",
+            ),
             OpaqueFunction(function=_resolve_world),
-            robot_state_publisher,
-            spawn_robot,
+            OpaqueFunction(function=_robot_entities),
             clock_bridge,
             robot_bridge,
             camera_bridge,

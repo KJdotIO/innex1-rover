@@ -7,8 +7,10 @@ URDF/xacro robot model for the INNEX-1 rover.
 The model extends the stock Leo Rover description (`leo_description`) with
 the sensor payloads used on the competition rover:
 
-- **Ouster LiDAR** (`ouster_link`) — mounted on top of the base, 32-beam
-  GPU LiDAR in simulation (1024 horizontal samples, 20 m range).
+- **Ouster LiDAR** (`ouster_link`) — mounted on top of the base. The sim
+  defaults to a lighter 32-beam GPU LiDAR profile, and
+  `moon_yard.launch.py` can raise it with `ouster_vertical_samples:=128` for
+  OS1-128 localisation rehearsals.
 - **Front depth camera** (`camera_front_link` / `camera_front_optical_frame`)
   — 640 x 480 RGBD at 15 Hz, 90° FOV, tilted 0.3 rad downward.
 - **Rear depth camera** (`camera_rear_link` / `camera_rear_optical_frame`)

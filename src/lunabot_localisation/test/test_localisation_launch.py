@@ -32,7 +32,7 @@ def _condition_text(condition) -> str:
 
 def _substitution_text(value) -> str:
     """Return nested launch substitution internals as readable text."""
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         return "".join(_substitution_text(part) for part in value)
     if "_TextSubstitution__text" in value.__dict__:
         return value.__dict__["_TextSubstitution__text"]
@@ -41,6 +41,22 @@ def _substitution_text(value) -> str:
     if "_PythonExpression__expression" in value.__dict__:
         return _substitution_text(value.__dict__["_PythonExpression__expression"])
     return str(value)
+
+
+def _parameter_dict(parameters) -> dict:
+    """Return launch node parameters as readable key/value pairs."""
+    result = {}
+    for group in parameters:
+        if not isinstance(group, dict):
+            continue
+        for key, value in group.items():
+            if isinstance(value, (list, tuple)) or hasattr(value, "__dict__"):
+                result[_substitution_text(key)] = _substitution_text(value).splitlines()[
+                    0
+                ]
+            else:
+                result[_substitution_text(key)] = value
+    return result
 
 
 @pytest.mark.parametrize(
@@ -125,8 +141,23 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     context.launch_configurations["use_sim_time"] = "true"
     context.launch_configurations["enable_apriltag_debug"] = "false"
     context.launch_configurations["sync_sim_camera_info"] = "false"
+    context.launch_configurations["lidar_odometry_backend"] = "none"
 
     with pytest.raises(ValueError, match="lidar_costmap_phase"):
+        launch_module._validate_boolean_launch_arguments(context)
+
+
+def test_validate_lidar_odometry_backend_rejects_unknown_backend():
+    launch_module = _load_launch_module()
+    context = LaunchContext()
+    context.launch_configurations["lidar_costmap_phase"] = "false"
+    context.launch_configurations["enable_visual_slam"] = "false"
+    context.launch_configurations["use_sim_time"] = "true"
+    context.launch_configurations["enable_apriltag_debug"] = "false"
+    context.launch_configurations["sync_sim_camera_info"] = "false"
+    context.launch_configurations["lidar_odometry_backend"] = "magic"
+
+    with pytest.raises(ValueError, match="lidar_odometry_backend"):
         launch_module._validate_boolean_launch_arguments(context)
 
 
@@ -156,10 +187,48 @@ def test_generate_launch_description_has_validation_and_sim_camera_info_aligner(
         if isinstance(entity, Node)
         and entity.__dict__.get("_Node__node_name") == "camera_info_stamp_aligner"
     ]
+    legal_lidar_filters = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__node_name") == "legal_lidar_filter_ouster"
+    ]
 
     assert len(validators) == 1
     assert len(tag_pose_publishers) == 1
     assert len(camera_info_aligners) == 1
+    assert len(legal_lidar_filters) == 1
+
+
+def test_kiss_icp_uses_legal_lidar_topic_and_disables_tf(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    launch_module = _load_launch_module()
+    monkeypatch.setattr(
+        launch_module,
+        "get_package_share_directory",
+        lambda _package: "/tmp/lunabot_localisation",
+    )
+    description = launch_module.generate_launch_description()
+
+    kiss_nodes = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__package") == "kiss_icp"
+    ]
+
+    assert len(kiss_nodes) == 1
+    remappings = kiss_nodes[0].__dict__.get("_Node__remappings", [])
+    parameters = _parameter_dict(kiss_nodes[0].__dict__.get("_Node__parameters", []))
+    remapping_text = [
+        (_substitution_text(source), _substitution_text(target))
+        for source, target in remappings
+    ]
+    assert ("pointcloud_topic", "legal_lidar_output_topic") in remapping_text
+    assert ("kiss/odometry", "/localisation/lidar/odometry") in remapping_text
+    assert parameters["lidar_odom_frame"] == "odom"
+    assert parameters["publish_odom_tf"] is False
 
 
 def test_no_global_ekf_in_launch_description(

@@ -52,6 +52,14 @@ preflight:
       type: sensor_msgs/msg/PointCloud2
       min_messages: 1
       critical: true
+    - name: /localisation/lidar/points_legal
+      type: sensor_msgs/msg/PointCloud2
+      min_messages: 1
+      critical: false
+    - name: /localisation/lidar/odometry
+      type: nav_msgs/msg/Odometry
+      min_messages: 1
+      critical: false
     - name: /map
       type: nav_msgs/msg/OccupancyGrid
       min_messages: 1
@@ -104,6 +112,8 @@ preflight:
       critical: false
     - name: arena_boundary_filter_ouster
       critical: true
+    - name: legal_lidar_filter_ouster
+      critical: false
     - name: rtabmap
       critical: false
     - name: planner_server

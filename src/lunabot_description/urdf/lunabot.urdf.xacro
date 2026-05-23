@@ -1,6 +1,8 @@
 <?xml version="1.0" ?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="lunabot">
 <xacro:include filename="$(find leo_description)/urdf/leo_sim.urdf.xacro" />
+<xacro:arg name="ouster_horizontal_samples" default="1024" />
+<xacro:arg name="ouster_vertical_samples" default="32" />
 
   <link name="ouster_link">
     <visual>
@@ -33,13 +35,13 @@
         <lidar>
         <scan>
             <horizontal>
-            <samples>1024</samples>
+            <samples>$(arg ouster_horizontal_samples)</samples>
             <resolution>1</resolution>
             <min_angle>-3.14159</min_angle>
             <max_angle>3.14159</max_angle>
             </horizontal>
             <vertical>
-            <samples>32</samples>
+            <samples>$(arg ouster_vertical_samples)</samples>
             <resolution>1</resolution>
             <min_angle>-0.261799</min_angle>
             <max_angle>0.261799</max_angle>
