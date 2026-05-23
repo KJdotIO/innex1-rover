@@ -45,6 +45,11 @@ Inspection demo:
 The COTS power logger is an inspection item. `/power/telemetry` is the ROS view
 of the same power story, not a replacement for a physical logger.
 
+The software low-voltage policy is deliberately conservative: warning voltage
+appears as diagnostics WARN, critical voltage appears as diagnostics ERROR and
+latched `/safety/motion_inhibit`. Re-enable motion only after the voltage has
+recovered and `/safety/reset_motion_inhibit` has been published.
+
 Document the logger wiring once electrical integration is final. The logger
 needs to be visible or quickly readable by a judge, and its record needs to
 survive E-stop.

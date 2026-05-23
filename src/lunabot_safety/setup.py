@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from setuptools import find_packages, setup
 
 package_name = "lunabot_safety"
+package_root = Path(__file__).resolve().parent
 
 setup(
     name=package_name,
@@ -12,6 +15,13 @@ setup(
             ["resource/" + package_name],
         ),
         ("share/" + package_name, ["package.xml"]),
+        (
+            "share/" + package_name + "/launch",
+            [
+                str(path.relative_to(package_root))
+                for path in package_root.joinpath("launch").glob("*.launch.py")
+            ],
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -27,6 +37,7 @@ setup(
     entry_points={
         "console_scripts": [
             "estop_node = lunabot_safety.estop_node:main",
+            "physical_estop_input = lunabot_safety.physical_estop_input:main",
         ],
     },
 )

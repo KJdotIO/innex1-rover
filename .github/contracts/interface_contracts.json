@@ -50,6 +50,13 @@
     {
       "name": "/safety/estop",
       "type": "std_msgs/msg/Bool",
+      "kind": "publisher",
+      "source": "src/lunabot_safety/lunabot_safety/physical_estop_input.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/safety/estop",
+      "type": "std_msgs/msg/Bool",
       "kind": "subscription",
       "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
       "phases": ["runtime", "hardware"]
@@ -65,6 +72,13 @@
     {
       "name": "/safety/reset_motion_inhibit",
       "type": "std_msgs/msg/Bool",
+      "kind": "subscription",
+      "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/power/telemetry",
+      "type": "lunabot_interfaces/msg/PowerTelemetry",
       "kind": "subscription",
       "source": "src/lunabot_safety/lunabot_safety/estop_node.py",
       "phases": ["runtime", "hardware"]
