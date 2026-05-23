@@ -1,9 +1,11 @@
-"""E-stop node: latches /safety/estop into /safety/motion_inhibit."""
+"""E-stop node: latches safety inputs into /safety/motion_inhibit."""
 
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool
+
+from lunabot_interfaces.msg import PowerTelemetry
 
 # TRANSIENT_LOCAL so late subscribers (e.g. motor controllers) receive the current
 # inhibit state immediately on connect rather than waiting for the next e-stop event.
@@ -23,8 +25,15 @@ class EstopNode(Node):
         super().__init__("estop_node")
 
         self._estop_active = False
+        self._power_critical = False
         self._inhibited = False
         self._reset_required = False
+        self._active_reasons: set[str] = set()
+
+        self.declare_parameter("power_inhibit_enabled", True)
+        self._power_inhibit_enabled = bool(
+            self.get_parameter("power_inhibit_enabled").value
+        )
 
         self._motion_inhibit_pub = self.create_publisher(
             Bool,
@@ -46,6 +55,13 @@ class EstopNode(Node):
             10,
         )
 
+        self._power_sub = self.create_subscription(
+            PowerTelemetry,
+            "/power/telemetry",
+            self._power_callback,
+            10,
+        )
+
         # Publish initial state so subscribers joining before any e-stop event
         # receive a well-defined value.
         self._publish_inhibit()
@@ -57,6 +73,14 @@ class EstopNode(Node):
         out.data = self._inhibited
         self._motion_inhibit_pub.publish(out)
 
+    def _set_latched_reason(self, reason: str, active: bool) -> None:
+        """Track which safety source requires an operator reset."""
+        if active:
+            self._active_reasons.add(reason)
+            self._reset_required = True
+        else:
+            self._active_reasons.discard(reason)
+
     def _estop_callback(self, msg: Bool) -> None:
         """Handle incoming e-stop signal and latch motion inhibit until reset."""
         new_state = bool(msg.data)
@@ -67,16 +91,48 @@ class EstopNode(Node):
 
         self._estop_active = new_state
         if self._estop_active:
-            self._reset_required = True
+            self._set_latched_reason("estop", True)
             self._inhibited = True
             self.get_logger().warn(
                 "E-stop active; motion inhibited until reset"
             )
         else:
+            self._set_latched_reason("estop", False)
             if self._reset_required:
                 self.get_logger().info(
-                    "E-stop cleared; publish /safety/reset_motion_inhibit "
+                    "Safety input cleared; publish /safety/reset_motion_inhibit "
                     "before motion is allowed"
+                )
+            else:
+                self._inhibited = False
+
+        self._publish_inhibit()
+
+    def _power_callback(self, msg: PowerTelemetry) -> None:
+        """Latch motion inhibit while power telemetry is critical."""
+        if not self._power_inhibit_enabled:
+            return
+
+        new_state = bool(msg.low_voltage_critical) or (
+            msg.state == PowerTelemetry.STATE_LOW_CRITICAL
+        )
+        if new_state == self._power_critical:
+            self._publish_inhibit()
+            return
+
+        self._power_critical = new_state
+        if self._power_critical:
+            self._set_latched_reason("power", True)
+            self._inhibited = True
+            self.get_logger().warn(
+                "Power voltage critical; motion inhibited until reset"
+            )
+        else:
+            self._set_latched_reason("power", False)
+            if self._reset_required:
+                self.get_logger().info(
+                    "Power voltage recovered; publish "
+                    "/safety/reset_motion_inhibit before motion is allowed"
                 )
             else:
                 self._inhibited = False
@@ -88,9 +144,9 @@ class EstopNode(Node):
         if not msg.data:
             return
 
-        if self._estop_active:
+        if self._active_reasons:
             self.get_logger().warn(
-                "Motion-inhibit reset ignored while E-stop is active"
+                "Motion-inhibit reset ignored while a safety input is active"
             )
             self._publish_inhibit()
             return
