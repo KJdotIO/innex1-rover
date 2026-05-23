@@ -266,4 +266,4 @@ under all reasonably foreseeable conditions. No additional PPE is required for n
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-05-22 | KJdotIO | Initial datasheet — sourced from official Luxonis datasheet (Dec 2021) and docs.luxonis.com |
+| 2026-05-22 | eniomecaj | Initial datasheet — sourced from official Luxonis datasheet (Dec 2021) and docs.luxonis.com |
