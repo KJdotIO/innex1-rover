@@ -13,6 +13,7 @@
 | **Price** | £35.99 (pair) |
 | **Supplier** | Amazon (DCHOUSE GLOBAL-UK) |
 | **Rating** | 4.3/5 — #1 Best Seller, Linear Motion Actuators |
+| **Weight** | ~350 g each / ~700 g total (estimated) |
 
 > **Voltage note:** This actuator is rated 12V DC. The motive rail is 22.2V. A DollaTek 300W
 > buck converter steps the motive rail down to 12V before Cytron MDD10A #2 — no duty cycle
@@ -82,7 +83,7 @@ This actuator has **2 wires only** — no encoder.
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **Powered via 12V buck — no duty cycle restriction needed.** Cytron MDD10A #2 runs at 12V
   from the buck output; full PWM range is available.

@@ -12,6 +12,7 @@
 | **Price** | £46.79 |
 | **Supplier** | StepperOnline |
 | **Drawing Date** | 12.8.2023 |
+| **Weight** | ~800 g (estimated — 57 mm BLDC with HG100 100:1 gearbox) |
 
 ---
 
@@ -102,7 +103,7 @@ This motor is driven by the **BLD-510B BLDC motor controller**.
 
 ---
 
-## Known Constraints & Gotchas
+## Key Notes & Constraints
 
 - **100:1 gearbox gives high torque at low speed** — output is ~35 RPM at rated conditions.
   This is appropriate for excavation duties but means back-driving is not possible.

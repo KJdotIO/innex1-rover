@@ -8,7 +8,7 @@
 | **Part Number** | TEENSY41-L (lock variant) |
 | **MPN** | TEENSY41_LOCK |
 | **Role on Rover** | Low-level motor I/O controller — bridges Jetson to all motor controllers and encoders |
-| **Power Domain** | 🔵 Compute (5 V from BD-02) |
+| **Power Domain** | 🔵 Compute (5 V from Jetson Orin Nano USB — USB-A to micro-USB) |
 | **Qty on Rover** | 1 |
 | **Supplier** | PiHut |
 | **Price** | £30.30 |
@@ -39,8 +39,7 @@
 - Max **10 mA per IO pin** — do not drive loads directly; use buffers or pull-ups where needed
 - Encoders are powered from the Teensy **3.3 V rail** — signals swing 0–3.3 V, safe for direct GPIO
 - **Never power the Teensy from both USB and an external 5 V rail simultaneously** — voltage conflict
-- Open-collector signals (BLD-510B PG and ALM) require **10 kΩ pull-up resistors to 3.3 V** on
-  the PCB/breadboard — do not rely on internal pull-ups for these
+- Open-collector signals (BLD-510B PG and ALM) — if monitoring PG/ALM: fit **10 kΩ pull-up resistors to 3.3 V** at Pins 31/32. If PG/ALM are unused, pull-ups can be omitted and the pins left unconnected
 
 ---
 
@@ -58,7 +57,7 @@
 | **5** | PWM ch2 | → | Cytron MDD10A #2 | Actuator 4 speed |
 | **11** | DIR ch1 | → | Cytron MDD10A #2 | Actuator 3 direction |
 | **12** | DIR ch2 | → | Cytron MDD10A #2 | Actuator 4 direction |
-| **6** | PWM (SV) | → | BLD-510B | Excavation speed — via 10 kΩ + 10 µF RC filter to SV pin |
+| **6** | PWM (SV) | → | BLD-510B | Excavation speed — direct 1–2 kHz PWM to SV pin (no external RC filter needed; driver accepts PWM directly) |
 | **13** | GPIO (F/R) | → | BLD-510B | Excavation direction — active-low |
 | **14** | GPIO (EN) | → | BLD-510B | Excavation enable — active-low |
 | **15** | Encoder A | ← | FL motor encoder | Front-Left quadrature CH-A |
@@ -69,8 +68,8 @@
 | **20** | Encoder B | ← | FR motor encoder | Front-Right quadrature CH-B |
 | **21** | Encoder A | ← | RR motor encoder | Rear-Right quadrature CH-A |
 | **22** | Encoder B | ← | RR motor encoder | Rear-Right quadrature CH-B |
-| **31** | PG pulse | ← | BLD-510B | BLDC speed pulse — 10 kΩ pull-up to 3.3 V required |
-| **32** | ALM | ← | BLD-510B | BLDC fault alarm — 10 kΩ pull-up to 3.3 V required |
+| **31** | PG pulse | ← | BLD-510B | BLDC speed pulse — 10 kΩ pull-up to 3.3 V if monitoring; omit if unused |
+| **32** | ALM | ← | BLD-510B | BLDC fault alarm — 10 kΩ pull-up to 3.3 V if monitoring; omit if unused |
 | **USB** | Serial ↕ | ↕ | Jetson Orin Nano | USB virtual COM — bidirectional command/telemetry |
 
 **~25 pins used — ~30 pins spare on Teensy 4.1**
@@ -81,7 +80,7 @@
 
 | Rail | Used For | Notes |
 |------|----------|-------|
-| **3.3 V** | Encoder VCC (all 4 drivetrain motors) | Two 3.3 V pins feed a WAGO 2-in-4-out to supply all 4 encoder VCC wires |
+| **3.3 V** | Encoder VCC (all 4 drivetrain motors) | Two 3.3 V pins feed a WAGO 2-in-4-out to supply all 4 encoder VCC wires. 4× encoders at ~10 mA each = 40 mA total — well within the 3.3 V rail 250 mA limit |
 | **GND** | Encoder GND, signal ground | Separate WAGO output from motor controller GND — star topology |
 
 > Encoders must **not** be powered from BD-02 5 V or any other rail. The SS460S Hall sensors
@@ -117,3 +116,4 @@
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from TEENSY41-L datasheet (joy-it.net, Feb 2025) and INNEX-1 pin allocation files |
+| 2026-05-24 | eniomecaj | Updated power source to Jetson USB; PG/ALM pull-ups made optional; RC filter removed from Pin 6; encoder current note added |

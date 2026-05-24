@@ -117,7 +117,7 @@ The Jetson runs the **high-level autonomy stack only**:
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **Always power up Jetson and Teensy before applying 22.2V to Sabertooth** — floating signal
   lines on Sabertooth power-on can be interpreted as drive commands.
