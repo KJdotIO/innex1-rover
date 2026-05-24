@@ -11,6 +11,7 @@
 | **Qty on Rover** | 1 |
 | **Price** | £5.99 |
 | **Supplier** | Amazon (DollaTek) |
+| **Weight** | ~80 g (estimated — 65 × 47 × 23.5 mm) |
 
 ---
 
@@ -68,7 +69,7 @@
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **No reverse polarity protection** — wiring polarity must be correct. Reversed input will
   likely damage the module.

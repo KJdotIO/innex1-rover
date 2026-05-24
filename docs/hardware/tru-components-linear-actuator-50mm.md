@@ -15,6 +15,7 @@
 | **Price** | £67.75 (pair) |
 | **Supplier** | TRU Components |
 | **Compliance** | RoHS |
+| **Weight** | ~200 g each / ~400 g total (estimated) |
 
 ---
 
@@ -86,17 +87,17 @@ is not connected as the Cytron MDD10A runs open-loop.
 | Fuse (motive fuse block) | **15 A blade** per Cytron MDD10A slot |
 
 > Both actuators on a single Cytron channel share a 15 A fuse. Peak draw per actuator is 1.6 A
-> so two actuators = 3.2 A combined — well within the 15 A fuse and 10 A Cytron channel rating.
+> so two actuators = 3.2 A combined — well within the 10 A Cytron channel rating. Note: a 10 A
+> fuse would give tighter overcurrent protection for the 3.2 A load; 15 A is the installed size.
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **2 min on / 18 min off** — strictly enforced duty cycle. Do not run continuously.
 - **IP65 rated** — sealed against dust and water jets; suitable for regolith environment.
 - **Built-in limit switches** cut power at end of travel — no software end-stops needed, but
   software should still time out commands to avoid stalling against the limit switch repeatedly.
-- **Never connect 24 V directly to the Teensy** — all 24 V switching goes through the Cytron MDD10A.
 - **Encoder unused** — open-loop control only. If position feedback is needed in future, the
   encoder wires (Red/Black/Yellow/White) are available but currently disconnected.
 
@@ -107,3 +108,4 @@ is not connected as the Cytron MDD10A runs open-loop.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from TRU Components datasheet (item 3373195) and INNEX-1 wiring notes |
+| 2026-05-24 | eniomecaj | Removed redundant Teensy voltage note; added fuse sizing note (10 A would give tighter protection) |

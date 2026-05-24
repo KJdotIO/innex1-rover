@@ -94,7 +94,7 @@ providing real-time per-cell voltage audible telemetry without cutting motive po
 
 ---
 
-## Known Constraints & Gotchas
+## Key Notes & Constraints
 
 - **XT90 anti-spark connector:** The main battery uses an XT90 anti-spark variant. Ensure
   the mating connector on the harness is also XT90 anti-spark — a standard XT90 will work

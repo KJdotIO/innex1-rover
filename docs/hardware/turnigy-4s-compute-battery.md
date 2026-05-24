@@ -33,9 +33,11 @@
 
 | Load | Peak Current | Battery Safety Factor |
 |------|--------------|-----------------------|
-| Full compute stack (Jetson + LiDAR + cameras + router) | ~10 A | **20×** (200 A / 10 A) |
+| BD-01 branch (Jetson ~4 A + LiDAR ~3 A) | ~6 A | — |
+| BD-02 branch (cameras ~2 A + router ~1.3 A + IMU ~0.1 A) | ~6 A | — |
+| **Full compute stack total** | **~12 A peak** | **16.7×** (200 A / 12 A) |
 
-> The compute battery is massively over-specced for current delivery by design. The 20×
+> The compute battery is massively over-specced for current delivery by design. The 16.7×
 > safety factor guarantees **zero voltage sag** on the 14.8 V rail, completely isolating
 > the Jetson and Ouster LiDAR from any transients on the motive domain.
 
@@ -43,7 +45,7 @@
 
 | Profile | Avg Current | Usable Capacity (80%) | Runtime |
 |---------|------------|----------------------|---------|
-| Full compute stack | ~6 A | 4 Ah | **~40 min** |
+| Full compute stack (typical) | ~8 A | 4 Ah | **~30 min** |
 
 ---
 
@@ -82,11 +84,12 @@ a safety stop.
 
 ---
 
-## Known Constraints & Gotchas
+## Key Notes & Constraints
 
-- **Buck converter input range:** The 14.8 V rail feeds two XL4015 buck converters (BD-01
-  → 19 V for Jetson, BD-02 → 5 V for sensors). Verify both converters accept input down
-  to 13.6 V (minimum cell voltage) without dropping output regulation.
+- **Buck converter input range:** The 14.8 V rail feeds two buck converters: BD-01 (DollaTek
+  Reg.NO:013726393, 14.8 V → 12 V for Jetson + LiDAR, ≤10 A) and BD-02 (Yosoo Health Gear
+  g0qigxo64d, 14.8 V → 5 V for cameras/router/IMU, ≤10 A). Both must accept input down
+  to 13.6 V (minimum cell voltage) without losing output regulation — verify during bench test.
 - **Voltage sag non-issue:** At a 20× safety factor the pack will never sag meaningfully
   under compute load. Voltage at the buck converter input will be stable throughout the run.
 - **Do not cross-connect rails:** The compute ground and motive ground must remain isolated.
@@ -99,3 +102,4 @@ a safety stop.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-22 | eniomecaj | Initial datasheet |
+| 2026-05-24 | eniomecaj | Updated peak current to 12 A, SF to 16.7×, corrected BD-01/BD-02 names and voltages |

@@ -73,7 +73,7 @@ Jetson USB-C ──── Y-adapter DATA leg  ──┐
 |------------|-----------|-------------------|-------|
 | Data (Jetson → OAK-D Pro) | USB-C 3.1 Gen 2 | ≥ 1 A, 10 Gbps rated | Keep ≤ 1 m for USB 3 reliability |
 | Y-adapter aux power | USB-C or barrel | ≥ 3 A / 5 V | From dedicated 5 V DC-DC on compute rail |
-| 5 V rail feed to DC-DC | 22–24 AWG | ≥ 3 A capacity | Fuse at 5 A on this branch |
+| 5 V rail feed to DC-DC | 22–24 AWG | ≥ 3 A capacity | Protected by compute domain master fuse (no individual branch fuse needed) |
 
 ---
 
@@ -228,7 +228,7 @@ SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666", SYMLINK+="oakdpro"
 
 ---
 
-## Known Constraints & Gotchas
+## Key Notes & Constraints
 
 - **Y-adapter is not optional with IR on:** Running IR features without the Y-adapter will
   cause USB undervoltage, device resets, or host port current limiting. Wire the aux supply
@@ -264,6 +264,7 @@ under all reasonably foreseeable conditions. No additional PPE is required for n
 
 ## Revision History
 
- Date | Author | Change |
+| Date | Author | Change |
 |------|--------|--------|
 | 2026-05-22 | eniomecaj | Initial datasheet — sourced from official Luxonis datasheet (Dec 2021) and docs.luxonis.com |
+| 2026-05-24 | eniomecaj | Removed individual 5A branch fuse (covered by compute domain master fuse) |

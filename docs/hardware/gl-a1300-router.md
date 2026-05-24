@@ -91,7 +91,7 @@ auto-select or fixed to a clear channel at the competition venue.
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **Boot time ~30–60 s** — router must be given time to fully boot before the Jetson or OS1
   attempts network connections. Include router boot in the startup sequence.

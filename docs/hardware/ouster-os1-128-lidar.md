@@ -12,6 +12,7 @@
 | **Acquisition** | Sponsored — estimated value £16,809 |
 | **Manual** | OS1 Hardware User Manual Rev 7 (Oct 14, 2024) |
 | **Product Page** | https://ouster.com/products/hardware/os1 |
+| **Weight** | ~370 g (Ouster OS1 spec) |
 
 ---
 
@@ -123,7 +124,7 @@ This is the cable type relevant to INNEX-1 (12 V operation, standard Ethernet).
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **Boot delay is mandatory** — 60 s from power-on before data is available. Build this into the
   startup sequence explicitly; do not rely on topic availability as a proxy.

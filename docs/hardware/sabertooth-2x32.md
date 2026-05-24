@@ -110,8 +110,11 @@ The Sabertooth is controlled by the Teensy 4.1 over **TTL UART (plain text or pa
 | **5** | **ON** | **Packet serial address 128** |
 | **6** | **ON** | **Emergency stops disabled** (A1/A2 not used as E-stop) |
 
-> DIP 6 ON = emergency stops disabled. INNEX-1 uses software-only stop via Teensy. If hardware
-> E-stop is later needed, wire A1 → 5V (M1 enable) and A2 → 5V (M2 enable), then set DIP 6 OFF.
+> DIP 6 ON = emergency stops disabled (current INNEX-1 setup — software stop via Teensy).
+> To enable hardware E-stop via A1/A2: set DIP 6 OFF, then wire the E-stop contacts so that
+> A1 and A2 are normally held at 5 V (via Sabertooth's own 5 V output) and drop to 0 V when
+> the E-stop is pressed. With DIP 6 OFF: A1/A2 HIGH (5 V) = motors enabled; A1/A2 LOW (0 V)
+> = both channels cut immediately in hardware, before any software response.
 
 ### Baud Rate (DIP 1 & 2, switch 4 ON)
 
@@ -152,7 +155,7 @@ Command range: −2047 to +2047. Positive = forward, negative = reverse.
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **Power up sequence:** Always power Jetson + Teensy **before** applying 22.2 V to the motive rail.
   Floating signal lines on Sabertooth power-on can be interpreted as drive commands.
@@ -175,3 +178,4 @@ Command range: −2047 to +2047. Positive = forward, negative = reverse.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from Sabertooth 2×32 User Manual (Dimension Engineering) |
+| 2026-05-24 | eniomecaj | Clarified A1/A2 E-stop wiring explanation |
