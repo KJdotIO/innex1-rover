@@ -8,25 +8,15 @@
 | **Part Number (MPN)** | L11TGF1000N250-T-1 |
 | **ASIN** | B07S3VWKTB |
 | **Role on Rover** | Linear actuation — deployment / adjustment mechanism |
-| **Power Domain** | 🔴 Motive (via Cytron MDD10A — see voltage warning below) |
+| **Power Domain** | 🔴 Motive → DollaTek 12V buck converter → Cytron MDD10A #2 → actuators |
 | **Qty on Rover** | 2 |
 | **Price** | £35.99 (pair) |
 | **Supplier** | Amazon (DCHOUSE GLOBAL-UK) |
 | **Rating** | 4.3/5 — #1 Best Seller, Linear Motion Actuators |
 
----
-
-## ⚠️ Voltage Warning
-
-> **This actuator is rated 12V DC. The INNEX-1 motive rail is 22.2V nominal.**
->
-> The Cytron MDD10A uses PWM switching — average voltage to the actuator depends on duty cycle.
-> To stay within the actuator's 12V rating, **cap PWM duty cycle at approximately 55%**
-> (55% × 22.2V ≈ 12.2V average). Running at 100% duty cycle from the 22.2V rail will over-voltage
-> the actuator and risk burning out the motor winding.
->
-> Software must enforce a duty cycle cap on all Cytron channels driving these actuators.
-> See software-team-notes.md.
+> **Voltage note:** This actuator is rated 12V DC. The motive rail is 22.2V. A DollaTek 300W
+> buck converter steps the motive rail down to 12V before Cytron MDD10A #2 — no duty cycle
+> capping required. See dollatek-buck-converter-12v.md.
 
 ---
 
@@ -70,8 +60,8 @@ This actuator has **2 wires only** — no encoder.
 
 | Wire Colour | Function | INNEX-1 Connection |
 |-------------|----------|-------------------|
-| **Red** | Motor + (extend) | Cytron MDD10A M1A (or M2A) |
-| **Black** | Motor − (retract) | Cytron MDD10A M1B (or M2B) |
+| **Red** | Motor + (extend) | Cytron MDD10A #2 M1A (or M2A) |
+| **Black** | Motor − (retract) | Cytron MDD10A #2 M1B (or M2B) |
 
 > **Direction:** Red to M1A / Black to M1B = actuator extends. Swap wires to reverse direction.
 > If movement is wrong, swap at the Cytron terminals — do not invert in software first.
@@ -82,28 +72,28 @@ This actuator has **2 wires only** — no encoder.
 
 | Parameter | Value |
 |-----------|-------|
-| Controller | Cytron MDD10A (dual channel) |
+| Controller | Cytron MDD10A #2 (dual channel) |
+| Supply to Cytron | 12 V from DollaTek buck converter (not direct motive rail) |
 | Actuators per controller | 2 (one per channel) |
 | Control type | **Open-loop — timed PWM commands, no position feedback** |
-| Teensy PWM pins | Actuators 1 & 2: Pins 2, 3 / Actuators 3 & 4: Pins 4, 5 |
-| Teensy DIR pins | Actuators 1 & 2: Pins 9, 10 / Actuators 3 & 4: Pins 11, 12 |
-| **Max PWM duty cycle** | **~55%** to keep average voltage at 12V from 22.2V rail |
-| Fuse (motive fuse block) | **15 A blade** per Cytron MDD10A slot |
+| Teensy PWM pins | Pins 4, 5 (Actuators 3 & 4) |
+| Teensy DIR pins | Pins 11, 12 (Actuators 3 & 4) |
+| Fuse (motive fuse block) | **15 A blade** — Cytron #2 slot (fuses the buck converter input) |
 
 ---
 
 ## Key Rules & Gotchas
 
-- **12V rated on a 22.2V rail — duty cycle must be capped at ~55% in software.** This is a
-  critical constraint. Over-voltage will burn the actuator motor winding over time.
+- **Powered via 12V buck — no duty cycle restriction needed.** Cytron MDD10A #2 runs at 12V
+  from the buck output; full PWM range is available.
 - **20% duty cycle** — maximum 1 minute on, 4 minutes off. Do not run continuously.
 - **IP54** — dust and splash resistant but not fully sealed. Adequate for regolith environment
   provided the actuator is not directly submerged.
-- **No encoder** — open-loop timed control only. Position cannot be verified; use timed commands
-  with known extension rates (~10mm/s at rated load under correct voltage).
-- **Inner limit switch is non-adjustable** — full stroke is always 250mm. No mid-stroke stopping
-  via hardware; software must time out before end of travel if partial extension is needed.
-- **Holds position when unpowered** — no need for active braking or holding current.
+- **No encoder** — open-loop timed control only. Use timed commands with known extension rate
+  (~10mm/s at rated load).
+- **Inner limit switch is non-adjustable** — full stroke is 250mm. Software must time out before
+  end of travel if partial extension is needed.
+- **Holds position when unpowered** — no active braking or holding current required.
 
 ---
 
@@ -112,3 +102,4 @@ This actuator has **2 wires only** — no encoder.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from Amazon product page (ASIN B07S3VWKTB, DCHOUSE GLOBAL-UK) |
+| 2026-05-24 | eniomecaj | Removed PWM duty cycle warning — DollaTek 12V buck converter added before Cytron MDD10A #2 |
