@@ -12,6 +12,7 @@
 | **Price** | £27.51 |
 | **Supplier** | Amazon (KRS STORE LTD) |
 | **Rating** | 4.7/5 (4,106 ratings) |
+| **Weight** | ~150 g (estimated) |
 
 ---
 
@@ -78,7 +79,7 @@ For full fuse rationale see **fuses.md**.
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **100A block total, 30A max per slot** — motive domain ANL is 40A so total block load is
   already capped well below the 100A block rating

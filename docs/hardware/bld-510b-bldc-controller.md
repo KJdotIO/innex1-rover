@@ -9,6 +9,7 @@
 | **Role on Rover** | Brushless DC motor driver — excavation motor (57BLR50) |
 | **Power Domain** | 🔴 Motive (22.2 V from WUPP fuse block slot 5, 10 A blade fuse) |
 | **Qty on Rover** | 1 |
+| **Weight** | ~200 g (estimated from dimensions 118 × 75.5 × 34 mm) |
 
 ---
 
@@ -89,16 +90,16 @@
 |-------------|--------|----------------|-------|
 | GND | Signal GND | GND | Shared logic ground |
 | SV | Speed PWM | **Pin 6** | 1–2 kHz PWM, 3.3 V amplitude (see note) |
-| EN | Enable | **Pin 13** | HIGH = stop (V2.0 logic), LOW = run |
-| F/R | Direction | **Pin 14** | LOW = CCW, HIGH/open = CW |
+| F/R | Direction | **Pin 13** | LOW = CCW, HIGH/open = CW |
+| EN | Enable | **Pin 14** | HIGH = stop (V2.0 logic), LOW = run |
 | BK | Brake | **TBD** | LOW = brake; use GPIO output |
-| PG | Speed feedback | **Pin 15** | Open-collector — add 4.7 kΩ pull-up to 3.3 V |
-| ALM | Alarm | **Pin 16** | Open-collector — add 4.7 kΩ pull-up to 3.3 V |
+| PG | Speed feedback | **Pin 31** | Open-collector — add 10 kΩ pull-up to 3.3 V |
+| ALM | Alarm | **Pin 32** | Open-collector — add 10 kΩ pull-up to 3.3 V |
 
-> **SV PWM amplitude:** The SV pin accepts 0–5 V. Teensy 4.1 outputs 3.3 V PWM. This gives
-> approximately 66% of rated speed at full duty cycle. Adjust R-SL potentiometer on driver to
-> scale accordingly, or set maximum speed via internal jumpers to match the 57BLR50 target RPM.
-> See `teensy-4.1-microcontroller.md` for confirmed pin assignments.
+> **SV PWM — no external RC filter needed:** The BLD-510B SV pin accepts PWM directly (1–2 kHz
+> from Teensy Pin 6). No external RC filter is required — the driver handles the PWM internally.
+> Teensy outputs 3.3 V PWM which gives ~66% of rated speed at full duty cycle; adjust the R-SL
+> potentiometer to scale as needed. See `teensy-4.1-microcontroller.md` for confirmed pin assignments.
 
 ---
 
@@ -165,10 +166,11 @@ The ALM output goes LOW during any alarm — Teensy should monitor this pin.
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
-- **PG and ALM are open-collector** — must have external pull-up resistors (3–10 kΩ to 5 V
-  or 4.7 kΩ to 3.3 V for Teensy inputs). Without pull-ups, pins float and give false readings.
+- **PG and ALM are open-collector** — if you intend to monitor speed feedback (PG) or fault
+  alarms (ALM), fit 10 kΩ pull-up resistors to 3.3 V at Teensy Pins 31 and 32. If PG/ALM
+  monitoring is not used, pull-ups can be omitted and the pins left unconnected.
 - **Check EN firmware version before first power-on** — wrong EN polarity causes motor to
   run immediately at power-up, before the Teensy asserts control.
 - **Never change F/R direction while motor is running** — always bring motor to stop first
@@ -191,3 +193,5 @@ The ALM output goes LOW during any alarm — Teensy should monitor this pin.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from BLD-510B User Manual V1 (STEPPERONLINE, 2024) |
+| 2026-05-24 | eniomecaj | Corrected pin assignments (F/R↔EN, PG→31, ALM→32); RC filter removed (not needed); PG/ALM pull-ups made optional |
+  

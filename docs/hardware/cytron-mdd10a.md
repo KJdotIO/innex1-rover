@@ -9,6 +9,7 @@
 | **Role on Rover** | Dual-channel PWM motor driver — linear actuators |
 | **Power Domain** | 🔴 Motive (see per-unit detail below) |
 | **Qty on Rover** | 2 |
+| **Weight** | ~100 g each / ~200 g total (estimated — 84.5 × 62 mm PCB) |
 
 | Unit | Power Input | Controls |
 |------|-------------|----------|
@@ -122,7 +123,7 @@ The direction LEDs are useful for confirming correct actuator polarity during be
 
 ---
 
-## Key Rules & Gotchas
+## Key Rules & Notes
 
 - **10A continuous, 30A peak** — the 50mm actuators draw up to 1.6 A each (well within limit).
   The 250mm actuators draw up to 3 A each; combined max is 6 A — within the 10 A rating.

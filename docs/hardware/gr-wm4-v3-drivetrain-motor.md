@@ -10,6 +10,7 @@
 | **Power Domain** | 🔴 Motive (22.2 V nominal) |
 | **Qty on Rover** | 4 |
 | **Product Page** | https://gimsonrobotics.co.uk/collections/all |
+| **Weight** | ~900 g each / ~3600 g total (estimated — high-torque geared motor with encoder) |
 
 ---
 
@@ -25,16 +26,16 @@
 | Peak current (gearbox limit) | **13 A** — hard limit imposed by gearbox bearing rating |
 | Motor connector | Bullet terminals / 6-pin connector |
 
-> **Operational note:** The 13 A peak current is the gearbox's mechanical limit, not the motor's
-> electrical limit. Always fuse at or below this value per motor to prevent gearbox damage. The
-> Sabertooth 2×32 current limiting is configured accordingly.
+> **Operational note:** The gearbox's mechanical limit is 13 A but the Sabertooth 2×32 is
+> software-configured to limit each channel to **10 A** — protecting the gearbox while capping
+> total drivetrain peak at 40 A (4 × 10 A), giving a 3× safety factor over the 120 A battery rating.
 
 ### INNEX1 Power Budget
 
 | Scenario | Current per Motor | Total (4 motors) | Battery Safety Factor |
 |----------|--------------------|-------------------|----------------------|
 | Normal driving | ~3–5 A | ~12–20 A | **6–10×** (120 A / ~12–20 A) |
-| Peak demand (4× motors) | 13 A | **52 A** (fuse-capped) | ~2.3× |
+| Peak demand (Sabertooth software-limited) | 10 A | **40 A** (4 × 10 A software cap) | **3×** (120 A / 40 A) |
 
 > Driving and excavation must **never run simultaneously** — see main battery datasheet.
 
@@ -147,11 +148,11 @@ ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist \
 
 ---
 
-## Known Constraints & Gotchas
+## Key Notes & Constraints
 
-- **Stall current vs gearbox limit:** Stall current is 22.6 A electrically but the gearbox bearing
-  is limited to 13 A peak. Always configure current limiting at the Sabertooth to enforce this.
-  Exceeding 13 A per motor risks gearbox damage, not motor damage.
+- **Stall current vs software limit:** Stall current is 22.6 A electrically but the gearbox
+  bearing is limited to 13 A peak. The Sabertooth is software-configured to 10 A/channel —
+  protecting the gearbox with margin. Total drivetrain peak is 40 A (4 × 10 A, SF 3×).
 - **40% duty cycle:** At rated load, 60 s on / 90 s off is mandatory. Mission planning must account
   for this — continuous full-throttle driving on soft regolith simulant will approach rated load quickly.
 - **IP30 — no dust protection:** The motor body has no sealing against lunar regolith simulant.
@@ -172,3 +173,4 @@ ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist \
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-05-23 | eniomecaj | Initial datasheet |
+| 2026-05-24 | eniomecaj | Updated peak demand to 40 A (10 A/ch × 4, SF 3×); encoder pin table confirmed |
