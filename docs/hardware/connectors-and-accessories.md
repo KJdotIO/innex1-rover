@@ -28,7 +28,7 @@ component datasheets — just enough to know what each item is for and any key p
 
 ### WAGO 2-in-4-out (£9.89, Amazon)
 - **Role:** BD-01 12 V output distribution — Jetson (pigtail barrel jack) + LiDAR (pigtail barrel jack)
-- **Status:** ✅ Active — 2 outputs in use (Jetson + LiDAR), 2 spare
+- **Status:** ✅ Active — 2 outputs in use (Jetson + LiDAR)
 
 ---
 
