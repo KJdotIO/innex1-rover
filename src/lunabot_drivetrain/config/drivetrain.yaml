@@ -57,3 +57,22 @@ drivetrain_bridge:
     # --- Rates ---
     control_loop_hz: 20.0
     telemetry_publish_hz: 10.0
+
+teensy_drivetrain_bridge:
+  ros__parameters:
+    # Teensy 4.1 USB CDC endpoint. Prefer a udev symlink on the Jetson.
+    serial_port: "/dev/teensy_motor_io"
+    baud_rate: 115200
+    dry_run: false
+    cmd_vel_topic: "/cmd_vel_gated"
+
+    track_width_m: 0.44
+    wheel_radius_m: 0.065
+    encoder_counts_per_rev: 720
+
+    command_timeout_s: 0.5
+    teensy_timeout_s: 0.35
+    max_throttle: 1.0
+
+    control_loop_hz: 20.0
+    telemetry_publish_hz: 10.0

@@ -70,9 +70,20 @@ Use this for first-motion and bench drivetrain checks:
 ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
 ```
 
+The launch defaults to the direct Jetson-to-Sabertooth bench path. To exercise
+the newer Teensy USB path, select it explicitly:
+
+```bash
+ros2 launch lunabot_drivetrain drivetrain_bench.launch.py \
+  bridge_backend:=teensy \
+  serial_port:=/dev/teensy_motor_io \
+  max_throttle:=0.2
+```
+
 `drivetrain_bench.launch.py` starts:
 
-- `lunabot_drivetrain/drivetrain_bridge`
+- `lunabot_drivetrain/drivetrain_bridge` or
+  `lunabot_drivetrain/teensy_drivetrain_bridge`
 - `lunabot_drivetrain/velocity_gate`
 - optional joystick teleop through `twist_mux`
 
@@ -84,7 +95,7 @@ The command path is:
   -> /cmd_vel_safe
   -> velocity_gate
   -> /cmd_vel_gated
-  -> drivetrain_bridge
+  -> selected drivetrain bridge
 ```
 
 Keep the velocity gate in this path for hardware work. Do not command the

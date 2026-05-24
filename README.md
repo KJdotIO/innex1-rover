@@ -198,6 +198,8 @@ src/
 ├── lunabot_safety/          # E-stop to motion-inhibit bridge
 ├── lunabot_simulation/      # Gazebo Fortress worlds and ros_gz bridges
 └── lunabot_teleop/          # Manual control
+firmware/
+└── teensy_motor_io/          # Host-testable Teensy 4.1 motor IO core
 ```
 
 ## Interface contracts in CI

@@ -72,35 +72,73 @@ def _create_optional_teleop_nodes(context):
     return [joystick_teleop, twist_mux]
 
 
-def generate_launch_description():
-    """Generate the drivetrain bench launch description."""
+def _create_drivetrain_bridge_node(context):
+    """Create the selected drivetrain hardware bridge."""
+    backend = LaunchConfiguration("bridge_backend").perform(context).strip().lower()
     config_path = _share_path("lunabot_drivetrain", "config", "drivetrain.yaml")
 
     serial_port = LaunchConfiguration("serial_port")
     baud_rate = LaunchConfiguration("baud_rate")
+    teensy_baud_rate = LaunchConfiguration("teensy_baud_rate")
     serial_protocol = LaunchConfiguration("serial_protocol")
     max_throttle = LaunchConfiguration("max_throttle")
     dry_run = LaunchConfiguration("dry_run")
 
-    drivetrain_bridge = Node(
-        package="lunabot_drivetrain",
-        executable="drivetrain_bridge",
-        name="drivetrain_bridge",
-        output="screen",
-        parameters=[
-            config_path,
-            {
-                "serial_port": ParameterValue(serial_port, value_type=str),
-                "baud_rate": ParameterValue(baud_rate, value_type=int),
-                "serial_protocol": ParameterValue(
-                    serial_protocol, value_type=str
-                ),
-                "max_throttle": ParameterValue(max_throttle, value_type=float),
-                "dry_run": ParameterValue(dry_run, value_type=bool),
-            },
-        ],
+    if backend == "sabertooth":
+        return [
+            Node(
+                package="lunabot_drivetrain",
+                executable="drivetrain_bridge",
+                name="drivetrain_bridge",
+                output="screen",
+                parameters=[
+                    config_path,
+                    {
+                        "serial_port": ParameterValue(serial_port, value_type=str),
+                        "baud_rate": ParameterValue(baud_rate, value_type=int),
+                        "serial_protocol": ParameterValue(
+                            serial_protocol, value_type=str
+                        ),
+                        "max_throttle": ParameterValue(
+                            max_throttle, value_type=float
+                        ),
+                        "dry_run": ParameterValue(dry_run, value_type=bool),
+                    },
+                ],
+            )
+        ]
+
+    if backend == "teensy":
+        return [
+            Node(
+                package="lunabot_drivetrain",
+                executable="teensy_drivetrain_bridge",
+                name="teensy_drivetrain_bridge",
+                output="screen",
+                parameters=[
+                    config_path,
+                    {
+                        "serial_port": ParameterValue(serial_port, value_type=str),
+                        "baud_rate": ParameterValue(
+                            teensy_baud_rate, value_type=int
+                        ),
+                        "max_throttle": ParameterValue(
+                            max_throttle, value_type=float
+                        ),
+                        "dry_run": ParameterValue(dry_run, value_type=bool),
+                    },
+                ],
+            )
+        ]
+
+    raise ValueError(
+        "bridge_backend must be 'sabertooth' or 'teensy', "
+        f"got {backend!r}"
     )
 
+
+def generate_launch_description():
+    """Generate the drivetrain bench launch description."""
     velocity_gate = Node(
         package="lunabot_drivetrain",
         executable="velocity_gate",
@@ -111,14 +149,31 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
+                "bridge_backend",
+                default_value="sabertooth",
+                description=(
+                    "Hardware bridge to run: sabertooth for direct Jetson UART "
+                    "or teensy for Jetson USB serial to Teensy 4.1."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "serial_port",
                 default_value="/dev/ttyTHS1",
-                description="Jetson UART device connected to the Sabertooth S1 pins.",
+                description=(
+                    "Serial device for the selected backend. Use /dev/ttyTHS1 "
+                    "for direct Sabertooth UART or /dev/teensy_motor_io for "
+                    "the Teensy USB endpoint."
+                ),
             ),
             DeclareLaunchArgument(
                 "baud_rate",
                 default_value="9600",
-                description="Sabertooth serial baud rate.",
+                description="Direct Sabertooth serial baud rate.",
+            ),
+            DeclareLaunchArgument(
+                "teensy_baud_rate",
+                default_value="115200",
+                description="Teensy USB CDC serial baud rate.",
             ),
             DeclareLaunchArgument(
                 "serial_protocol",
@@ -143,7 +198,9 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "enable_teleop",
                 default_value="false",
-                description="Start joystick teleop and route it through the safety gate.",
+                description=(
+                    "Start joystick teleop and route it through the safety gate."
+                ),
             ),
             DeclareLaunchArgument(
                 "joy_device_id",
@@ -156,7 +213,7 @@ def generate_launch_description():
                 description="Optional SDL controller name to match.",
             ),
             velocity_gate,
-            drivetrain_bridge,
+            OpaqueFunction(function=_create_drivetrain_bridge_node),
             OpaqueFunction(function=_create_optional_teleop_nodes),
         ]
     )

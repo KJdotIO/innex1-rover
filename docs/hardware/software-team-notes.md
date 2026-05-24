@@ -85,19 +85,23 @@ Two controllers used — skid-steer topology:
 | SW5 | ON | Address 128 |
 | SW6 | ON | No E-Stop |
 
-### Software Configuration at Startup
-```cpp
-// Must be called once at startup before any motion commands
-setSaberRamping(20);         // Hardware ramping — smooth accel/decel on all stop commands
-// ⚠️ REQUIRED: set per-channel current limit to 10 A max
-// Enforces gearbox bearing limit (13 A) and keeps motive draw within 40 A ANL fuse / 10 AWG wiring rating
-// setCurrentLimit(10);     // Replace with actual Sabertooth packetised serial command for current limit
-```
+### Software Configuration Before Startup
 
-- Protocol: packetised serial, 9600 baud, address 128
+Configure both Sabertooths in DEScribe before powered motion:
+
+- Packet Serial with CRC for the field firmware.
+- Serial timeout enabled as a backstop for broken wiring or dead firmware.
+- Conservative ramping for first-motion tests.
+- Per-channel soft current limit set to **≤ 10 A**.
+
+The Teensy firmware should refuse drivetrain motion until this configuration has
+been confirmed in preflight. Runtime packet commands for current targets can be
+added later, but they are not the first safety line.
+
+- Protocol: Packet Serial with CRC, 9600 baud, address 128
 - TX only — Teensy talks, Sabertooth listens (no RX needed)
 - ROS 2 package: `lunabot_drivetrain`
-- Command topic: `/cmd_vel_safe` (`geometry_msgs/msg/Twist`)
+- Command topic into hardware bridge: `/cmd_vel_gated` (`geometry_msgs/msg/Twist`)
 
 ---
 
@@ -116,16 +120,9 @@ setSaberRamping(20);         // Hardware ramping — smooth accel/decel on all s
 ## BLD-510B — BLDC Excavation Motor Controller
 
 ### Speed Control (SV pin)
-The SV pin accepts 0–5 V analog. Drive it with **PWM from Teensy Pin 6 through a 10 kΩ + 10 µF
-RC low-pass filter** to convert PWM to a smooth analog voltage.
-
-```
-Teensy Pin 6 (PWM) ── 10kΩ ──┬── BLD-510B SV pin
-                              │
-                             10µF
-                              │
-                             GND
-```
+The current Teensy handoff uses **direct PWM from Teensy Pin 6 to the BLD-510B
+SV pin**. Do not add the old Arduino RC-filter circuit unless electrical
+reverses this decision after bench testing.
 
 ### Control Signal Logic
 - EN (Pin 14), F/R (Pin 13), BK — all **active-low**
@@ -143,7 +140,7 @@ be fitted on the PCB/breadboard at Pins 31 and 32.
 > The startup sequence in the mission manager should monitor ALM continuously. Any fault must
 > trigger an immediate safe shutdown of the excavation system.
 
-### RC Filter Note (Arduino conflict — not applicable to Teensy)
+### Power Note (Arduino conflict — not applicable to Teensy)
 The previous test setup used an Arduino powered from both USB and the driver's +5 V simultaneously,
 which caused a voltage conflict and triggered the red alarm LED. On the Teensy/Jetson setup this
 conflict does not apply, but **never power the Teensy from both USB and an external 5 V rail simultaneously**.

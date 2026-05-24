@@ -46,6 +46,9 @@ setup(
     entry_points={
         "console_scripts": [
             "drivetrain_bridge = lunabot_drivetrain.drivetrain_bridge:main",
+            "fake_teensy = lunabot_drivetrain.fake_teensy:main",
+            "teensy_drivetrain_bridge = "
+            "lunabot_drivetrain.teensy_drivetrain_bridge:main",
             "velocity_gate = lunabot_drivetrain.velocity_gate:main",
         ],
     },
