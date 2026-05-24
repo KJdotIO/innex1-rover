@@ -43,7 +43,7 @@ is the domain protection. Branch fuses here provide per-device fault isolation.
 
 | Slot | Device | Fuse | Reasoning |
 |------|--------|------|-----------|
-| 1 | Sabertooth 2×32 #1 (Left: FL + RL) | **No fuse** | 2 motors × 13 A = 26 A peak. 60 A ANL is domain protection. No suitable blade fuse in kit; adds complexity for minimal gain |
+| 1 | Sabertooth 2×32 #1 (Left: FL + RL) | **No fuse** | 2 motors × 13 A = 26 A peak. 40 A ANL is domain protection. No suitable blade fuse in kit; adds complexity for minimal gain |
 | 2 | Sabertooth 2×32 #2 (Right: FR + RR) | **No fuse** | Same as above |
 | 3 | Cytron MDD10A #1 (Actuators 1 & 2) | **15 A** | 10 A per channel × 2 = 20 A max. 15 A protects against a single-channel fault without nuisance tripping |
 | 4 | Cytron MDD10A #2 (Actuators 3 & 4) | **15 A** | Same as above |
@@ -53,7 +53,7 @@ is the domain protection. Branch fuses here provide per-device fault isolation.
 
 ---
 
-## What the Included Kit Fuses Are Used For
+## What the Included Kit Fuses Are Used For (OPTIONAL)
 
 | Fuse Rating | Qty in Kit | Used | Where |
 |-------------|-----------|------|-------|
@@ -62,12 +62,13 @@ is the domain protection. Branch fuses here provide per-device fault isolation.
 | 15 A | 6 | 2 | Cytron MDD10A #1 and #2 slots |
 | 20 A | 6 | 0 | Not required in current design |
 
+> The above fuses are not needed to be used, just a general idea to increase safety
 ---
 
 ## Key Rules
 
 - Driving (drivetrain) and excavation must **never run simultaneously** — this is what keeps
-  peak motive demand within the 60 A ANL rating
+  peak motive demand within the 40 A ANL rating
 - The compute rail (20 A inline fuse) remains live through E-Stop by design — do not fuse it
   in a way that would cut it during a safety event
 - Motive main trunk is 10 AWG — ANL fuse must be **40 A** to match wire ampacity. This is safe
