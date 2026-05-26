@@ -21,8 +21,9 @@ ros2 launch lunabot_bringup navigation.launch.py
 
 - `lunabot_bringup/localisation.launch.py`
 - `lunabot_bringup/nav2_navigation.launch.py`
-- optional `lunabot_localisation/legal_lidar_filter` and KISS-ICP when
-  `lidar_odometry_backend:=kiss_icp`
+- optional `lunabot_localisation_cpp/legal_lidar_filter_cpp` and KISS-ICP when
+  `lidar_odometry_backend:=kiss_icp`; pass
+  `legal_lidar_filter_impl:=python` only for the Python fallback
 - `lunabot_perception/arena_boundary_filter` for front/rear camera clouds and
   Ouster clouds
 - `lunabot_perception/crater_detection`
@@ -58,6 +59,10 @@ For a legal LiDAR-odometry rehearsal, pass
 `max_shuttle_cycles` to `2` or `3`.
 Use the `debug` evidence profile so `/localisation/lidar/points_legal`,
 `/localisation/lidar/odometry`, and filter diagnostics are recorded.
+
+On hardware, the Ouster driver publishes `os_sensor -> os_lidar`. When using a
+temporary static transform for filter-only tests, attach the test root to
+`os_sensor`, not `os_lidar`, so the legal filter can resolve a single TF tree.
 
 ## Mission Manager Only
 

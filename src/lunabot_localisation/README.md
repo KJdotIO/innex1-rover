@@ -10,11 +10,15 @@ The localisation pipeline has two layers:
   selected legal LiDAR odometry source to produce a smooth
   `odom -> base_footprint` transform and `/odometry/local`.
 2. **Optional legal LiDAR odometry**: when
-  `lidar_odometry_backend:=kiss_icp`, `/ouster/points` is first filtered by
-  `legal_lidar_filter` into `/localisation/lidar/points_legal`. The filter
-  uses arena-frame bounds to reject wall/out-of-field points, but republishes
-  the surviving points in the original LiDAR frame and preserves the original
-  `PointCloud2` fields for odometry deskewing.
+  `lidar_odometry_backend:=kiss_icp` or `lidar_odometry_backend:=rko_lio`,
+  `/ouster/points` is first filtered into
+  `/localisation/lidar/points_legal`. The default implementation is the C++
+  `lunabot_localisation_cpp/legal_lidar_filter_cpp` hot path; the Python
+  `lunabot_localisation/legal_lidar_filter` node is kept as a fallback via
+  `legal_lidar_filter_impl:=python`. The filter uses arena-frame bounds to
+  reject wall/out-of-field points, but republishes the surviving records in the
+  original LiDAR frame and preserves the original `PointCloud2` fields for
+  odometry deskewing.
 3. **Optional RTAB-Map SLAM** (`rtabmap_slam`): when
   `enable_visual_slam:=true`, subscribes to RGB-D images from the front depth
   camera and `/odometry/local`. It publishes the `map -> odom` correction via
@@ -56,8 +60,10 @@ frame with the known tag position.
   testing before promotion.
 - `config/rtabmap.yaml`: RTAB-Map SLAM parameters.
 - `launch/localisation.launch.py`: localisation bring-up.
-- `lunabot_localisation/legal_lidar_filter.py`: field-preserving wall filter
-  for OS1 localisation input.
+- `../lunabot_localisation_cpp/`: default C++ field-preserving wall filter for
+  OS1 localisation input.
+- `lunabot_localisation/legal_lidar_filter.py`: Python fallback for the same
+  legal LiDAR filter contract.
 - `lunabot_localisation/tag_pose_publisher.py`: tag detection to pose bridge.
 - `lunabot_localisation/start_zone_localiser.py`: tag search and readiness gate.
 
@@ -71,6 +77,9 @@ frame with the known tag position.
   that will later be claimed as competition-legal.
 - LiDAR filters that rebuild a cloud as plain XYZ and accidentally drop Ouster
   fields such as timestamp, ring, intensity or reflectivity.
+- Test static TFs attached directly to `os_lidar` while the Ouster driver is
+  also publishing `os_sensor -> os_lidar`. For hardware probes, attach the test
+  root to `os_sensor` so TF remains a single tree.
 
 ## Related docs
 
