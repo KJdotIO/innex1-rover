@@ -186,6 +186,10 @@ Use `lipo_4s` if the rover is on a 4S pack. The default voltage is unavailable,
 so diagnostics will say power telemetry is missing until someone enters a real
 value.
 
+If the voltage reaches the critical threshold, the safety bridge latches
+`/safety/motion_inhibit`. Do not reset it until the pack has recovered or been
+replaced and `/power/telemetry` is no longer critical.
+
 The physical COTS power logger is still required for inspection. Treat
 `/power/telemetry` as the operator and evidence view of that power story, not as
 a substitute for the logger itself.

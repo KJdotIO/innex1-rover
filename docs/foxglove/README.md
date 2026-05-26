@@ -32,6 +32,16 @@ The launch file republishes `/camera_front/image` to
 to the compressed topic. Do not point the operator layout at raw
 `/camera_front/image`.
 
+On the Jetson bench test, the usable live view was the lean path: throttle the
+front RGB image to about 8 Hz, compress that stream, and keep Foxglove to the
+camera plus small telemetry. Full-rate RGB, compressed depth and point clouds
+made Foxglove fall several seconds behind.
+
+For a camera-only operator check, use `oak_camera_lean.layout.json`. It shows
+the front compressed image, camera info and diagnostics. Keep only one Foxglove
+tab connected while testing, otherwise the bridge sends the same video stream to
+each client.
+
 Rear camera streaming is available when needed, but is off by default:
 
 ```bash
@@ -55,6 +65,40 @@ Use RViz, or a separate Foxglove debug profile, for navigation and perception
 debugging. If you need TF, robot model, costmap layers, point clouds, local
 planner behaviour, or camera geometry, keep that out of the scored-run operator
 layout.
+
+`oak_camera_debug.layout.json` is intentionally heavy. It exists for short bench
+checks only. Do not use it as the normal driving view.
+
+## Ouster LiDAR Debug
+
+Use `ouster_lidar_debug.layout.json` for a live Ouster-only debug view. This is
+for bring-up and mapping checks, not for the scored-run operator layout.
+
+Connect the Ouster to the Jetson Ethernet port, then check the Jetson Ethernet
+address:
+
+```bash
+ip -br addr show
+```
+
+If the Ethernet address is not `169.254.86.134`, edit `udp_dest` in
+`src/lunabot_bringup/config/ouster_lidar_debug.yaml` or pass a copied parameter
+file with the correct address. Then start the debug stack:
+
+```bash
+ros2 launch lunabot_bringup ouster_lidar_foxglove_debug.launch.py
+```
+
+Open Foxglove on the ground-control laptop and connect to:
+
+```text
+ws://<jetson-tailscale-or-router-ip>:8765
+```
+
+The debug launch exposes `/ouster/points`, `/ouster/imu`, `/ouster/scan`,
+`/ouster/metadata`, `/ouster/telemetry`, and TF. Keep this separate from the
+competition layout because point clouds are too heavy for the 4,000 Kbps
+telemetry budget.
 
 The layout includes `/power/telemetry`. If the power telemetry PR has not
 merged yet, that panel will simply be empty.

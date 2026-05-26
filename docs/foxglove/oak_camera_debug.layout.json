@@ -1,0 +1,89 @@
+{
+  "configById": {
+    "Image!rgb": {
+      "cameraTopic": "/camera_front/image/compressed",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": true,
+      "zoom": 1
+    },
+    "Image!depth": {
+      "cameraTopic": "/camera_front/depth_image/compressedDepth",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": true,
+      "zoom": 1
+    },
+    "RawMessages!camera_info": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/camera_front/camera_info"
+    },
+    "RawMessages!imu": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/camera_front/imu/data"
+    },
+    "RawMessages!points": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/camera_front/points"
+    },
+    "RawMessages!diagnostics": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/diagnostics"
+    },
+    "RawMessages!topics": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/parameter_events"
+    }
+  },
+  "globalVariables": {},
+  "layout": {
+    "direction": "row",
+    "first": {
+      "direction": "column",
+      "first": "Image!rgb",
+      "second": "Image!depth",
+      "splitPercentage": 58
+    },
+    "second": {
+      "direction": "column",
+      "first": {
+        "direction": "row",
+        "first": "RawMessages!camera_info",
+        "second": "RawMessages!imu",
+        "splitPercentage": 50
+      },
+      "second": {
+        "direction": "column",
+        "first": "RawMessages!points",
+        "second": "RawMessages!diagnostics",
+        "splitPercentage": 50
+      },
+      "splitPercentage": 45
+    },
+    "splitPercentage": 62
+  },
+  "playbackConfig": {
+    "speed": 1
+  },
+  "userNodes": {}
+}

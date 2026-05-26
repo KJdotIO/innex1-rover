@@ -7,6 +7,18 @@ LAYOUT_PATH = (
     / "foxglove"
     / "mission_control.layout.json"
 )
+OAK_DEBUG_LAYOUT_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "docs"
+    / "foxglove"
+    / "oak_camera_debug.layout.json"
+)
+OAK_LEAN_LAYOUT_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "docs"
+    / "foxglove"
+    / "oak_camera_lean.layout.json"
+)
 
 
 def _walk_layout_ids(node):
@@ -74,3 +86,37 @@ def test_mission_control_layout_has_expected_panel_groups():
         "RawMessages!drivetrain",
         "RawMessages!excavation",
     }.issubset(panels)
+
+
+def test_oak_camera_debug_layout_covers_camera_check_topics():
+    layout = json.loads(OAK_DEBUG_LAYOUT_PATH.read_text(encoding="utf-8"))
+    topics = _configured_topics(layout)
+    panels = set(_walk_layout_ids(layout["layout"]))
+
+    assert "/camera_front/image/compressed" in topics
+    assert "/camera_front/depth_image/compressedDepth" in topics
+    assert "/camera_front/camera_info" in topics
+    assert "/camera_front/points" in topics
+    assert "/camera_front/imu/data" in topics
+    assert {
+        "Image!rgb",
+        "Image!depth",
+        "RawMessages!camera_info",
+        "RawMessages!imu",
+        "RawMessages!points",
+    }.issubset(panels)
+
+
+def test_oak_camera_lean_layout_keeps_operator_view_light():
+    layout = json.loads(OAK_LEAN_LAYOUT_PATH.read_text(encoding="utf-8"))
+    topics = _configured_topics(layout)
+    panels = set(_walk_layout_ids(layout["layout"]))
+
+    assert "/camera_front/image/compressed" in topics
+    assert "/camera_front/camera_info" in topics
+    assert "/diagnostics" in topics
+    assert "/camera_front/depth_image/compressedDepth" not in topics
+    assert "/camera_front/points" not in topics
+    assert {"Image!rgb", "RawMessages!camera_info", "RawMessages!diagnostics"}.issubset(
+        panels
+    )

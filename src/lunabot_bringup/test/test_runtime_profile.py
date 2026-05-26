@@ -53,6 +53,16 @@ def test_competition_foxglove_allowlists_exclude_raw_streams_but_allow_compresse
         assert "/camera_front/image/compressed" in exposed
 
 
+def test_camera_debug_profile_exposes_oak_debug_topics():
+    profiles = load_profiles(RUNTIME_PROFILES_PATH)
+    exposed = set(profiles["hardware_camera_debug"].foxglove_allowlist)
+
+    assert "/camera_front/image/compressed" in exposed
+    assert "/camera_front/depth_image/compressedDepth" in exposed
+    assert "/camera_front/points" in exposed
+    assert "/camera_front/imu/data" in exposed
+
+
 def test_hardware_competition_keeps_debug_tools_off_by_default():
     profiles = load_profiles(RUNTIME_PROFILES_PATH)
 

@@ -22,6 +22,43 @@ def _profile_allowlist(context) -> list[str]:
     return list(profiles[profile_name].foxglove_allowlist)
 
 
+def _compressed_republisher(
+    *,
+    name: str,
+    input_topic: str,
+    output_topic: str,
+    transport: str,
+    use_sim_time: LaunchConfiguration,
+    condition: IfCondition,
+    jpeg_quality: LaunchConfiguration | None = None,
+) -> Node:
+    parameters = [{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}]
+    if jpeg_quality is not None:
+        parameters[0]["out.format"] = "jpeg"
+        parameters[0]["out.jpeg_quality"] = ParameterValue(
+            jpeg_quality,
+            value_type=int,
+        )
+
+    return Node(
+        package="image_transport",
+        executable="republish",
+        name=name,
+        output="screen",
+        arguments=[
+            "raw",
+            transport,
+            "--ros-args",
+            "--remap",
+            f"in:={input_topic}",
+            "--remap",
+            f"out/{transport}:={output_topic}",
+        ],
+        parameters=parameters,
+        condition=condition,
+    )
+
+
 def _launch_nodes(context):
     allowlist = _profile_allowlist(context)
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -29,52 +66,33 @@ def _launch_nodes(context):
     port = LaunchConfiguration("port")
     send_buffer_limit = LaunchConfiguration("send_buffer_limit")
 
-    front_camera_republisher = Node(
-        package="image_transport",
-        executable="republish",
+    front_camera_republisher = _compressed_republisher(
         name="camera_front_compressed_republisher",
-        output="screen",
-        arguments=[
-            "raw",
-            "compressed",
-            "--ros-args",
-            "--remap",
-            "in:=/camera_front/image",
-            "--remap",
-            "out/compressed:=/camera_front/image/compressed",
-        ],
-        parameters=[
-            {
-                "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
-                "out.format": "jpeg",
-                "out.jpeg_quality": ParameterValue(jpeg_quality, value_type=int),
-            }
-        ],
+        input_topic="/camera_front/image",
+        output_topic="/camera_front/image/compressed",
+        transport="compressed",
+        use_sim_time=use_sim_time,
+        jpeg_quality=jpeg_quality,
         condition=IfCondition(LaunchConfiguration("enable_front_camera")),
     )
 
-    rear_camera_republisher = Node(
-        package="image_transport",
-        executable="republish",
+    rear_camera_republisher = _compressed_republisher(
         name="camera_rear_compressed_republisher",
-        output="screen",
-        arguments=[
-            "raw",
-            "compressed",
-            "--ros-args",
-            "--remap",
-            "in:=/camera_rear/image",
-            "--remap",
-            "out/compressed:=/camera_rear/image/compressed",
-        ],
-        parameters=[
-            {
-                "use_sim_time": ParameterValue(use_sim_time, value_type=bool),
-                "out.format": "jpeg",
-                "out.jpeg_quality": ParameterValue(jpeg_quality, value_type=int),
-            }
-        ],
+        input_topic="/camera_rear/image",
+        output_topic="/camera_rear/image/compressed",
+        transport="compressed",
+        use_sim_time=use_sim_time,
+        jpeg_quality=jpeg_quality,
         condition=IfCondition(LaunchConfiguration("enable_rear_camera")),
+    )
+
+    front_depth_republisher = _compressed_republisher(
+        name="camera_front_depth_compressed_republisher",
+        input_topic="/camera_front/depth_image",
+        output_topic="/camera_front/depth_image/compressedDepth",
+        transport="compressedDepth",
+        use_sim_time=use_sim_time,
+        condition=IfCondition(LaunchConfiguration("enable_front_depth")),
     )
 
     foxglove_bridge = Node(
@@ -96,10 +114,15 @@ def _launch_nodes(context):
         ],
     )
 
-    return [front_camera_republisher, rear_camera_republisher, foxglove_bridge]
+    return [
+        front_camera_republisher,
+        rear_camera_republisher,
+        front_depth_republisher,
+        foxglove_bridge,
+    ]
 
 
-def generate_launch_description():
+def generate_launch_description() -> LaunchDescription:
     """Generate a Foxglove bridge launch description for operator telemetry."""
     return LaunchDescription(
         [
@@ -140,6 +163,11 @@ def generate_launch_description():
                 "enable_rear_camera",
                 default_value="false",
                 description="Republish /camera_rear/image as compressed JPEG.",
+            ),
+            DeclareLaunchArgument(
+                "enable_front_depth",
+                default_value="false",
+                description="Republish /camera_front/depth_image as compressedDepth.",
             ),
             OpaqueFunction(function=_launch_nodes),
         ]

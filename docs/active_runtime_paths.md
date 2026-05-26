@@ -131,6 +131,33 @@ Diagnostics should continue to use `/diagnostics` with
 `diagnostic_msgs/DiagnosticArray`, which is the standard ROS diagnostics topic
 shape.
 
+## Depth Camera Bring-Up
+
+Use this when checking an OAK-D camera on the Jetson before running the full
+navigation stack:
+
+```bash
+ros2 launch lunabot_bringup oak_front_camera.launch.py use_rviz:=true
+```
+
+This opens `src/lunabot_bringup/rviz/depth_camera_debug.rviz`, which is aimed
+at the project camera topics:
+
+- `/camera_front/image`
+- `/camera_front/depth_image`
+- `/camera_front/camera_info`
+- `/camera_front/points`
+
+The launch can also run `lunabot_perception/crater_detection` with:
+
+```bash
+ros2 launch lunabot_bringup depth_camera_debug.launch.py run_crater_detection:=true
+```
+
+Only use that after the camera point cloud is publishing and TF exists from the
+point cloud frame to `odom`. See `docs/depth_camera_bringup.md` for the full
+bring-up flow.
+
 ## Package-Local Debug Paths
 
 These are still useful, but they are not the default hardware-week path:
