@@ -20,6 +20,7 @@ from launch_ros.substitutions import FindPackageShare
 TRUTHY_VALUES = ("1", "true", "yes", "on")
 FALSEY_VALUES = ("0", "false", "no", "off")
 LIDAR_ODOMETRY_BACKENDS = ("none", "kiss_icp", "rko_lio")
+LEGAL_LIDAR_FILTER_IMPLEMENTATIONS = ("cpp", "python")
 
 
 def _config_path(*parts: str) -> str:
@@ -110,6 +111,12 @@ def _validate_boolean_launch_arguments(context):
             "Expected lidar_odometry_backend to be one of "
             f"{LIDAR_ODOMETRY_BACKENDS}, got '{backend}'."
         )
+    filter_impl = LaunchConfiguration("legal_lidar_filter_impl").perform(context)
+    if filter_impl.strip().lower() not in LEGAL_LIDAR_FILTER_IMPLEMENTATIONS:
+        raise ValueError(
+            "Expected legal_lidar_filter_impl to be one of "
+            f"{LEGAL_LIDAR_FILTER_IMPLEMENTATIONS}, got '{filter_impl}'."
+        )
     return []
 
 
@@ -141,6 +148,7 @@ def generate_launch_description():
     legal_lidar_input_topic = LaunchConfiguration("legal_lidar_input_topic")
     legal_lidar_output_topic = LaunchConfiguration("legal_lidar_output_topic")
     legal_lidar_mask_frame = LaunchConfiguration("legal_lidar_mask_frame")
+    legal_lidar_filter_impl = LaunchConfiguration("legal_lidar_filter_impl")
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     camera_info_topic = LaunchConfiguration("camera_info_topic")
     sync_sim_camera_info = LaunchConfiguration("sync_sim_camera_info")
@@ -177,12 +185,25 @@ def generate_launch_description():
             ]
         )
     )
-    lidar_filter_condition = IfCondition(
+    lidar_filter_cpp_condition = IfCondition(
         PythonExpression(
             [
                 "'",
                 lidar_odometry_backend,
-                "'.strip().lower() != 'none'",
+                "'.strip().lower() != 'none' and '",
+                legal_lidar_filter_impl,
+                "'.strip().lower() == 'cpp'",
+            ]
+        )
+    )
+    lidar_filter_python_condition = IfCondition(
+        PythonExpression(
+            [
+                "'",
+                lidar_odometry_backend,
+                "'.strip().lower() != 'none' and '",
+                legal_lidar_filter_impl,
+                "'.strip().lower() == 'python'",
             ]
         )
     )
@@ -243,6 +264,11 @@ def generate_launch_description():
                 description="Field-preserved, wall-excluded cloud for LiDAR odometry.",
             ),
             DeclareLaunchArgument(
+                "legal_lidar_filter_impl",
+                default_value="cpp",
+                description="Legal LiDAR filter implementation: cpp or python.",
+            ),
+            DeclareLaunchArgument(
                 "legal_lidar_mask_frame",
                 default_value="odom",
                 description="Arena frame used only for deciding legal point membership.",
@@ -290,7 +316,23 @@ def generate_launch_description():
                 description=("Configured map-frame yaw of the start-zone tag."),
             ),
             OpaqueFunction(function=_validate_boolean_launch_arguments),
-            # --- Legal LiDAR filter: preserves Ouster point fields for odometry ---
+            # --- Legal LiDAR filter: C++ hot path, Python fallback ---
+            Node(
+                package="lunabot_localisation_cpp",
+                executable="legal_lidar_filter_cpp",
+                name="legal_lidar_filter_ouster",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {
+                        "input_topic": legal_lidar_input_topic,
+                        "output_topic": legal_lidar_output_topic,
+                        "source_name": "ouster",
+                        "mask_frame": legal_lidar_mask_frame,
+                    },
+                ],
+                condition=lidar_filter_cpp_condition,
+            ),
             Node(
                 package="lunabot_localisation",
                 executable="legal_lidar_filter",
@@ -305,7 +347,7 @@ def generate_launch_description():
                         "mask_frame": legal_lidar_mask_frame,
                     },
                 ],
-                condition=lidar_filter_condition,
+                condition=lidar_filter_python_condition,
             ),
             # --- KISS-ICP: first legal LiDAR odometry baseline ---
             Node(
