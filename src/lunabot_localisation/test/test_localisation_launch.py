@@ -319,3 +319,16 @@ def test_rtabmap_config_publishes_map_to_odom_tf():
     assert params["publish_tf_odom"] is False
     assert params["subscribe_depth"] is True
     assert params["subscribe_stereo"] is False
+
+
+def test_rko_lio_config_matches_live_os1_topics_and_frames():
+    rko_path = Path(__file__).resolve().parents[1] / "config" / "rko_lio_lunabot.yaml"
+    config = yaml.safe_load(rko_path.read_text())
+
+    assert config["lidar_topic"] == "/localisation/lidar/points_legal"
+    assert config["imu_topic"] == "/ouster/imu"
+    assert config["lidar_frame"] == "os_lidar"
+    assert config["imu_frame"] == "os_imu"
+    assert config["base_frame"] == "base_footprint"
+    assert "extrinsic_lidar2base_quat_xyzw_xyz" in config
+    assert "extrinsic_imu2base_quat_xyzw_xyz" in config

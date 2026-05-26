@@ -22,6 +22,7 @@ def test_ouster_debug_config_matches_successful_bringup_topics():
     config_text = CONFIG_PATH.read_text(encoding="utf-8")
 
     assert "sensor_hostname: os-122610007923.local" in config_text
+    assert "udp_dest: 192.168.8.20" in config_text
     assert "lidar_mode: 1024x10" in config_text
     assert "udp_profile_lidar: RNG15_RFL8_NIR8" in config_text
     assert "proc_mask: IMU|PCL|SCAN|TLM" in config_text

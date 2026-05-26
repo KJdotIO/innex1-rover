@@ -1,8 +1,12 @@
 lidar_topic: /localisation/lidar/points_legal
-imu_topic: /imu/data_raw
+imu_topic: /ouster/imu
+lidar_frame: os_lidar
+imu_frame: os_imu
 odom_topic: /localisation/lidar/odometry
 odom_frame: odom
 base_frame: base_footprint
+extrinsic_lidar2base_quat_xyzw_xyz: [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.35]
+extrinsic_imu2base_quat_xyzw_xyz: [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.35]
 invert_odom_tf: false
 publish_local_map: false
 publish_deskewed_scan: false

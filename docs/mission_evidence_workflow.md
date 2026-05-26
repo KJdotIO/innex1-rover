@@ -45,7 +45,7 @@ ros2 run lunabot_bringup mission_evidence \
 ```
 
 For the legal LiDAR-odometry dress rehearsal, use the same launcher with two
-or three cycles and the KISS-ICP baseline enabled:
+or three cycles and the RKO-LIO backend enabled:
 
 ```bash
 ros2 run lunabot_bringup mission_evidence \
@@ -55,7 +55,7 @@ ros2 run lunabot_bringup mission_evidence \
   -- ros2 launch lunabot_bringup mission_shuttle_evidence.launch.py \
     launch_rviz:=false \
     ouster_vertical_samples:=128 \
-    lidar_odometry_backend:=kiss_icp \
+    lidar_odometry_backend:=rko_lio \
     max_shuttle_cycles:=3
 ```
 
