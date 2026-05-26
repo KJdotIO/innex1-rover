@@ -155,23 +155,31 @@ def cloud_records(cloud) -> np.ndarray:
     return np.concatenate(rows).copy()
 
 
-def selected_point_bytes(cloud, keep_mask: np.ndarray) -> bytes:
+def selected_point_bytes(
+    cloud,
+    keep_mask: np.ndarray,
+    records: np.ndarray | None = None,
+) -> bytes:
     """Copy selected point records from the original PointCloud2 byte layout."""
+    del records
     width = int(cloud.width)
+    height = int(cloud.height)
     point_step = int(cloud.point_step)
     row_step = int(cloud.row_step)
+    if width == 0 or height == 0:
+        return b""
+
     data = memoryview(cloud.data)
-    selected = bytearray(point_step * int(np.count_nonzero(keep_mask)))
-    write_offset = 0
-    for flat_index in np.flatnonzero(keep_mask):
-        row = int(flat_index) // width
-        column = int(flat_index) % width
-        read_offset = row * row_step + column * point_step
-        selected[write_offset:write_offset + point_step] = data[
-            read_offset:read_offset + point_step
-        ]
-        write_offset += point_step
-    return bytes(selected)
+    point_rows = [
+        np.frombuffer(
+            data[row * row_step:row * row_step + width * point_step],
+            dtype=np.uint8,
+            count=width * point_step,
+        ).reshape(width, point_step)
+        for row in range(height)
+    ]
+    point_bytes = np.concatenate(point_rows, axis=0)
+    return point_bytes[keep_mask].tobytes()
 
 
 def cloud_xyz(cloud) -> np.ndarray:
@@ -230,7 +238,7 @@ def filter_cloud_to_legal_bounds(
         width=kept_count,
         height=1,
         is_dense=True,
-        data=selected_point_bytes(cloud, keep_mask),
+        data=selected_point_bytes(cloud, keep_mask, records),
     )
     finite_count = int(np.count_nonzero(finite_mask))
     return LegalLidarFilterResult(
