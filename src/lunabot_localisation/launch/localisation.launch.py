@@ -346,7 +346,7 @@ def generate_launch_description():
                 launch_arguments={
                     "config_file": rko_lio_yaml,
                     "lidar_topic": legal_lidar_output_topic,
-                    "imu_topic": "/imu/data_raw",
+                    "imu_topic": "/ouster/imu",
                     "odom_topic": "/localisation/lidar/odometry",
                     "odom_frame": "odom",
                     "base_frame": "base_footprint",

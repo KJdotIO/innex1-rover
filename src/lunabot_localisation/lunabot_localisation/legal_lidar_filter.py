@@ -36,6 +36,7 @@ class LegalLidarFilterNode(Node):
         self.declare_parameter("wall_exclusion_margin_m", 0.35)
         self.declare_parameter("diagnostic_publish_hz", 1.0)
         self.declare_parameter("stale_timeout_s", 2.5)
+        self.declare_parameter("tf_lookup_timeout_s", 0.05)
 
         self.input_topic = self.get_parameter("input_topic").value
         self.output_topic = self.get_parameter("output_topic").value
@@ -49,12 +50,15 @@ class LegalLidarFilterNode(Node):
             wall_exclusion_margin_m=self.get_parameter("wall_exclusion_margin_m").value,
         )
         self.stale_timeout_s = self.get_parameter("stale_timeout_s").value
+        self.tf_lookup_timeout_s = self.get_parameter("tf_lookup_timeout_s").value
         diagnostic_publish_hz = self.get_parameter("diagnostic_publish_hz").value
 
         if diagnostic_publish_hz <= 0.0:
             raise ValueError("diagnostic_publish_hz must be > 0")
         if self.stale_timeout_s <= 0.0:
             raise ValueError("stale_timeout_s must be > 0")
+        if self.tf_lookup_timeout_s < 0.0:
+            raise ValueError("tf_lookup_timeout_s must be >= 0")
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -132,7 +136,7 @@ class LegalLidarFilterNode(Node):
                 self.mask_frame,
                 msg.header.frame_id,
                 cloud_time,
-                timeout=Duration(seconds=0.0),
+                timeout=Duration(seconds=self.tf_lookup_timeout_s),
             )
         except ExtrapolationException as error:
             if "future" not in str(error).lower():
@@ -143,7 +147,7 @@ class LegalLidarFilterNode(Node):
                     self.mask_frame,
                     msg.header.frame_id,
                     Time(),
-                    timeout=Duration(seconds=0.0),
+                    timeout=Duration(seconds=self.tf_lookup_timeout_s),
                 )
             except TransformException as latest_error:
                 self._log_tf_lookup_failure(msg, latest_error)

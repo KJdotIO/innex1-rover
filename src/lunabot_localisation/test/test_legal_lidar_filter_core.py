@@ -13,7 +13,6 @@ from lunabot_localisation.legal_lidar_filter_core import (
     transform_points,
 )
 
-
 FLOAT32 = 7
 UINT16 = 4
 UINT32 = 6

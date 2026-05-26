@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 from launch import LaunchContext
-from launch.actions import OpaqueFunction
+from launch.actions import IncludeLaunchDescription, OpaqueFunction
 from launch_ros.actions import Node
 
 
@@ -32,7 +32,7 @@ def _condition_text(condition) -> str:
 
 def _substitution_text(value) -> str:
     """Return nested launch substitution internals as readable text."""
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return "".join(_substitution_text(part) for part in value)
     if "_TextSubstitution__text" in value.__dict__:
         return value.__dict__["_TextSubstitution__text"]
@@ -50,7 +50,7 @@ def _parameter_dict(parameters) -> dict:
         if not isinstance(group, dict):
             continue
         for key, value in group.items():
-            if isinstance(value, (list, tuple)) or hasattr(value, "__dict__"):
+            if isinstance(value, list | tuple) or hasattr(value, "__dict__"):
                 result[_substitution_text(key)] = _substitution_text(value).splitlines()[
                     0
                 ]
@@ -229,6 +229,32 @@ def test_kiss_icp_uses_legal_lidar_topic_and_disables_tf(
     assert ("kiss/odometry", "/localisation/lidar/odometry") in remapping_text
     assert parameters["lidar_odom_frame"] == "odom"
     assert parameters["publish_odom_tf"] is False
+
+
+def test_rko_lio_launch_uses_live_os1_imu_topic(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    launch_module = _load_launch_module()
+    monkeypatch.setattr(
+        launch_module,
+        "get_package_share_directory",
+        lambda _package: "/tmp/lunabot_localisation",
+    )
+    description = launch_module.generate_launch_description()
+
+    rko_includes = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, IncludeLaunchDescription)
+        and "odom_topic"
+        in dict(entity.__dict__.get("_IncludeLaunchDescription__launch_arguments", []))
+    ]
+
+    assert len(rko_includes) == 1
+    launch_arguments = dict(
+        rko_includes[0].__dict__.get("_IncludeLaunchDescription__launch_arguments", [])
+    )
+    assert launch_arguments["imu_topic"] == "/ouster/imu"
 
 
 def test_no_global_ekf_in_launch_description(
