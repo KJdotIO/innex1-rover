@@ -95,6 +95,11 @@ Jetson:
 sudo sysctl -w net.core.rmem_max=1048576 net.core.rmem_default=1048576
 ```
 
+The debug config uses `v_reduction: 4`, so the OS1-128 publishes a 32-line
+stream. That keeps the Python legal LiDAR filter close enough for live RKO-LIO
+testing on the Jetson. Full 128-line raw LIO works, but the legal filter needs
+a C++ implementation before we should run full-density filtered LIO.
+
 Then start the debug stack:
 
 ```bash

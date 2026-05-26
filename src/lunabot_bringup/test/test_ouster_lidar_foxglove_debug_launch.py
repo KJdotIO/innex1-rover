@@ -27,6 +27,7 @@ def test_ouster_debug_config_matches_successful_bringup_topics():
     assert "udp_profile_lidar: RNG15_RFL8_NIR8" in config_text
     assert "proc_mask: IMU|PCL|SCAN|TLM" in config_text
     assert "point_type: native" in config_text
+    assert "v_reduction: 4" in config_text
 
 
 def test_ouster_debug_layout_covers_lidar_topics():

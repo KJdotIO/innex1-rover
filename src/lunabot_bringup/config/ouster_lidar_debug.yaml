@@ -25,4 +25,4 @@ ouster/os_driver:
     destagger: true
     min_range: 0.2
     max_range: 30.0
-    v_reduction: 1
+    v_reduction: 4
