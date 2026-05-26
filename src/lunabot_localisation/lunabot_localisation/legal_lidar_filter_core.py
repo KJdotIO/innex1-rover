@@ -17,6 +17,9 @@ _DATATYPE_TO_DTYPE = {
     8: np.float64,
 }
 
+FLOAT32 = 7
+FLOAT64 = 8
+
 
 @dataclass(frozen=True)
 class ArenaBounds:
@@ -155,22 +158,17 @@ def cloud_records(cloud) -> np.ndarray:
     return np.concatenate(rows).copy()
 
 
-def selected_point_bytes(
-    cloud,
-    keep_mask: np.ndarray,
-    records: np.ndarray | None = None,
-) -> bytes:
-    """Copy selected point records from the original PointCloud2 byte layout."""
-    del records
+def point_byte_matrix(cloud) -> np.ndarray:
+    """Return an Nx point_step byte matrix without row padding."""
     width = int(cloud.width)
     height = int(cloud.height)
     point_step = int(cloud.point_step)
     row_step = int(cloud.row_step)
     if width == 0 or height == 0:
-        return b""
+        return np.empty((0, point_step), dtype=np.uint8)
 
     data = memoryview(cloud.data)
-    point_rows = [
+    rows = [
         np.frombuffer(
             data[row * row_step:row * row_step + width * point_step],
             dtype=np.uint8,
@@ -178,23 +176,55 @@ def selected_point_bytes(
         ).reshape(width, point_step)
         for row in range(height)
     ]
-    point_bytes = np.concatenate(point_rows, axis=0)
+    return np.concatenate(rows, axis=0)
+
+
+def _field_dtype(field, is_bigendian: bool) -> np.dtype:
+    dtype = _DATATYPE_TO_DTYPE.get(field.datatype)
+    if dtype is None:
+        raise ValueError(f"Unsupported PointCloud2 datatype {field.datatype}")
+    endian = ">" if is_bigendian else "<"
+    return np.dtype(dtype).newbyteorder(endian)
+
+
+def cloud_xyz_from_bytes(cloud, point_bytes: np.ndarray) -> np.ndarray:
+    """Extract XYZ coordinates from raw point bytes without parsing every field."""
+    fields_by_name = {field.name: field for field in cloud.fields}
+    missing = {"x", "y", "z"} - set(fields_by_name)
+    if missing:
+        raise ValueError(f"PointCloud2 is missing required fields: {sorted(missing)}")
+
+    coordinates = []
+    for name in ("x", "y", "z"):
+        field = fields_by_name[name]
+        dtype = _field_dtype(field, bool(cloud.is_bigendian))
+        if field.datatype not in (FLOAT32, FLOAT64):
+            raise ValueError(f"PointCloud2 field {name} must be FLOAT32 or FLOAT64")
+        if int(getattr(field, "count", 1)) != 1:
+            raise ValueError(f"PointCloud2 field {name} must have count 1")
+        itemsize = dtype.itemsize
+        start = int(field.offset)
+        stop = start + itemsize
+        coordinates.append(
+            point_bytes[:, start:stop].copy().view(dtype).reshape(-1).astype(np.float64)
+        )
+    return np.column_stack(coordinates)
+
+
+def selected_point_bytes(
+    cloud,
+    keep_mask: np.ndarray,
+    point_bytes: np.ndarray | None = None,
+) -> bytes:
+    """Copy selected point records from the original PointCloud2 byte layout."""
+    if point_bytes is None:
+        point_bytes = point_byte_matrix(cloud)
     return point_bytes[keep_mask].tobytes()
 
 
 def cloud_xyz(cloud) -> np.ndarray:
     """Extract XYZ coordinates from a PointCloud2-like object."""
-    records = cloud_records(cloud)
-    missing = {"x", "y", "z"} - set(records.dtype.names or ())
-    if missing:
-        raise ValueError(f"PointCloud2 is missing required fields: {sorted(missing)}")
-    return np.column_stack(
-        [
-            np.asarray(records["x"], dtype=np.float64).reshape(-1),
-            np.asarray(records["y"], dtype=np.float64).reshape(-1),
-            np.asarray(records["z"], dtype=np.float64).reshape(-1),
-        ]
-    )
+    return cloud_xyz_from_bytes(cloud, point_byte_matrix(cloud))
 
 
 def legal_point_mask(points_in_mask_frame: np.ndarray, bounds: ArenaBounds) -> np.ndarray:
@@ -217,14 +247,8 @@ def filter_cloud_to_legal_bounds(
     quaternion_xyzw: tuple[float, float, float, float],
 ) -> LegalLidarFilterResult:
     """Filter a PointCloud2-like cloud while preserving its original fields."""
-    records = cloud_records(cloud)
-    xyz = np.column_stack(
-        [
-            np.asarray(records["x"], dtype=np.float64).reshape(-1),
-            np.asarray(records["y"], dtype=np.float64).reshape(-1),
-            np.asarray(records["z"], dtype=np.float64).reshape(-1),
-        ]
-    )
+    point_bytes = point_byte_matrix(cloud)
+    xyz = cloud_xyz_from_bytes(cloud, point_bytes)
     finite_mask = np.all(np.isfinite(xyz), axis=1)
     transformed = transform_points(xyz, translation_xyz, quaternion_xyzw)
     keep_mask = legal_point_mask(transformed, bounds)
@@ -238,12 +262,12 @@ def filter_cloud_to_legal_bounds(
         width=kept_count,
         height=1,
         is_dense=True,
-        data=selected_point_bytes(cloud, keep_mask, records),
+        data=selected_point_bytes(cloud, keep_mask, point_bytes),
     )
     finite_count = int(np.count_nonzero(finite_mask))
     return LegalLidarFilterResult(
         cloud=filtered_cloud,
-        raw_count=int(records.shape[0]),
+        raw_count=int(point_bytes.shape[0]),
         finite_count=finite_count,
         kept_count=kept_count,
         rejected_count=finite_count - kept_count,
