@@ -127,6 +127,10 @@
   ],
   "deferred_topics": [
     "/ouster/points",
+    "/ouster/imu",
+    "/ouster/scan",
+    "/localisation/lidar/points_legal",
+    "/localisation/lidar/odometry",
     "/drivetrain/command",
     "/drivetrain/telemetry",
     "/drivetrain/status"

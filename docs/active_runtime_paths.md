@@ -21,6 +21,8 @@ ros2 launch lunabot_bringup navigation.launch.py
 
 - `lunabot_bringup/localisation.launch.py`
 - `lunabot_bringup/nav2_navigation.launch.py`
+- optional `lunabot_localisation/legal_lidar_filter` and KISS-ICP when
+  `lidar_odometry_backend:=kiss_icp`
 - `lunabot_perception/arena_boundary_filter` for front/rear camera clouds and
   Ouster clouds
 - `lunabot_perception/crater_detection`
@@ -50,6 +52,12 @@ navigation, simulated excavation, the deposition action server, E-stop bridge,
 diagnostics, and one mission-manager cycle. It also disables the AprilTag
 readiness gate because the sim does not always provide a stable start-zone tag
 lock.
+
+For a legal LiDAR-odometry rehearsal, pass
+`lidar_odometry_backend:=kiss_icp`, `ouster_vertical_samples:=128`, and raise
+`max_shuttle_cycles` to `2` or `3`.
+Use the `debug` evidence profile so `/localisation/lidar/points_legal`,
+`/localisation/lidar/odometry`, and filter diagnostics are recorded.
 
 ## Mission Manager Only
 

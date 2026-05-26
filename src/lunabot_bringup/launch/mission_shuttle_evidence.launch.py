@@ -49,8 +49,16 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     launch_rviz = LaunchConfiguration("launch_rviz")
     world = LaunchConfiguration("world")
+    ouster_horizontal_samples = LaunchConfiguration("ouster_horizontal_samples")
+    ouster_vertical_samples = LaunchConfiguration("ouster_vertical_samples")
     waypoints_file = LaunchConfiguration("waypoints_file")
     max_shuttle_cycles = LaunchConfiguration("max_shuttle_cycles")
+    mission_start_delay_s = LaunchConfiguration("mission_start_delay_s")
+    nav_goal_timeout_s = LaunchConfiguration("nav_goal_timeout_s")
+    lidar_costmap_phase = LaunchConfiguration("lidar_costmap_phase")
+    lidar_odometry_backend = LaunchConfiguration("lidar_odometry_backend")
+    nav_params_file = LaunchConfiguration("nav_params_file")
+    collision_monitor_params_file = LaunchConfiguration("collision_monitor_params_file")
     disable_nav_gate = LaunchConfiguration("disable_nav_gate")
     enforce_preflight = LaunchConfiguration("enforce_preflight")
     force_overcurrent = LaunchConfiguration("force_overcurrent")
@@ -61,7 +69,11 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             _launch_file("lunabot_simulation", "launch", "moon_yard.launch.py")
         ),
-        launch_arguments={"world": world}.items(),
+        launch_arguments={
+            "world": world,
+            "ouster_horizontal_samples": ouster_horizontal_samples,
+            "ouster_vertical_samples": ouster_vertical_samples,
+        }.items(),
     )
 
     navigation = IncludeLaunchDescription(
@@ -73,6 +85,10 @@ def generate_launch_description():
             "launch_rviz": launch_rviz,
             "enforce_preflight": enforce_preflight,
             "disable_nav_gate": disable_nav_gate,
+            "lidar_costmap_phase": lidar_costmap_phase,
+            "lidar_odometry_backend": lidar_odometry_backend,
+            "nav_params_file": nav_params_file,
+            "collision_monitor_params_file": collision_monitor_params_file,
             "camera_info_topic": "/camera_front/camera_info_synced",
             "sync_sim_camera_info": "true",
         }.items(),
@@ -139,6 +155,10 @@ def generate_launch_description():
                     max_shuttle_cycles,
                     value_type=int,
                 ),
+                "nav_goal_timeout_s": ParameterValue(
+                    nav_goal_timeout_s,
+                    value_type=float,
+                ),
             },
         ],
     )
@@ -155,6 +175,8 @@ def generate_launch_description():
             DeclareLaunchArgument("use_sim_time", default_value="true"),
             DeclareLaunchArgument("launch_rviz", default_value="false"),
             DeclareLaunchArgument("world", default_value="moon_yard_craters"),
+            DeclareLaunchArgument("ouster_horizontal_samples", default_value="1024"),
+            DeclareLaunchArgument("ouster_vertical_samples", default_value="32"),
             DeclareLaunchArgument(
                 "waypoints_file",
                 default_value=_launch_file(
@@ -164,6 +186,26 @@ def generate_launch_description():
                 ),
             ),
             DeclareLaunchArgument("max_shuttle_cycles", default_value="1"),
+            DeclareLaunchArgument("mission_start_delay_s", default_value="75.0"),
+            DeclareLaunchArgument("nav_goal_timeout_s", default_value="360.0"),
+            DeclareLaunchArgument("lidar_costmap_phase", default_value="true"),
+            DeclareLaunchArgument("lidar_odometry_backend", default_value="none"),
+            DeclareLaunchArgument(
+                "nav_params_file",
+                default_value=_launch_file(
+                    "lunabot_navigation",
+                    "config",
+                    "nav2_params_lio_evidence.yaml",
+                ),
+            ),
+            DeclareLaunchArgument(
+                "collision_monitor_params_file",
+                default_value=_launch_file(
+                    "lunabot_navigation",
+                    "config",
+                    "collision_monitor_lio_evidence.yaml",
+                ),
+            ),
             DeclareLaunchArgument("disable_nav_gate", default_value="true"),
             DeclareLaunchArgument("enforce_preflight", default_value="false"),
             DeclareLaunchArgument("force_overcurrent", default_value="false"),
@@ -176,7 +218,7 @@ def generate_launch_description():
             deposit_action_server,
             rover_diagnostics,
             movement_watchdog,
-            TimerAction(period=45.0, actions=[mission_manager]),
+            TimerAction(period=mission_start_delay_s, actions=[mission_manager]),
             mission_exit_handler,
         ]
     )

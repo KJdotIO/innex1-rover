@@ -74,16 +74,33 @@ checks only. Do not use it as the normal driving view.
 Use `ouster_lidar_debug.layout.json` for a live Ouster-only debug view. This is
 for bring-up and mapping checks, not for the scored-run operator layout.
 
-Connect the Ouster to the Jetson Ethernet port, then check the Jetson Ethernet
+Connect the Ouster through the rover router, then check the Jetson Ethernet
 address:
 
 ```bash
 ip -br addr show
 ```
 
-If the Ethernet address is not `169.254.86.134`, edit `udp_dest` in
-`src/lunabot_bringup/config/ouster_lidar_debug.yaml` or pass a copied parameter
-file with the correct address. Then start the debug stack:
+The current router setup uses `enP8p1s0` on `192.168.8.20/24`, and the Ouster
+resolves as `os-122610007923.local`. If the Jetson Ethernet address changes,
+edit `udp_dest` in `src/lunabot_bringup/config/ouster_lidar_debug.yaml` or pass
+a copied parameter file with the correct address. For direct Jetson-to-Ouster
+testing, set `udp_dest` back to the Jetson link-local address on that cable.
+
+The Ouster driver needs a larger UDP receive buffer than the Jetson default.
+Set it before testing, and keep the same values in `/etc/sysctl.d/` on the
+Jetson:
+
+```bash
+sudo sysctl -w net.core.rmem_max=1048576 net.core.rmem_default=1048576
+```
+
+The debug config uses `v_reduction: 4`, so the OS1-128 publishes a 32-line
+stream. That keeps the Python legal LiDAR filter close enough for live RKO-LIO
+testing on the Jetson. Full 128-line raw LIO works, but the legal filter needs
+a C++ implementation before we should run full-density filtered LIO.
+
+Then start the debug stack:
 
 ```bash
 ros2 launch lunabot_bringup ouster_lidar_foxglove_debug.launch.py

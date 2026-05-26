@@ -487,6 +487,32 @@ def test_wait_for_server_stops_when_safety_callback_trips(monkeypatch):
     sleep.assert_not_called()
 
 
+def test_check_goal_result_cancels_timed_out_goal(monkeypatch):
+    """A timed-out Nav2 attempt must not keep running into the retry."""
+    manager = _make_manager(monkeypatch)
+    goal_handle = MagicMock()
+    goal_handle.accepted = True
+    result_future = MagicMock()
+    cancel_future = MagicMock()
+    goal_handle.get_result_async.return_value = result_future
+    goal_handle.cancel_goal_async.return_value = cancel_future
+
+    def _wait_for_future(future, _timeout_s, timeout_detail):
+        if future is result_future:
+            return timeout_detail
+        if future is cancel_future:
+            return SimpleNamespace()
+        raise AssertionError("unexpected future")
+
+    monkeypatch.setattr(manager, "_wait_for_future", _wait_for_future)
+
+    success, detail = manager._check_goal_result(goal_handle, "navigate", 120.0)
+
+    assert not success
+    assert detail == "navigate result timed out"
+    goal_handle.cancel_goal_async.assert_called_once()
+
+
 def test_deposit_success_transitions_to_check_next_cycle_time(monkeypatch):
     """DEPOSIT must advance to CHECK_NEXT_CYCLE_TIME on success."""
     manager = _make_manager(monkeypatch)

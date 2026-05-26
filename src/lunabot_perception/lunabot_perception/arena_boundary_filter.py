@@ -23,8 +23,8 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
-from sensor_msgs.msg import PointCloud2
-from sensor_msgs_py.point_cloud2 import create_cloud_xyz32, read_points_numpy
+from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs_py.point_cloud2 import create_cloud_xyz32
 from std_msgs.msg import Header
 from tf2_ros import ExtrapolationException, TransformException
 from tf2_ros.buffer import Buffer
@@ -90,6 +90,72 @@ class BoundaryFilterResult:
         if self.input_count == 0:
             return 0.0
         return self.rejected_count / self.input_count
+
+
+_POINT_FIELD_DTYPES = {
+    PointField.INT8: np.int8,
+    PointField.UINT8: np.uint8,
+    PointField.INT16: np.int16,
+    PointField.UINT16: np.uint16,
+    PointField.INT32: np.int32,
+    PointField.UINT32: np.uint32,
+    PointField.FLOAT32: np.float32,
+    PointField.FLOAT64: np.float64,
+}
+
+
+def _cloud_dtype(cloud: PointCloud2) -> np.dtype:
+    """Return a structured dtype matching a PointCloud2 record layout."""
+    names: list[str] = []
+    formats: list[object] = []
+    offsets: list[int] = []
+    endian = ">" if cloud.is_bigendian else "<"
+    for field in cloud.fields:
+        dtype = _POINT_FIELD_DTYPES.get(field.datatype)
+        if dtype is None:
+            raise ValueError(f"unsupported PointCloud2 field datatype {field.datatype}")
+        base_dtype = np.dtype(dtype).newbyteorder(endian)
+        names.append(field.name)
+        if field.count == 1:
+            formats.append(base_dtype)
+        else:
+            formats.append((base_dtype, (field.count,)))
+        offsets.append(field.offset)
+
+    return np.dtype(
+        {
+            "names": names,
+            "formats": formats,
+            "offsets": offsets,
+            "itemsize": cloud.point_step,
+        }
+    )
+
+
+def cloud_xyz(cloud: PointCloud2) -> np.ndarray:
+    """Extract x/y/z points without assuming all cloud fields share a datatype."""
+    field_names = {field.name for field in cloud.fields}
+    missing = {"x", "y", "z"} - field_names
+    if missing:
+        raise ValueError(f"PointCloud2 is missing required fields: {sorted(missing)}")
+    if cloud.point_step <= 0 or cloud.width * cloud.height == 0:
+        return np.empty((0, 3), dtype=np.float32)
+
+    dtype = _cloud_dtype(cloud)
+    data = memoryview(cloud.data)
+    rows = [
+        np.frombuffer(
+            data[row * cloud.row_step:row * cloud.row_step + cloud.width * cloud.point_step],
+            dtype=dtype,
+            count=cloud.width,
+        )
+        for row in range(cloud.height)
+    ]
+    records = np.concatenate(rows)
+    return np.column_stack((records["x"], records["y"], records["z"])).astype(
+        np.float32,
+        copy=False,
+    )
 
 
 def transform_points(
@@ -233,7 +299,16 @@ class ArenaBoundaryFilterNode(Node):
         if tf is None:
             return
 
-        points = read_points_numpy(msg, field_names=["x", "y", "z"], skip_nans=True)
+        try:
+            points = cloud_xyz(msg)
+        except ValueError as e:
+            self.last_error = str(e)
+            self.get_logger().warning(
+                f"Dropping malformed point cloud from {self.input_topic}: {e}",
+                throttle_duration_sec=5.0,
+            )
+            return
+
         if points.size == 0:
             result = BoundaryFilterResult(
                 points=np.empty((0, 3), dtype=np.float32),
