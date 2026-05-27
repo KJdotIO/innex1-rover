@@ -755,9 +755,9 @@ class MissionManager(Node):
         """Best-effort cancellation so retries do not overlap stale goals."""
         try:
             cancel_future = goal_handle.cancel_goal_async()
-        except Exception as e:  # noqa: BLE001
+        except (AttributeError, RuntimeError) as error:
             self.get_logger().warn(
-                f"{action_name} timed out; cancellation request failed: {e}"
+                f"{action_name} timed out; cancellation request failed: {error}"
             )
             return
 

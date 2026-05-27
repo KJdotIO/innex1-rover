@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 import numpy as np
 
-
 _DATATYPE_TO_DTYPE = {
     1: np.int8,
     2: np.uint8,
@@ -217,9 +216,8 @@ def selected_point_bytes(
     point_bytes: np.ndarray | None = None,
 ) -> bytes:
     """Copy selected point records from the original PointCloud2 byte layout."""
-    if point_bytes is None:
-        point_bytes = point_byte_matrix(cloud)
-    return point_bytes[keep_mask].tobytes()
+    source_bytes = point_byte_matrix(cloud) if point_bytes is None else point_bytes
+    return source_bytes[keep_mask].tobytes()
 
 
 def cloud_xyz(cloud) -> np.ndarray:

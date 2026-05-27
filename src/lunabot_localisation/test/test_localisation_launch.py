@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 from launch import LaunchContext
-from launch.actions import OpaqueFunction
+from launch.actions import IncludeLaunchDescription, OpaqueFunction
 from launch_ros.actions import Node
 
 
@@ -32,7 +32,7 @@ def _condition_text(condition) -> str:
 
 def _substitution_text(value) -> str:
     """Return nested launch substitution internals as readable text."""
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return "".join(_substitution_text(part) for part in value)
     if "_TextSubstitution__text" in value.__dict__:
         return value.__dict__["_TextSubstitution__text"]
@@ -50,7 +50,7 @@ def _parameter_dict(parameters) -> dict:
         if not isinstance(group, dict):
             continue
         for key, value in group.items():
-            if isinstance(value, (list, tuple)) or hasattr(value, "__dict__"):
+            if isinstance(value, list | tuple) or hasattr(value, "__dict__"):
                 result[_substitution_text(key)] = _substitution_text(value).splitlines()[
                     0
                 ]
@@ -142,6 +142,7 @@ def test_validate_boolean_launch_arguments_rejects_invalid_launch_value():
     context.launch_configurations["enable_apriltag_debug"] = "false"
     context.launch_configurations["sync_sim_camera_info"] = "false"
     context.launch_configurations["lidar_odometry_backend"] = "none"
+    context.launch_configurations["legal_lidar_filter_impl"] = "cpp"
 
     with pytest.raises(ValueError, match="lidar_costmap_phase"):
         launch_module._validate_boolean_launch_arguments(context)
@@ -156,8 +157,24 @@ def test_validate_lidar_odometry_backend_rejects_unknown_backend():
     context.launch_configurations["enable_apriltag_debug"] = "false"
     context.launch_configurations["sync_sim_camera_info"] = "false"
     context.launch_configurations["lidar_odometry_backend"] = "magic"
+    context.launch_configurations["legal_lidar_filter_impl"] = "cpp"
 
     with pytest.raises(ValueError, match="lidar_odometry_backend"):
+        launch_module._validate_boolean_launch_arguments(context)
+
+
+def test_validate_legal_lidar_filter_impl_rejects_unknown_impl():
+    launch_module = _load_launch_module()
+    context = LaunchContext()
+    context.launch_configurations["lidar_costmap_phase"] = "false"
+    context.launch_configurations["enable_visual_slam"] = "false"
+    context.launch_configurations["use_sim_time"] = "true"
+    context.launch_configurations["enable_apriltag_debug"] = "false"
+    context.launch_configurations["sync_sim_camera_info"] = "false"
+    context.launch_configurations["lidar_odometry_backend"] = "kiss_icp"
+    context.launch_configurations["legal_lidar_filter_impl"] = "rust"
+
+    with pytest.raises(ValueError, match="legal_lidar_filter_impl"):
         launch_module._validate_boolean_launch_arguments(context)
 
 
@@ -197,7 +214,41 @@ def test_generate_launch_description_has_validation_and_sim_camera_info_aligner(
     assert len(validators) == 1
     assert len(tag_pose_publishers) == 1
     assert len(camera_info_aligners) == 1
-    assert len(legal_lidar_filters) == 1
+    assert len(legal_lidar_filters) == 2
+
+
+def test_legal_lidar_filter_launch_selector_has_exactly_one_active_filter(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    launch_module = _load_launch_module()
+    monkeypatch.setattr(
+        launch_module,
+        "get_package_share_directory",
+        lambda _package: "/tmp/lunabot_localisation",
+    )
+    description = launch_module.generate_launch_description()
+
+    filters = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, Node)
+        and entity.__dict__.get("_Node__node_name") == "legal_lidar_filter_ouster"
+    ]
+    assert {
+        entity.__dict__.get("_Node__package")
+        for entity in filters
+    } == {"lunabot_localisation_cpp", "lunabot_localisation"}
+
+    conditions = {
+        entity.__dict__.get("_Node__package"): _condition_text(entity.condition)
+        for entity in filters
+    }
+    assert "legal_lidar_filter_impl" in conditions["lunabot_localisation_cpp"]
+    assert "== 'cpp'" in conditions["lunabot_localisation_cpp"]
+    assert "legal_lidar_filter_impl" in conditions["lunabot_localisation"]
+    assert "== 'python'" in conditions["lunabot_localisation"]
+    assert "!= 'none'" in conditions["lunabot_localisation_cpp"]
+    assert "!= 'none'" in conditions["lunabot_localisation"]
 
 
 def test_kiss_icp_uses_legal_lidar_topic_and_disables_tf(
@@ -229,6 +280,32 @@ def test_kiss_icp_uses_legal_lidar_topic_and_disables_tf(
     assert ("kiss/odometry", "/localisation/lidar/odometry") in remapping_text
     assert parameters["lidar_odom_frame"] == "odom"
     assert parameters["publish_odom_tf"] is False
+
+
+def test_rko_lio_launch_uses_live_os1_imu_topic(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    launch_module = _load_launch_module()
+    monkeypatch.setattr(
+        launch_module,
+        "get_package_share_directory",
+        lambda _package: "/tmp/lunabot_localisation",
+    )
+    description = launch_module.generate_launch_description()
+
+    rko_includes = [
+        entity
+        for entity in description.entities
+        if isinstance(entity, IncludeLaunchDescription)
+        and "odom_topic"
+        in dict(entity.__dict__.get("_IncludeLaunchDescription__launch_arguments", []))
+    ]
+
+    assert len(rko_includes) == 1
+    launch_arguments = dict(
+        rko_includes[0].__dict__.get("_IncludeLaunchDescription__launch_arguments", [])
+    )
+    assert launch_arguments["imu_topic"] == "/ouster/imu"
 
 
 def test_no_global_ekf_in_launch_description(
