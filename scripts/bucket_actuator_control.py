@@ -30,11 +30,20 @@ def parse_uart_state(line):
 
  
 def terminal_state_for_command(command):
-    if command == "g":
-        return BucketActuatorState.BUCKET_UP
     if command == "s":
         return BucketActuatorState.STOPPED
     return None
+
+
+def bucket_sequence_complete(command, state, seen_bucket_down, seen_waiting):
+    if command == "g":
+        return (
+            state == BucketActuatorState.BUCKET_UP
+            and seen_bucket_down
+            and seen_waiting
+        )
+
+    return state == terminal_state_for_command(command)
 
 
 def send_command(port, baud, command, listen_timeout_s):
@@ -45,7 +54,8 @@ def send_command(port, baud, command, listen_timeout_s):
  
         print(f"Sent command: {command}")
  
-        terminal_state = terminal_state_for_command(command)
+        seen_bucket_down = False
+        seen_waiting = False
         start_time = time.time()
         while time.time() - start_time < listen_timeout_s:
             line = ser.readline().decode(errors="ignore").strip()
@@ -55,7 +65,17 @@ def send_command(port, baud, command, listen_timeout_s):
                     print(line)
                 else:
                     print_state(state)
-                    if state == terminal_state:
+                    if state == BucketActuatorState.BUCKET_DOWN:
+                        seen_bucket_down = True
+                    elif state == BucketActuatorState.WAITING:
+                        seen_waiting = True
+
+                    if bucket_sequence_complete(
+                        command,
+                        state,
+                        seen_bucket_down,
+                        seen_waiting,
+                    ):
                         break
  
  
