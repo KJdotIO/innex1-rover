@@ -1,9 +1,33 @@
 #!/usr/bin/env python3
  
 import argparse
+from enum import Enum
 import time
 import serial
  
+
+class BucketActuatorState(Enum):
+    """Operator-facing bucket actuator states."""
+
+    BUCKET_DOWN = "bucket down"
+    WAITING = "waiting"
+    BUCKET_UP = "bucket up"
+    STOPPED = "stopped"
+
+
+STATE_BY_UART_TEXT = {
+    state.value: state
+    for state in BucketActuatorState
+}
+
+
+def print_state(state):
+    print(f"Bucket actuator state: {state.value}")
+
+
+def parse_uart_state(line):
+    return STATE_BY_UART_TEXT.get(line.strip().lower())
+
  
 def send_command(port, baud, command):
     with serial.Serial(port, baudrate=baud, timeout=1) as ser:
@@ -17,7 +41,11 @@ def send_command(port, baud, command):
         while time.time() - start_time < 5:
             line = ser.readline().decode(errors="ignore").strip()
             if line:
-                print(line)
+                state = parse_uart_state(line)
+                if state is None:
+                    print(line)
+                else:
+                    print_state(state)
  
  
 def main():
