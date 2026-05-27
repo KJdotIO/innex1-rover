@@ -29,7 +29,15 @@ def parse_uart_state(line):
     return STATE_BY_UART_TEXT.get(line.strip().lower())
 
  
-def send_command(port, baud, command):
+def terminal_state_for_command(command):
+    if command == "g":
+        return BucketActuatorState.BUCKET_UP
+    if command == "s":
+        return BucketActuatorState.STOPPED
+    return None
+
+
+def send_command(port, baud, command, listen_timeout_s):
     with serial.Serial(port, baudrate=baud, timeout=1) as ser:
         time.sleep(2)
         ser.write(command.encode("ascii"))
@@ -37,8 +45,9 @@ def send_command(port, baud, command):
  
         print(f"Sent command: {command}")
  
+        terminal_state = terminal_state_for_command(command)
         start_time = time.time()
-        while time.time() - start_time < 5:
+        while time.time() - start_time < listen_timeout_s:
             line = ser.readline().decode(errors="ignore").strip()
             if line:
                 state = parse_uart_state(line)
@@ -46,6 +55,8 @@ def send_command(port, baud, command):
                     print(line)
                 else:
                     print_state(state)
+                    if state == terminal_state:
+                        break
  
  
 def main():
@@ -71,9 +82,16 @@ def main():
         default=9600,
         help="Serial baud rate, default 9600",
     )
+
+    parser.add_argument(
+        "--listen-timeout-s",
+        type=float,
+        default=60.0,
+        help="Seconds to listen for Nucleo state updates, default 60",
+    )
  
     args = parser.parse_args()
-    send_command(args.port, args.baud, args.command)
+    send_command(args.port, args.baud, args.command, args.listen_timeout_s)
  
  
 if __name__ == "__main__":
