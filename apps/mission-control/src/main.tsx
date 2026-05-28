@@ -79,6 +79,193 @@ interface DashboardState {
 
 const API_BASE = import.meta.env.VITE_ROVER_API_BASE ?? "";
 
+type WebGamepadBridgeState = {
+  limits?: {
+    max_linear_mps?: number;
+    max_angular_radps?: number;
+    command_timeout_s?: number;
+  };
+  command?: {
+    linear_x?: number;
+    angular_z?: number;
+    enabled?: boolean;
+    age_s?: number;
+    fresh?: boolean;
+  };
+  drivetrain_status?: {
+    state?: number;
+    fault_code?: number;
+    estop_active?: boolean;
+    motion_inhibited?: boolean;
+    controller_online?: boolean[];
+  };
+  drivetrain_telemetry?: {
+    wheel_velocity_rps?: number[];
+    encoder_ticks?: number[];
+    controller_online?: boolean[];
+    estop_active?: boolean;
+    motion_inhibited?: boolean;
+    fault_code?: number;
+  };
+};
+
+function isWebGamepadBridgeState(value: unknown): value is WebGamepadBridgeState {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      ("drivetrain_status" in value || "drivetrain_telemetry" in value) &&
+      "command" in value
+  );
+}
+
+function drivetrainStateLabel(state?: number) {
+  return (
+    {
+      0: "UNINITIALISED",
+      1: "READY",
+      2: "DRIVING",
+      3: "STOPPING",
+      4: "FAULT",
+      5: "ESTOP"
+    } as Record<number, string>
+  )[Number(state)] ?? "UNKNOWN";
+}
+
+function faultText(faultCode?: number) {
+  return (
+    {
+      0: "No active faults",
+      1: "E-stop active",
+      2: "Encoder stall",
+      3: "Controller offline",
+      4: "Overcurrent",
+      5: "Command timeout"
+    } as Record<number, string>
+  )[Number(faultCode)] ?? `Fault ${faultCode ?? "unknown"}`;
+}
+
+function adaptWebGamepadState(
+  raw: WebGamepadBridgeState,
+  latencyMs: number,
+  recording: boolean
+): DashboardState {
+  const status = raw.drivetrain_status ?? {};
+  const telemetry = raw.drivetrain_telemetry ?? {};
+  const command = raw.command ?? {};
+  const limits = raw.limits ?? {};
+  const controllerOnline =
+    status.controller_online ?? telemetry.controller_online ?? [];
+  const faultCode = Number(status.fault_code ?? telemetry.fault_code ?? 0);
+  const stateCode = Number(status.state ?? 0);
+  const estopActive = Boolean(status.estop_active ?? telemetry.estop_active);
+  const motionInhibited = Boolean(
+    status.motion_inhibited ?? telemetry.motion_inhibited
+  );
+  const controllersReady =
+    controllerOnline.length > 0 && controllerOnline.every(Boolean);
+  const gateOpen =
+    (stateCode === 1 || stateCode === 2) &&
+    faultCode === 0 &&
+    !estopActive &&
+    !motionInhibited &&
+    controllersReady;
+  const commandFresh = Boolean(command.fresh);
+  const commandEnabled = Boolean(command.enabled);
+  const safeLinear =
+    Number(command.linear_x ?? 0) * Number(limits.max_linear_mps ?? 0);
+  const safeAngular =
+    Number(command.angular_z ?? 0) * Number(limits.max_angular_radps ?? 0);
+  const gatedCommand = gateOpen && commandFresh && commandEnabled
+    ? { linear: safeLinear, angular: safeAngular }
+    : { linear: 0, angular: 0 };
+
+  return {
+    connection: {
+      route: "tailscale",
+      jetsonOnline: true,
+      rosOnline: true,
+      latencyMs
+    },
+    safety: {
+      estopActive,
+      motionInhibited,
+      gateOpen,
+      canMove: gateOpen,
+      faultText: faultText(faultCode)
+    },
+    mission: {
+      phase: "Bench monitoring",
+      mode: commandEnabled ? "teleop" : "manual",
+      timeRemainingS: 0,
+      cycleCount: 0,
+      lastFailureReason: faultCode === 0 ? "None" : faultText(faultCode),
+      rosbagRecording: recording
+    },
+    drivetrain: {
+      state: drivetrainStateLabel(stateCode),
+      faultCode,
+      commandAgeS: Number(command.age_s ?? 0),
+      safeCommand: { linear: safeLinear, angular: safeAngular },
+      gatedCommand,
+      encoderTicks: telemetry.encoder_ticks ?? [0, 0, 0, 0],
+      wheelRps: telemetry.wheel_velocity_rps ?? [0, 0, 0, 0]
+    },
+    localisation: {
+      ready: false,
+      tfHealthy: false,
+      aprilTags: 0,
+      pose: { x: 0, y: 0, yawDeg: 0 }
+    },
+    power: {
+      batteryV: 0,
+      currentA: 0
+    },
+    cameras: {
+      frontFps: 0,
+      rearFps: 0,
+      frontStale: true,
+      rearStale: true
+    },
+    preflight: [
+      { label: "Jetson", ok: true, detail: "Reachable" },
+      { label: "ROS graph", ok: true, detail: "Bridge live" },
+      {
+        label: "Safety gate",
+        ok: gateOpen,
+        detail: gateOpen ? "Open" : "Holding zero"
+      },
+      {
+        label: "Controllers",
+        ok: controllersReady,
+        detail: controllersReady ? "Online" : "Offline"
+      },
+      {
+        label: "Command stream",
+        ok: commandFresh && commandEnabled,
+        detail: commandFresh ? "Fresh" : "Stale"
+      },
+      { label: "Localisation", ok: false, detail: "Not in bridge" }
+    ],
+    events: [
+      {
+        level: faultCode === 0 ? "ok" : "bad",
+        text:
+          faultCode === 0
+            ? "Live drivetrain bridge state received"
+            : faultText(faultCode)
+      },
+      {
+        level: gateOpen ? "ok" : "warn",
+        text: gateOpen ? "Velocity gate can pass movement" : "Velocity gate holding zero"
+      },
+      {
+        level: commandFresh ? "ok" : "warn",
+        text: commandFresh ? "Browser command stream fresh" : "Browser command stream stale"
+      }
+    ]
+  };
+}
+
 function makeMockState(tick: number, recording = false): DashboardState {
   const gateOpen = tick % 70 < 58;
   const inhibited = tick % 70 >= 58 && tick % 70 < 64;
@@ -181,9 +368,18 @@ function makeMockState(tick: number, recording = false): DashboardState {
 
 async function fetchState(tick: number, recording: boolean) {
   if (!API_BASE) return makeMockState(tick, recording);
+  const startedAt = performance.now();
   const response = await fetch(`${API_BASE}/api/state`, { cache: "no-store" });
   if (!response.ok) throw new Error(`State request failed: ${response.status}`);
-  return (await response.json()) as DashboardState;
+  const payload = (await response.json()) as unknown;
+  if (isWebGamepadBridgeState(payload)) {
+    return adaptWebGamepadState(
+      payload,
+      Math.round(performance.now() - startedAt),
+      recording
+    );
+  }
+  return payload as DashboardState;
 }
 
 async function sendAction(action: ActionName) {
@@ -204,6 +400,11 @@ function formatSeconds(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}
+
+function formatAge(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds > 99) return "stale";
+  return `${seconds.toFixed(2)} s`;
 }
 
 function statusFromBoolean(ok: boolean): Health {
@@ -311,7 +512,9 @@ function App() {
   const [state, setState] = useState(() => makeMockState(1));
   const [busyAction, setBusyAction] = useState<ActionName | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [log, setLog] = useState<string[]>(["Dashboard started in mock mode."]);
+  const [log, setLog] = useState<string[]>([
+    API_BASE ? "Dashboard connected to rover bridge." : "Dashboard started in mock mode."
+  ]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setTick((value) => value + 1), 1200);
@@ -368,6 +571,7 @@ function App() {
     : state.safety.estopActive || state.drivetrain.faultCode
       ? "bad"
       : "warn";
+  const hasPower = state.power.batteryV > 0 || state.power.currentA > 0;
 
   return (
     <main className="dashboard">
@@ -394,7 +598,11 @@ function App() {
         <Stat label="Can move" value={state.safety.canMove ? "Yes" : "No"} muted={state.safety.faultText} />
         <Stat label="Mission" value={state.mission.phase} muted={`${state.mission.mode} · ${formatSeconds(state.mission.timeRemainingS)}`} />
         <Stat label="Drivetrain" value={state.drivetrain.state} muted={`fault ${state.drivetrain.faultCode}`} />
-        <Stat label="Power" value={`${state.power.batteryV.toFixed(1)} V`} muted={`${state.power.currentA.toFixed(1)} A`} />
+        <Stat
+          label="Power"
+          value={hasPower ? `${state.power.batteryV.toFixed(1)} V` : "n/a"}
+          muted={hasPower ? `${state.power.currentA.toFixed(1)} A` : "not in bridge"}
+        />
         <Stat label="Localisation" value={state.localisation.ready ? "Ready" : "Waiting"} muted={`${state.localisation.aprilTags} tags`} />
       </section>
 
@@ -443,7 +651,7 @@ function App() {
             </div>
             <div>
               <span>Command age</span>
-              <strong>{state.drivetrain.commandAgeS.toFixed(2)} s</strong>
+              <strong>{formatAge(state.drivetrain.commandAgeS)}</strong>
             </div>
           </div>
           <table>

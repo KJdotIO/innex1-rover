@@ -12,6 +12,22 @@ npm install
 npm run dev
 ```
 
+For a live Jetson bench check over Tailscale, use the Vite proxy. This avoids
+browser CORS and self-signed certificate friction while still reading the real
+Jetson bridge:
+
+```bash
+ROVER_API_TARGET=https://100.71.241.9:9443 \
+VITE_ROVER_API_BASE=/rover \
+npm run dev -- --host 127.0.0.1
+```
+
+The current dashboard can adapt the existing browser Gamepad bridge
+`GET /api/state` response, so it will show drivetrain state, controller
+online/offline status, wheel encoder ticks, command freshness, and whether the
+velocity gate is holding zero. Topics not exposed by that bridge, such as power
+and localisation, are shown as unavailable rather than invented.
+
 Planned bridge shape:
 
 - `GET /api/state` returns one reduced mission-control state document.
