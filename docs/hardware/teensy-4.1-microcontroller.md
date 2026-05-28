@@ -47,8 +47,10 @@
 
 | Pin(s) | Signal | Direction | Device | Notes |
 |--------|--------|-----------|--------|-------|
-| **0** | UART1 TX | → | Sabertooth 2×32 #1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
-| **7** | UART2 TX | → | Sabertooth 2×32 #2 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128 |
+| **1** | UART1 TX | → | Sabertooth 2×32 #1 S1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
+| **0** | UART1 RX | ← | Sabertooth 2×32 #1 S2 | Optional telemetry/readback |
+| **8** | UART2 TX | → | Sabertooth 2×32 #2 S1 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128 |
+| **7** | UART2 RX | ← | Sabertooth 2×32 #2 S2 | Optional telemetry/readback |
 | **2** | PWM ch1 | → | Cytron MDD10A #1 | Actuator 1 speed |
 | **3** | PWM ch2 | → | Cytron MDD10A #1 | Actuator 2 speed |
 | **9** | DIR ch1 | → | Cytron MDD10A #1 | Actuator 1 direction |
@@ -74,6 +76,11 @@
 
 **~25 pins used — ~30 pins spare on Teensy 4.1**
 
+Bench validation on 2026-05-27 confirmed the left drivetrain mapping:
+Teensy pin `1` to the left Sabertooth `S1`, FL encoder on `15/16`, and RL
+encoder on `17/18`. A left-side command drove both motors with matching encoder
+counts after rear-left motor polarity was corrected at the Sabertooth output.
+
 ---
 
 ## Power Rails Provided by Teensy
@@ -93,8 +100,8 @@
 | Interface | Protocol | Connected To |
 |-----------|----------|-------------|
 | USB (virtual COM) | Serial | Jetson Orin Nano — bidirectional |
-| UART1 (Pin 0) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
-| UART2 (Pin 7) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) |
+| UART1 (Pin 1 TX, Pin 0 RX optional) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 |
+| UART2 (Pin 8 TX, Pin 7 RX optional) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 |
 | GPIO PWM (Pins 2–6) | PWM + DIR | Cytron MDD10A #1 and #2, BLD-510B SV |
 | GPIO (Pins 13–14) | Digital out, active-low | BLD-510B F/R and EN |
 | GPIO (Pins 15–22) | Quadrature encoder input | 4× GR-WM4-V3 drivetrain motor encoders |

@@ -33,7 +33,7 @@ from rclpy.qos import (
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool
 
-from lunabot_drivetrain import sabertooth_serial
+from lunabot_drivetrain import sabertooth_serial, teensy_serial
 from lunabot_interfaces.msg import (
     DrivetrainStatus,
     DrivetrainTelemetry,
@@ -49,7 +49,10 @@ _INHIBIT_QOS = QoSProfile(
 _WHEEL_NAMES = ["wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]
 _LEGACY_SIMPLIFIED_PROTOCOLS = {"simplified", "legacy_simplified"}
 _PACKETIZED_PROTOCOLS = {"packetized", "packet_serial"}
-_SUPPORTED_PROTOCOLS = _LEGACY_SIMPLIFIED_PROTOCOLS | _PACKETIZED_PROTOCOLS
+_TEENSY_PROTOCOLS = {"teensy", "teensy_line"}
+_SUPPORTED_PROTOCOLS = (
+    _LEGACY_SIMPLIFIED_PROTOCOLS | _PACKETIZED_PROTOCOLS | _TEENSY_PROTOCOLS
+)
 
 
 class DrivetrainBridge(Node):
@@ -77,6 +80,7 @@ class DrivetrainBridge(Node):
         self.declare_parameter("serial_port", "/dev/ttyTHS1")
         self.declare_parameter("baud_rate", 9600)
         self.declare_parameter("serial_protocol", "legacy_simplified")
+        self.declare_parameter("reset_encoders_on_start", True)
         self.declare_parameter("dry_run", False)
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_gated")
         self.declare_parameter("sabertooth_addresses", [128, 129])
@@ -99,6 +103,9 @@ class DrivetrainBridge(Node):
             self.get_parameter("serial_protocol").value
         ).strip().lower()
         self._dry_run = bool(self.get_parameter("dry_run").value)
+        self._reset_encoders_on_start = bool(
+            self.get_parameter("reset_encoders_on_start").value
+        )
         self._cmd_vel_topic = str(
             self.get_parameter("cmd_vel_topic").value
         ).strip()
@@ -204,6 +211,8 @@ class DrivetrainBridge(Node):
         self._last_twist = Twist()
         self._encoder_ticks = [0, 0, 0, 0]
         self._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
+        self._last_teensy_ticks: Optional[list[int]] = None
+        self._last_teensy_sample_time: Optional[float] = None
         self._controller_online = [False, False]
         self._stall_start_time: Optional[float] = None
         self._estop_clear_time: Optional[float] = None
@@ -229,6 +238,10 @@ class DrivetrainBridge(Node):
                 timeout=0.01,
             )
             self._controller_online = [True, True]
+            if self._serial_protocol in _TEENSY_PROTOCOLS:
+                self._initialise_teensy_serial()
+                if self._state == DrivetrainStatus.STATE_FAULT:
+                    return
             self._state = DrivetrainStatus.STATE_READY
             self.get_logger().info(f"Serial port {self._serial_port} opened")
         except (OSError, pyserial.SerialException) as exc:
@@ -254,6 +267,24 @@ class DrivetrainBridge(Node):
         )
         self._fault_code = DrivetrainStatus.FAULT_CONTROLLER_OFFLINE
         self._state = DrivetrainStatus.STATE_FAULT
+
+    def _initialise_teensy_serial(self) -> None:
+        """Flush startup chatter and put the Teensy firmware in READY."""
+        if self._serial is None:
+            return
+
+        try:
+            time.sleep(0.2)
+            self._serial.reset_input_buffer()
+            self._serial.reset_output_buffer()
+            teensy_serial.send_release_estop(self._serial)
+            teensy_serial.send_restart(self._serial)
+            if self._reset_encoders_on_start:
+                teensy_serial.send_zero_encoders(self._serial)
+        except (AttributeError, OSError) as exc:
+            self._mark_controller_offline(
+                f"Teensy serial initialisation failed: {exc}"
+            )
 
     def _mark_controller_offline(self, reason: str) -> None:
         """Record a controller IO failure and fail closed."""
@@ -312,11 +343,13 @@ class DrivetrainBridge(Node):
         self._estop_active = msg.data
         if msg.data and not prev:
             self.get_logger().warn("E-stop ACTIVE — motors will be stopped")
+            self._send_estop()
             self._transition_to(DrivetrainStatus.STATE_ESTOP)
 
     def _control_loop(self) -> None:
         """Run one control cycle: convert cmd_vel to motor commands."""
         now = time.monotonic()
+        self._read_teensy_feedback(now)
 
         if self._state == DrivetrainStatus.STATE_FAULT:
             self._send_stop()
@@ -339,6 +372,7 @@ class DrivetrainBridge(Node):
                     "Sabertooth re-init"
                 )
             elif (now - self._estop_clear_time) >= 2.0:
+                self._release_estop()
                 self._estop_clear_time = None
                 self._fault_code = DrivetrainStatus.FAULT_NONE
                 self._transition_to(DrivetrainStatus.STATE_READY)
@@ -426,6 +460,9 @@ class DrivetrainBridge(Node):
         if self._serial is None:
             return
         try:
+            if self._serial_protocol in _TEENSY_PROTOCOLS:
+                teensy_serial.send_throttle(self._serial, left, right)
+                return
             if self._serial_protocol in _LEGACY_SIMPLIFIED_PROTOCOLS:
                 sabertooth_serial.send_simplified_throttle(
                     self._serial, left, right
@@ -445,6 +482,9 @@ class DrivetrainBridge(Node):
         if self._serial is None:
             return
         try:
+            if self._serial_protocol in _TEENSY_PROTOCOLS:
+                teensy_serial.send_stop(self._serial)
+                return
             if self._serial_protocol in _LEGACY_SIMPLIFIED_PROTOCOLS:
                 sabertooth_serial.send_simplified_stop(self._serial)
                 return
@@ -453,6 +493,78 @@ class DrivetrainBridge(Node):
         except OSError as exc:
             self._mark_controller_offline(f"Serial stop failed: {exc}")
 
+    def _send_estop(self) -> None:
+        """Send a software e-stop latch when the backend supports one."""
+        if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
+            self._send_stop()
+            return
+        try:
+            teensy_serial.send_estop(self._serial)
+        except OSError as exc:
+            self._mark_controller_offline(f"Serial e-stop failed: {exc}")
+
+    def _release_estop(self) -> None:
+        """Release and restart a Teensy software e-stop latch."""
+        if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
+            return
+        try:
+            teensy_serial.send_release_estop(self._serial)
+            teensy_serial.send_restart(self._serial)
+        except OSError as exc:
+            self._mark_controller_offline(
+                f"Serial e-stop release failed: {exc}"
+            )
+
+    def _read_teensy_feedback(self, now: float) -> None:
+        """Consume available Teensy telemetry without blocking control output."""
+        if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
+            return
+
+        while True:
+            try:
+                if getattr(self._serial, "in_waiting", 0) <= 0:
+                    return
+                raw_line = self._serial.readline()
+            except OSError as exc:
+                self._mark_controller_offline(f"Serial read failed: {exc}")
+                return
+            if not raw_line:
+                return
+
+            try:
+                telemetry = teensy_serial.parse_telemetry_line(raw_line)
+            except ValueError as exc:
+                self.get_logger().warn(
+                    f"Ignoring malformed Teensy telemetry: {exc}"
+                )
+                continue
+            if telemetry is None:
+                continue
+            self._apply_teensy_telemetry(telemetry, now)
+
+    def _apply_teensy_telemetry(
+        self, telemetry: teensy_serial.TeensyTelemetry, now: float
+    ) -> None:
+        """Update encoder ticks and wheel velocities from Teensy feedback."""
+        ticks = telemetry.encoder_ticks
+        if (
+            self._last_teensy_ticks is not None
+            and self._last_teensy_sample_time is not None
+        ):
+            dt = now - self._last_teensy_sample_time
+            if dt > 0.0:
+                self._wheel_velocity_rps = [
+                    (ticks[i] - self._last_teensy_ticks[i])
+                    / self._encoder_cpr
+                    / dt
+                    for i in range(4)
+                ]
+
+        self._encoder_ticks = ticks
+        self._last_teensy_ticks = list(ticks)
+        self._last_teensy_sample_time = now
+        self._controller_online = [True, True]
+
     def _transition_to(self, new_state: int) -> None:
         """Update the state machine, only logging on actual transitions."""
         if new_state != self._state:
@@ -460,6 +572,7 @@ class DrivetrainBridge(Node):
 
     def _publish_telemetry(self) -> None:
         """Publish telemetry and status at the configured rate."""
+        self._read_teensy_feedback(time.monotonic())
         now = self.get_clock().now().to_msg()
 
         status = DrivetrainStatus()
@@ -520,4 +633,5 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()

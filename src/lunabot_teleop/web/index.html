@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>INNEX-1 Drive Console</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d10;
+        --panel: #171b20;
+        --panel-soft: #101318;
+        --line: #2a3139;
+        --text: #eff4f8;
+        --muted: #95a1ad;
+        --good: #52d273;
+        --warn: #f1c75b;
+        --bad: #ff6767;
+        --blue: #64a7ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1280px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 24px 0;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: end;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 720;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 15px;
+        font-weight: 680;
+      }
+
+      button {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        background: var(--panel-soft);
+        padding: 10px 12px;
+        font: inherit;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      input[type="range"] {
+        width: 100%;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--bad);
+      }
+
+      .dot.ok {
+        background: var(--good);
+      }
+
+      .dot.warn {
+        background: var(--warn);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+        gap: 16px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 8px;
+        padding: 16px;
+      }
+
+      .readout,
+      .controls,
+      .telemetry {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric,
+      .control {
+        min-height: 84px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--panel-soft);
+      }
+
+      .metric span,
+      .control label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric strong,
+      .control strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 22px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .bar {
+        height: 12px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        background: #0c0f13;
+      }
+
+      .fill {
+        height: 100%;
+        width: 0%;
+        margin-left: 50%;
+        transform-origin: left;
+        background: var(--good);
+      }
+
+      .buttons {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .button {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px 8px;
+        text-align: center;
+        color: var(--muted);
+        background: var(--panel-soft);
+      }
+
+      .button.on {
+        border-color: var(--good);
+        color: var(--text);
+        background: #17331f;
+      }
+
+      .map {
+        position: relative;
+        height: 360px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+          #0c0f13;
+        background-size: 28px 28px;
+      }
+
+      .trail {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .rover {
+        position: absolute;
+        width: 34px;
+        height: 46px;
+        margin: -23px 0 0 -17px;
+        border: 2px solid var(--blue);
+        border-radius: 5px;
+        background: rgba(100, 167, 255, 0.18);
+        transform-origin: center;
+      }
+
+      .rover::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: -10px;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-bottom: 10px solid var(--blue);
+      }
+
+      .obstacle {
+        position: absolute;
+        width: 38px;
+        height: 38px;
+        border: 1px solid var(--warn);
+        border-radius: 50%;
+        background: rgba(241, 199, 91, 0.18);
+      }
+
+      .log {
+        height: 126px;
+        overflow: auto;
+        white-space: pre-wrap;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 920px) {
+        header,
+        .grid {
+          display: block;
+        }
+
+        section {
+          margin-bottom: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>INNEX-1 Drive Console</h1>
+          <div class="status"><span id="bridgeDot" class="dot warn"></span><span id="bridgeStatus">waiting for controller input</span></div>
+        </div>
+        <div class="status"><span id="enabledDot" class="dot"></span><span id="enabledStatus">disabled</span></div>
+      </header>
+
+      <div class="grid">
+        <div class="stack">
+          <section>
+            <h2>Command</h2>
+            <div class="readout">
+              <div class="metric">
+                <span>linear x</span>
+                <strong id="linearText">0.000</strong>
+                <div class="bar"><div id="linearBar" class="fill"></div></div>
+              </div>
+              <div class="metric">
+                <span>angular z</span>
+                <strong id="angularText">0.000</strong>
+                <div class="bar"><div id="angularBar" class="fill"></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2>Trim</h2>
+            <div class="controls">
+              <div class="control">
+                <label for="maxLinear">top speed</label>
+                <strong id="maxLinearText">0.30 m/s</strong>
+                <input id="maxLinear" type="range" min="5" max="60" value="30" />
+              </div>
+              <div class="control">
+                <label for="maxAngular">turn rate</label>
+                <strong id="maxAngularText">0.80 rad/s</strong>
+                <input id="maxAngular" type="range" min="10" max="160" value="80" />
+              </div>
+              <div class="control">
+                <label for="linearScale">linear scale</label>
+                <strong id="linearScaleText">35%</strong>
+                <input id="linearScale" type="range" min="0" max="100" value="35" />
+              </div>
+              <div class="control">
+                <label for="angularScale">angular scale</label>
+                <strong id="angularScaleText">35%</strong>
+                <input id="angularScale" type="range" min="0" max="100" value="35" />
+              </div>
+              <div class="control">
+                <label for="deadzone">deadzone</label>
+                <strong id="deadzoneText">0.08</strong>
+                <input id="deadzone" type="range" min="0" max="25" value="8" />
+              </div>
+              <div class="control">
+                <label>actions</label>
+                <strong id="serverLimits">loading</strong>
+                <button id="resetPose">Reset 2D Pose</button>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2>Telemetry</h2>
+            <div class="telemetry">
+              <div class="metric"><span>drivetrain</span><strong id="driveState">unknown</strong></div>
+              <div class="metric"><span>fault</span><strong id="faultState">unknown</strong></div>
+              <div class="metric"><span>encoder ticks</span><strong id="ticksText">-</strong></div>
+              <div class="metric"><span>wheel rps</span><strong id="rpsText">-</strong></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section>
+            <h2>2D Command Plane</h2>
+            <div id="map" class="map">
+              <svg id="trail" class="trail"></svg>
+              <div class="obstacle" style="left: 68%; top: 30%"></div>
+              <div class="obstacle" style="left: 24%; top: 65%"></div>
+              <div id="rover" class="rover"></div>
+            </div>
+          </section>
+
+          <section>
+            <h2>Controller</h2>
+            <div class="metric">
+              <span>gamepad</span>
+              <strong id="padName">none</strong>
+            </div>
+            <div id="buttons" class="buttons"></div>
+          </section>
+
+          <section>
+            <h2>Log</h2>
+            <div id="log" class="log"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const SEND_HZ = 20;
+      const ENABLE_BUTTON = 4;
+      const LINEAR_AXIS = 1;
+      const ANGULAR_AXIS = 2;
+      const state = {
+        lastOk: 0,
+        lastSend: 0,
+        lastStatePoll: 0,
+        configReady: false,
+        configSendAt: 0,
+        lastFrame: performance.now(),
+        pose: { x: 0, y: 0, yaw: 0 },
+        trail: [],
+        limits: { max_linear_mps: 0.3, max_angular_radps: 0.8 },
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const buttonsEl = $("buttons");
+      for (let i = 0; i < 16; i += 1) {
+        const el = document.createElement("div");
+        el.className = "button";
+        el.id = `button-${i}`;
+        el.textContent = i === ENABLE_BUTTON ? `${i} LB enable` : `${i}`;
+        buttonsEl.appendChild(el);
+      }
+
+      function log(message) {
+        const now = new Date().toLocaleTimeString("en-GB");
+        $("log").textContent = `${now} ${message}\n${$("log").textContent}`.slice(0, 3000);
+      }
+
+      function scaleValue(id) {
+        return Number($(id).value) / 100;
+      }
+
+      function deadzoneValue() {
+        return Number($("deadzone").value) / 100;
+      }
+
+      function shapeAxis(value) {
+        const dz = deadzoneValue();
+        const v = Math.abs(value) < dz ? 0 : value;
+        return Math.max(-1, Math.min(1, v));
+      }
+
+      function setBar(id, value) {
+        const pct = 50 + value * 50;
+        const el = $(id);
+        el.style.width = `${Math.abs(value) * 50}%`;
+        el.style.marginLeft = value < 0 ? `${pct}%` : "50%";
+        el.style.background = value === 0 ? "#56616d" : "var(--good)";
+      }
+
+      async function sendCommand(command) {
+        const res = await fetch("/api/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(command),
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        state.lastOk = performance.now();
+      }
+
+      async function sendConfig() {
+        const res = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            max_linear_mps: Number($("maxLinear").value) / 100,
+            max_angular_radps: Number($("maxAngular").value) / 100,
+          }),
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          throw new Error(`config HTTP ${res.status}`);
+        }
+        state.limits = await res.json();
+        updateSpeedText();
+      }
+
+      async function pollState() {
+        const res = await fetch("/api/state", { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error(`state HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        state.limits = data.limits || state.limits;
+        if (!state.configReady) {
+          $("maxLinear").value = Math.round(state.limits.max_linear_mps * 100);
+          $("maxAngular").value = Math.round(state.limits.max_angular_radps * 100);
+          state.configReady = true;
+          updateSpeedText();
+        }
+        $("serverLimits").textContent = `${state.limits.max_linear_mps.toFixed(2)} m/s, ${state.limits.max_angular_radps.toFixed(2)} rad/s`;
+
+        const status = data.drivetrain_status || {};
+        const telemetry = data.drivetrain_telemetry || {};
+        $("driveState").textContent = stateName(status.state);
+        $("faultState").textContent = faultName(status.fault_code);
+        $("ticksText").textContent = compactArray(telemetry.encoder_ticks);
+        $("rpsText").textContent = compactArray(telemetry.wheel_velocity_rps, 2);
+      }
+
+      function compactArray(values, digits = 0) {
+        if (!Array.isArray(values) || values.length === 0) {
+          return "-";
+        }
+        return values.map((v) => Number(v).toFixed(digits)).join(" ");
+      }
+
+      function stateName(value) {
+        return {
+          0: "uninitialised",
+          1: "ready",
+          2: "driving",
+          3: "stopping",
+          4: "fault",
+          5: "e-stop",
+        }[value] || "unknown";
+      }
+
+      function faultName(value) {
+        return {
+          0: "none",
+          1: "e-stop",
+          2: "encoder stall",
+          3: "offline",
+          4: "overcurrent",
+          5: "timeout",
+        }[value] || "unknown";
+      }
+
+      function updateStatus(ok, enabled) {
+        $("bridgeDot").className = `dot ${ok ? "ok" : "warn"}`;
+        $("bridgeStatus").textContent = ok ? "sending to Jetson" : "waiting for bridge";
+        $("enabledDot").className = `dot ${enabled ? "ok" : ""}`;
+        $("enabledStatus").textContent = enabled ? "enabled" : "disabled";
+      }
+
+      function updateTrimText() {
+        $("linearScaleText").textContent = `${$("linearScale").value}%`;
+        $("angularScaleText").textContent = `${$("angularScale").value}%`;
+        $("deadzoneText").textContent = deadzoneValue().toFixed(2);
+      }
+
+      function updateSpeedText() {
+        $("maxLinearText").textContent = `${(Number($("maxLinear").value) / 100).toFixed(2)} m/s`;
+        $("maxAngularText").textContent = `${(Number($("maxAngular").value) / 100).toFixed(2)} rad/s`;
+      }
+
+      function scheduleConfigSend() {
+        updateSpeedText();
+        state.configSendAt = performance.now() + 120;
+      }
+
+      function integratePreview(linear, angular, dt) {
+        const maxLinear = state.limits.max_linear_mps || 0.1;
+        const maxAngular = state.limits.max_angular_radps || 0.3;
+        state.pose.yaw += angular * maxAngular * dt;
+        state.pose.x += Math.sin(state.pose.yaw) * linear * maxLinear * dt * 160;
+        state.pose.y -= Math.cos(state.pose.yaw) * linear * maxLinear * dt * 160;
+        state.pose.x = Math.max(-220, Math.min(220, state.pose.x));
+        state.pose.y = Math.max(-150, Math.min(150, state.pose.y));
+        state.trail.push({ x: state.pose.x, y: state.pose.y });
+        state.trail = state.trail.slice(-180);
+      }
+
+      function drawPreview() {
+        const map = $("map");
+        const rover = $("rover");
+        const cx = map.clientWidth / 2;
+        const cy = map.clientHeight / 2;
+        rover.style.left = `${cx + state.pose.x}px`;
+        rover.style.top = `${cy + state.pose.y}px`;
+        rover.style.transform = `rotate(${state.pose.yaw}rad)`;
+
+        const points = state.trail
+          .map((p) => `${cx + p.x},${cy + p.y}`)
+          .join(" ");
+        $("trail").innerHTML = `<polyline points="${points}" fill="none" stroke="#64a7ff" stroke-width="2" opacity="0.8" />`;
+      }
+
+      async function tick(now) {
+        updateTrimText();
+        const dt = Math.min(0.08, (now - state.lastFrame) / 1000);
+        state.lastFrame = now;
+
+        const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        const pad = Array.from(pads).find(Boolean);
+        if (state.configSendAt && now >= state.configSendAt) {
+          state.configSendAt = 0;
+          sendConfig().catch((err) => log(`config failed: ${err.message}`));
+        }
+        if (!pad) {
+          $("padName").textContent = "none";
+          updateStatus(false, false);
+          drawPreview();
+          requestAnimationFrame(tick);
+          return;
+        }
+
+        $("padName").textContent = pad.id;
+        const enabled = Boolean(pad.buttons[ENABLE_BUTTON]?.pressed);
+        const linear = enabled
+          ? -shapeAxis(pad.axes[LINEAR_AXIS] || 0) * scaleValue("linearScale")
+          : 0;
+        const angular = enabled
+          ? -shapeAxis(pad.axes[ANGULAR_AXIS] || 0) * scaleValue("angularScale")
+          : 0;
+
+        $("linearText").textContent = linear.toFixed(3);
+        $("angularText").textContent = angular.toFixed(3);
+        setBar("linearBar", linear);
+        setBar("angularBar", angular);
+
+        for (let i = 0; i < 16; i += 1) {
+          const on = Boolean(pad.buttons[i]?.pressed);
+          $("button-" + i).classList.toggle("on", on);
+        }
+
+        integratePreview(linear, angular, dt);
+        drawPreview();
+
+        if (now - state.lastSend > 1000 / SEND_HZ) {
+          state.lastSend = now;
+          try {
+            await sendCommand({ linear_x: linear, angular_z: angular, enabled });
+          } catch (err) {
+            log(`send failed: ${err.message}`);
+          }
+        }
+        if (now - state.lastStatePoll > 500) {
+          state.lastStatePoll = now;
+          pollState().catch((err) => log(`state failed: ${err.message}`));
+        }
+        updateStatus(now - state.lastOk < 500, enabled);
+        requestAnimationFrame(tick);
+      }
+
+      $("resetPose").addEventListener("click", () => {
+        state.pose = { x: 0, y: 0, yaw: 0 };
+        state.trail = [];
+        drawPreview();
+      });
+      $("maxLinear").addEventListener("input", scheduleConfigSend);
+      $("maxAngular").addEventListener("input", scheduleConfigSend);
+      window.addEventListener("gamepadconnected", (event) => {
+        log(`connected: ${event.gamepad.id}`);
+      });
+      window.addEventListener("gamepaddisconnected", () => {
+        log("controller disconnected");
+      });
+      updateSpeedText();
+      log("press a controller button if the browser has not detected it yet");
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>

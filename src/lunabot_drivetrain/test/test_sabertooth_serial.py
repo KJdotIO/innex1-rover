@@ -20,6 +20,7 @@ import types
 import pytest
 
 import lunabot_drivetrain.sabertooth_serial as sabertooth_serial
+import lunabot_drivetrain.teensy_serial as teensy_serial
 from lunabot_drivetrain.sabertooth_serial import (
     _pack_command,
     simplified_throttle_to_bytes,
@@ -48,6 +49,104 @@ except ModuleNotFoundError:
     fake_msg.DrivetrainTelemetry = DrivetrainTelemetry
     sys.modules.setdefault("lunabot_interfaces", types.ModuleType("lunabot_interfaces"))
     sys.modules["lunabot_interfaces.msg"] = fake_msg
+
+for name, value in {
+    "STATE_UNINITIALISED": 0,
+    "STATE_READY": 1,
+    "STATE_DRIVING": 2,
+    "STATE_FAULT": 3,
+    "STATE_ESTOP": 4,
+    "FAULT_NONE": 0,
+    "FAULT_CONTROLLER_OFFLINE": 2,
+    "FAULT_ENCODER_STALL": 3,
+}.items():
+    if not hasattr(DrivetrainStatus, name):
+        setattr(DrivetrainStatus, name, value)
+
+
+def _install_ros_fakes():
+    """Install tiny ROS message/module fakes for non-ROS unit test hosts."""
+    try:
+        import rclpy as _rclpy  # noqa: F401
+        from geometry_msgs.msg import Twist as _Twist  # noqa: F401
+        from nav_msgs.msg import Odometry as _Odometry  # noqa: F401
+        from sensor_msgs.msg import JointState as _JointState  # noqa: F401
+        from std_msgs.msg import Bool as _Bool  # noqa: F401
+
+        return
+    except ModuleNotFoundError:
+        pass
+
+    class _Vector:
+        x = 0.0
+        y = 0.0
+        z = 0.0
+
+    class Twist:
+        def __init__(self):
+            self.linear = _Vector()
+            self.angular = _Vector()
+
+    class Odometry:
+        pass
+
+    class JointState:
+        pass
+
+    class Bool:
+        def __init__(self):
+            self.data = False
+
+    class Node:
+        pass
+
+    class QoSProfile:
+        def __init__(self, **_kwargs):
+            pass
+
+    class _Policy:
+        KEEP_LAST = 1
+        RELIABLE = 1
+        TRANSIENT_LOCAL = 1
+
+    geometry_msgs = types.ModuleType("geometry_msgs")
+    geometry_msg = types.ModuleType("geometry_msgs.msg")
+    geometry_msg.Twist = Twist
+    sys.modules["geometry_msgs"] = geometry_msgs
+    sys.modules["geometry_msgs.msg"] = geometry_msg
+
+    nav_msgs = types.ModuleType("nav_msgs")
+    nav_msg = types.ModuleType("nav_msgs.msg")
+    nav_msg.Odometry = Odometry
+    sys.modules["nav_msgs"] = nav_msgs
+    sys.modules["nav_msgs.msg"] = nav_msg
+
+    sensor_msgs = types.ModuleType("sensor_msgs")
+    sensor_msg = types.ModuleType("sensor_msgs.msg")
+    sensor_msg.JointState = JointState
+    sys.modules["sensor_msgs"] = sensor_msgs
+    sys.modules["sensor_msgs.msg"] = sensor_msg
+
+    std_msgs = types.ModuleType("std_msgs")
+    std_msg = types.ModuleType("std_msgs.msg")
+    std_msg.Bool = Bool
+    sys.modules["std_msgs"] = std_msgs
+    sys.modules["std_msgs.msg"] = std_msg
+
+    rclpy = types.ModuleType("rclpy")
+    rclpy.node = types.ModuleType("rclpy.node")
+    rclpy.node.Node = Node
+    rclpy.qos = types.ModuleType("rclpy.qos")
+    rclpy.qos.QoSProfile = QoSProfile
+    rclpy.qos.DurabilityPolicy = _Policy
+    rclpy.qos.HistoryPolicy = _Policy
+    rclpy.qos.ReliabilityPolicy = _Policy
+    sys.modules["rclpy"] = rclpy
+    sys.modules["rclpy.node"] = rclpy.node
+    sys.modules["rclpy.qos"] = rclpy.qos
+
+
+_install_ros_fakes()
 
 
 class TestPackCommand:
@@ -137,6 +236,37 @@ class TestSimplifiedThrottleToBytes:
 
     def test_half_throttle(self):
         assert simplified_throttle_to_bytes(0.5, -0.5) == bytes([96, 160])
+
+
+class TestTeensySerial:
+    """Verify the Teensy USB serial line protocol."""
+
+    def test_full_scale_command(self):
+        assert teensy_serial.throttle_to_bytes(1.0, -1.0) == b"V 127 -127\n"
+
+    def test_command_clamps(self):
+        assert teensy_serial.throttle_to_bytes(2.0, -2.0) == b"V 127 -127\n"
+
+    def test_stop_and_estop_commands(self):
+        assert teensy_serial.stop_to_bytes() == b"X\n"
+        assert teensy_serial.estop_to_bytes() == b"E\n"
+        assert teensy_serial.release_estop_to_bytes() == b"U\n"
+        assert teensy_serial.restart_to_bytes() == b"R\n"
+
+    def test_parse_telemetry_reorders_ticks_to_ros_wheel_order(self):
+        telemetry = teensy_serial.parse_telemetry_line(
+            b"T 1234 RUN 0 0 30 30 28 29 10 20 30 40\n"
+        )
+
+        assert telemetry is not None
+        assert telemetry.millis == 1234
+        assert telemetry.state == "RUN"
+        assert telemetry.estop_active is False
+        assert telemetry.motion_inhibited is False
+        assert telemetry.encoder_ticks == [10, 30, 20, 40]
+
+    def test_non_telemetry_line_is_ignored(self):
+        assert teensy_serial.parse_telemetry_line(b"READY\n") is None
 
 
 class TestDrivetrainBridgeTwistConversion:
@@ -237,6 +367,30 @@ class TestDrivetrainBridgeSerialDispatch:
             (bridge._serial, 129, 0.2, -0.1),
         ]
 
+    def test_teensy_throttle_path(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_throttle",
+            lambda port, left, right: calls.append((port, left, right)),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_throttle",
+            lambda *args: pytest.fail(f"unexpected simplified call: {args}"),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_throttle",
+            lambda *args: pytest.fail(f"unexpected packet call: {args}"),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._send_wheel_throttles(0.2, -0.1)
+
+        assert calls == [(bridge._serial, 0.2, -0.1)]
+
     def test_legacy_simplified_stop_path(self, monkeypatch):
         calls = []
 
@@ -274,6 +428,72 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._send_stop()
 
         assert calls == [(bridge._serial, 128), (bridge._serial, 129)]
+
+    def test_teensy_stop_path(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_stop",
+            lambda port: calls.append(port),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_simplified_stop",
+            lambda *args: pytest.fail(f"unexpected simplified stop: {args}"),
+        )
+        monkeypatch.setattr(
+            sabertooth_serial,
+            "send_stop",
+            lambda *args: pytest.fail(f"unexpected packet stop: {args}"),
+        )
+
+        bridge = self._make_bridge("teensy")
+        bridge._send_stop()
+
+        assert calls == [bridge._serial]
+
+    def test_teensy_feedback_updates_encoder_velocity(self):
+        from unittest.mock import MagicMock
+
+        from lunabot_drivetrain.drivetrain_bridge import DrivetrainBridge
+
+        class FakeSerial:
+            def __init__(self):
+                self.lines = [
+                    b"T 100 READY 0 0 0 0 0 0 0 0 0 0\n",
+                    b"T 200 RUN 0 0 30 30 30 30 72 72 144 144\n",
+                ]
+
+            @property
+            def in_waiting(self):
+                return len(self.lines)
+
+            def readline(self):
+                return self.lines.pop(0)
+
+        bridge = object.__new__(DrivetrainBridge)
+        bridge._serial = FakeSerial()
+        bridge._serial_protocol = "teensy_line"
+        bridge._encoder_cpr = 720
+        bridge._encoder_ticks = [0, 0, 0, 0]
+        bridge._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
+        bridge._last_teensy_ticks = None
+        bridge._last_teensy_sample_time = None
+        bridge._controller_online = [False, False]
+        bridge.get_logger = MagicMock()
+
+        bridge._read_teensy_feedback(10.0)
+        bridge._serial.lines = [
+            b"T 300 RUN 0 0 30 30 30 30 72 72 144 144\n"
+        ]
+        bridge._read_teensy_feedback(11.0)
+
+        assert bridge._encoder_ticks == [72, 144, 72, 144]
+        assert bridge._controller_online == [True, True]
+        assert bridge._wheel_velocity_rps == pytest.approx(
+            [0.0, 0.0, 0.0, 0.0]
+        )
 
     def test_throttle_write_failure_faults_controller(self, monkeypatch):
         def raise_io_error(*_args):

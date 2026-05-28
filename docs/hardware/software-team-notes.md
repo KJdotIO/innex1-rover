@@ -48,8 +48,10 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 
 | Pin(s) | Signal | Direction | Device |
 |--------|--------|-----------|--------|
-| 0 | UART1 TX | → | Sabertooth #1 (Left: FL + RL) |
-| 7 | UART2 TX | → | Sabertooth #2 (Right: FR + RR) |
+| 1 | UART1 TX | → | Sabertooth #1 S1 (Left: FL + RL) |
+| 0 | UART1 RX | ← | Sabertooth #1 S2 (optional telemetry/readback) |
+| 8 | UART2 TX | → | Sabertooth #2 S1 (Right: FR + RR) |
+| 7 | UART2 RX | ← | Sabertooth #2 S2 (optional telemetry/readback) |
 | 2, 3 | PWM ch1 & ch2 | → | Cytron MDD10A #1 (Actuators 1 & 2) |
 | 9, 10 | DIR ch1 & ch2 | → | Cytron MDD10A #1 |
 | 4, 5 | PWM ch1 & ch2 | → | Cytron MDD10A #2 (Actuators 3 & 4) |
@@ -72,8 +74,28 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 ## Sabertooth 2×32 — Drivetrain Controllers
 
 Two controllers used — skid-steer topology:
-- **Sabertooth #1** — Left side (FL + RL motors), Teensy Pin 0
-- **Sabertooth #2** — Right side (FR + RR motors), Teensy Pin 7
+- **Sabertooth #1** — Left side (FL + RL motors), Teensy Pin 1 TX to S1
+- **Sabertooth #2** — Right side (FR + RR motors), Teensy Pin 8 TX to S1
+
+Motor channel assignment:
+
+| Controller | Channel | Motor |
+|------------|---------|-------|
+| Sabertooth #1 left | M1 | Front-left |
+| Sabertooth #1 left | M2 | Rear-left |
+| Sabertooth #2 right | M1 | Front-right |
+| Sabertooth #2 right | M2 | Rear-right |
+
+Bench result from 2026-05-27: all four drivetrain motors were tested through the
+Teensy serial firmware. Left-only and right-only commands moved only their
+respective sides, arc commands produced different left/right encoder distances,
+and a pivot command produced positive left counts with negative right counts.
+Use `docs/teensy_drivetrain_bringup.md` for the current wiring checklist and
+captured encoder results.
+
+Common wiring fault found during bench: both Sabertooth `S1` inputs were wired
+to Teensy pin `1`, causing all four motors to follow the left command. Correct
+mapping is left `S1` to pin `1`, right `S1` to pin `8`.
 
 ### DIP Switch Settings (both controllers)
 | Switch | Position | Reason |
@@ -83,7 +105,7 @@ Two controllers used — skid-steer topology:
 | SW3 | OFF | PSU mode (not battery) |
 | SW4 | ON | Packetised serial |
 | SW5 | ON | Address 128 |
-| SW6 | ON | No E-Stop |
+| SW6 | ON | Sabertooth A1/A2 hardware E-stop disabled; Teensy software stop used during bench tests |
 
 ### Software Configuration at Startup
 ```cpp

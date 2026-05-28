@@ -201,6 +201,10 @@ profiles:
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
+      - /joy
+      - /cmd_vel_teleop
+      - /cmd_vel_safe
+      - /cmd_vel_gated
       - /drivetrain/status
       - /drivetrain/telemetry
       - /excavation/status

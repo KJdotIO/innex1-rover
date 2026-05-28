@@ -90,8 +90,31 @@ See `software-team-notes.md` and `fuses.md` for the full fuse rationale.
 | 0V | Common GND with Teensy / logic domain |
 
 **Teensy UART pin assignments (from `teensy-4.1-microcontroller.md`):**
-- Sabertooth #1: Teensy pins 0 (TX1) and 1 (RX1) — Left drivetrain
-- Sabertooth #2: Teensy pins 7 (TX2) and 8 (RX2) — Right drivetrain
+- Sabertooth #1: Teensy pin 1 (TX1) to S1, optional pin 0 (RX1) from S2 — Left drivetrain
+- Sabertooth #2: Teensy pin 8 (TX2) to S1, optional pin 7 (RX2) from S2 — Right drivetrain
+
+**Motor channel assignment:**
+
+| Controller | Channel | Motor |
+|------------|---------|-------|
+| Sabertooth #1 left | M1A / M1B | Front-left |
+| Sabertooth #1 left | M2A / M2B | Rear-left |
+| Sabertooth #2 right | M1A / M1B | Front-right |
+| Sabertooth #2 right | M2A / M2B | Rear-right |
+
+The full drivetrain was bench-tested on 2026-05-27 with FL/RL on the left
+controller and FR/RR on the right controller. Final checks confirmed independent
+skid-steer control:
+
+```text
+V 35 0 -> only FL/RL moved
+V 0 35 -> only FR/RR moved
+V 30 60 -> right side moved about twice as far as left
+V 40 -40 -> left positive, right negative pivot
+```
+
+Do not tie the two `S1` inputs together. Left `S1` goes only to Teensy pin `1`;
+right `S1` goes only to Teensy pin `8`.
 
 ---
 

@@ -31,6 +31,10 @@ setup(
             f"share/{package_name}/config",
             _relative_matches("config/*.yaml"),
         ),
+        (
+            f"share/{package_name}/web",
+            _relative_matches("web/*"),
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -44,6 +48,8 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "web_gamepad_bridge = lunabot_teleop.web_gamepad_bridge:main",
+        ],
     },
 )

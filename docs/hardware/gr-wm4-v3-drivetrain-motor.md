@@ -84,7 +84,7 @@
 |--------|------------|------------|
 | VCC | Red | Teensy 4.1 3.3 V pin (via WAGO 2-in-4-out) |
 | GND | Black | Teensy GND (star topology, separate WAGO output from motor controllers) |
-| CH-A | Blue | Teensy GPIO directly (see pin table below) |
+| CH-A | White | Teensy GPIO directly (see pin table below) |
 | CH-B | Yellow | Teensy GPIO directly (see pin table below) |
 
 > **No level shifter required:** The SS460S Hall sensors operate down to 3 V. Powering the
@@ -101,6 +101,21 @@
 | Front-Right (FR) | 19 | 20 |
 | Rear-Right (RR) | 21 | 22 |
 
+Bench note from 2026-05-27: all four encoders were tested through the Teensy
+drivetrain firmware. A smooth all-forward command produced matching positive
+counts:
+
+```text
+FL +1596 ticks
+RL +1627 ticks
+FR +1673 ticks
+RR +1584 ticks
+```
+
+If a motor spins the wrong physical direction, swap that motor's thick leads at
+the Sabertooth channel. If physical direction is correct but encoder sign is
+wrong, swap that encoder's white/yellow signal wires.
+
 ---
 
 ## Motor Controller Interface
@@ -112,8 +127,8 @@ one per side of the rover).
 |-----------|-------|
 | Controller | Sabertooth 2×32 |
 | Communication | Packetized serial (9600 baud, address 128) |
-| Sabertooth #1 (Left: FL + RL) | Teensy Pin 0 (UART1 TX) |
-| Sabertooth #2 (Right: FR + RR) | Teensy Pin 7 (UART2 TX) |
+| Sabertooth #1 (Left: FL + RL) | Teensy Pin 1 (UART1 TX) to Sabertooth S1 |
+| Sabertooth #2 (Right: FR + RR) | Teensy Pin 8 (UART2 TX) to Sabertooth S1 |
 | Jetson role | High-level commands only — talks to Teensy over USB serial |
 | Hardware ramping | `setSaberRamping(20)` — configured once at startup |
 | Power-on sequence | Always power Jetson and Teensy before applying 22.2 V to Sabertooth |
@@ -121,6 +136,9 @@ one per side of the rover).
 > All motor I/O is handled by the Teensy 4.1. The Jetson sends velocity targets over USB serial
 > to the Teensy, which translates them into Sabertooth packetised serial commands. The Sabertooth
 > hardware ramping (`setSaberRamping(20)`) handles smooth acceleration and deceleration automatically.
+
+See `docs/teensy_drivetrain_bringup.md` for the tested two-motor left-side
+bench wiring and the right-side wiring checklist.
 
 ---
 

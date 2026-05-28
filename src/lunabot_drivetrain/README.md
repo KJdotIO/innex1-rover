@@ -1,28 +1,39 @@
 # lunabot_drivetrain
 
-Drivetrain bridge for the INNEX-1 four-wheel skid-steer rover. Converts
-`cmd_vel` to Sabertooth serial commands over UART and publishes
-encoder-derived odometry and telemetry.
+Drivetrain bridge for the INNEX-1 four-wheel skid-steer rover. The older bridge
+converts `cmd_vel` directly to Sabertooth serial commands over UART. The current
+bench-proven hardware path is now Teensy-based: Jetson USB serial to Teensy,
+then Teensy packet serial to the two Sabertooth controllers.
 
 ## Hardware
 
-- **Motors**: 4x GR-WM4-V4 brushed DC with Hall-sensor quadrature encoders.
-- **Controllers**: 2x Sabertooth 2x32 on Jetson UART (`/dev/ttyTHS1`,
-  9600 baud).
-- **Default protocol**: Legacy Simplified Serial, matching the electrical CDR's
-  "Simplified Serial" wiring. Packet Serial is also supported by setting
-  `serial_protocol:=packetized`.
+- **Motors**: 4x GR-WM4-V3 brushed DC with Hall-sensor quadrature encoders.
+- **Bench-proven controller path**: Jetson USB serial to Teensy 4.1; Teensy pin
+  `1` to left Sabertooth `S1`; Teensy pin `8` to right Sabertooth `S1`.
+- **Historical direct path**: 2x Sabertooth 2x32 on Jetson UART
+  (`/dev/ttyTHS1`, 9600 baud). This proved one-motor first motion, but is not
+  the final four-motor wiring.
+- **Current Teensy protocol**: line-based USB serial, documented in
+  `docs/teensy_drivetrain_bringup.md` and implemented in
+  `tools/teensy/drivetrain_serial_firmware/`.
 
 Real hardware launches fail closed if the serial port is unavailable. For
 desktop or Jetson dry-runs without motor output, set `dry_run:=true`
 explicitly.
+
+The normal bench path is now:
+
+`/cmd_vel_safe` → `velocity_gate` → `/cmd_vel_gated` → `drivetrain_bridge` →
+Teensy USB serial → left/right Sabertooth S1 pins.
 
 ## Nodes
 
 ### `drivetrain_bridge`
 
 Differential-drive kinematics: splits `Twist` into per-side throttles, sends
-them to both Sabertooth controllers, and publishes status/telemetry.
+them to the configured serial backend, and publishes status/telemetry. With
+`serial_protocol:=teensy_line`, the bridge also reads encoder ticks from the
+Teensy `T ...` telemetry line.
 
 | Direction | Topic | Type |
 |-----------|-------|------|
@@ -45,19 +56,20 @@ State machine: `UNINITIALISED → READY ⇄ DRIVING → FAULT` and `ESTOP`.
 
 ## Jetson bench bring-up
 
-Use this path when the Sabertooths are wired to the Jetson and you want a small,
-controlled first-motion test.
+Use the direct-Sabertooth path only when the Sabertooths are deliberately wired
+to the Jetson for a small, controlled first-motion test. For the current
+four-motor setup, use the Teensy path in `docs/teensy_drivetrain_bringup.md`.
 
 For the electrician-friendly checklist, see
 `docs/jetson_sabertooth_bringup.md` from the repository root.
 
 Before powering motor voltage, confirm:
 
-- Sabertooth `0V/GND` is tied to Jetson ground.
-- Jetson UART TX goes to each Sabertooth serial input (`S1`) as shown in the
-  electrical CDR.
-- The Sabertooth DIP switches are set for Legacy Simplified Serial at `9600`
-  baud, or `serial_protocol` and `baud_rate` are changed to match the hardware.
+- Teensy GND, both Sabertooth `0V/GND` pins, and encoder grounds are common.
+- Teensy pin `1` goes to the left Sabertooth `S1`.
+- Teensy pin `8` goes to the right Sabertooth `S1`.
+- The Teensy USB serial device is visible on the Jetson as `/dev/ttyACM0` or a
+  stable `/dev/serial/by-id/...` path.
 - The rover is lifted or restrained for the first test, with motor power ready
   to isolate immediately.
 
@@ -69,8 +81,8 @@ sudo apt install python3-serial
 sudo usermod -aG dialout $USER
 ```
 
-Log out and back in after changing groups. If `/dev/ttyTHS1` is not the wired
-UART, pass the actual device as `serial_port:=...`.
+Log out and back in after changing groups. If `/dev/ttyACM0` is not the Teensy,
+pass the actual device as `serial_port:=...`.
 
 Build and source the workspace:
 
@@ -84,7 +96,7 @@ source install/setup.bash
 Start the bridge with a low throttle cap:
 
 ```bash
-ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
+ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.25
 ```
 
 In a second terminal, send a short forward command:
@@ -113,14 +125,14 @@ For controller testing, plug in the gamepad and start the same launch file with
 teleop enabled:
 
 ```bash
-ros2 launch lunabot_drivetrain drivetrain_bench.launch.py enable_teleop:=true max_throttle:=0.2
+ros2 launch lunabot_drivetrain drivetrain_bench.launch.py enable_teleop:=true max_throttle:=0.25
 ```
 
-The joystick path is:
+The historical direct-Sabertooth joystick path is:
 
 `game_controller_node` → `/joy` → `teleop_twist_joy` → `/cmd_vel_teleop` →
 `twist_mux` → `/cmd_vel_safe` → `velocity_gate` → `/cmd_vel_gated` →
-`drivetrain_bridge` → Sabertooth serial.
+`drivetrain_bridge` → Teensy USB serial → Sabertooth serial.
 
 If the controller is not picked up as device `0`, try:
 
@@ -136,14 +148,14 @@ ros2 launch lunabot_drivetrain drivetrain_bench.launch.py enable_teleop:=true jo
 
 ## micro-ROS?
 
-micro-ROS is useful when the Arduino is staying in the system as a ROS-aware
-microcontroller. For this drivetrain, it is not the simplest first step: the
-Jetson can already publish ROS 2 velocity commands and this package already
-speaks Sabertooth serial.
+micro-ROS is useful when a microcontroller is staying in the system as a
+ROS-aware endpoint. The current Teensy bench firmware is simpler: it speaks a
+small USB serial protocol and owns encoder counting, ramping, watchdog timeout,
+and stop/restart behaviour.
 
-Use micro-ROS later if the Arduino needs to remain responsible for hard
-real-time IO, encoder counting, watchdogs, or extra sensors. For first motion,
-keep the chain shorter: Jetson ROS 2 node → UART → Sabertooth.
+Use micro-ROS later only if the Teensy needs to become a ROS-aware node. For the
+next integration step, add a normal ROS 2 serial bridge on the Jetson:
+`/cmd_vel_gated -> Teensy USB serial`.
 
 ### `velocity_gate`
 
@@ -163,13 +175,21 @@ zero twist.
 
 - `config/drivetrain.yaml`: all tuneable parameters (kinematics, encoder CPR,
   stall thresholds, control/telemetry rates).
-- `lunabot_drivetrain/sabertooth_serial.py`: low-level Simplified Serial and
-  Packet Serial framing helpers.
+- `lunabot_drivetrain/teensy_serial.py`: current Teensy USB serial line
+  protocol helpers.
+- `lunabot_drivetrain/sabertooth_serial.py`: historical low-level Simplified
+  Serial and Packet Serial framing helpers.
+- `docs/teensy_drivetrain_bringup.md`: current four-motor Teensy wiring and
+  bench results.
+- `tools/teensy/`: current low-level Teensy firmware and serial smoke tests.
 
 ## Common failure modes
 
 - Serial port permission denied on Jetson (`sudo usermod -aG dialout $USER`).
-- Wrong Sabertooth DIP-switch protocol or baud rate: bridge writes succeed but
-  motors don't respond.
-- Stall false-positives during bringup if encoder GPIO pins are not wired
+- Teensy opened from a raw terminal with echo enabled: boot text can be echoed
+  back into the firmware and latch software e-stop. The ROS bridge uses
+  pyserial and flushes startup chatter.
+- Wrong Sabertooth DIP-switch protocol or baud rate downstream of the Teensy:
+  bridge writes succeed but motors don't respond.
+- Stall false-positives during bring-up if encoder channels are unplugged
   (reduce `max_throttle` or raise `stall_throttle_threshold` for bench tests).

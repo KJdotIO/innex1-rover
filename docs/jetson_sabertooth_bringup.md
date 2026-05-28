@@ -3,6 +3,12 @@
 Use this when the Sabertooth motor controllers are wired to the Jetson and you
 want a careful first-motion test.
 
+> Historical bench path: this proved one-motor first motion on 2026-05-26. The
+> current drivetrain wiring uses the Teensy as the low-level controller:
+> `Jetson USB -> Teensy -> Sabertooth #1/#2 -> motors`, with encoders read by
+> the Teensy. For the current four-motor wiring and test results, use
+> `docs/teensy_drivetrain_bringup.md`.
+
 ## Wiring check
 
 Before applying motor power, check:
@@ -188,8 +194,9 @@ microcontroller for encoder counting, watchdogs, hard real-time IO, or extra
 sensors. For this drivetrain bring-up, the shortest reliable chain is:
 
 ```text
-Jetson ROS 2 node -> UART -> Sabertooth motor controller
+Jetson ROS 2 node -> USB serial -> Teensy -> Sabertooth motor controllers
 ```
 
-Keep the Arduino out of the path until there is a specific job that the Jetson
-should not be doing directly.
+The Teensy is not running micro-ROS in the current bench firmware. It exposes a
+small line-based USB serial protocol and owns encoder counting, ramping,
+watchdog timeout, and latched stop/restart behaviour.

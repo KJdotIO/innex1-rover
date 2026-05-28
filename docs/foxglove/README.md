@@ -120,6 +120,43 @@ telemetry budget.
 The layout includes `/power/telemetry`. If the power telemetry PR has not
 merged yet, that panel will simply be empty.
 
+## Browser Gamepad Bridge
+
+For Mac-based Mission Control, do not run ROS 2 on macOS just to read the Xbox
+controller. Start the Jetson-hosted web bridge instead:
+
+```bash
+ros2 launch lunabot_teleop web_gamepad_bridge.launch.py \
+  port:=9443 \
+  tls_cert_file:=/tmp/lunabot_web_gamepad.crt \
+  tls_key_file:=/tmp/lunabot_web_gamepad.key
+```
+
+Then open this on the Mac while connected to the rover router:
+
+```text
+https://192.168.8.20:9443
+```
+
+The browser will warn about the self-signed lab certificate. Accept the warning
+for this rover address. The HTTPS page matters because the browser Gamepad API
+is restricted to secure contexts in some browsers.
+
+The browser reads the controller through the Gamepad API and sends small command
+packets to the Jetson. The Jetson publishes `/cmd_vel_safe`, so the normal
+`velocity_gate`, drivetrain timeout, and Teensy watchdog still apply. If the
+page closes, the Wi-Fi drops, or packets stop for more than `0.35 s`, the web
+bridge publishes zero.
+
+The current browser mapping uses the left bumper as the enable button. Keep the
+drivetrain launch throttle cap low for first router tests.
+
+The page also shows a compact drivetrain readout from `/drivetrain/status` and
+`/drivetrain/telemetry`, local speed/deadzone trims, and a 2D command-plane
+preview. The preview is not localisation; it is dead reckoning from the command
+stream, useful for spotting “that stick input is asking for a pivot” before you
+look back at the motors.
+
 ## Bandwidth
 
 The rulebook limit is **4,000 Kbps average**. Raw image and point cloud topics
