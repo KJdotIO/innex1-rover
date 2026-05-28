@@ -137,8 +137,8 @@ one per side of the rover).
 > to the Teensy, which translates them into Sabertooth packetised serial commands. The Sabertooth
 > hardware ramping (`setSaberRamping(20)`) handles smooth acceleration and deceleration automatically.
 
-See `docs/teensy_drivetrain_bringup.md` for the tested two-motor left-side
-bench wiring and the right-side wiring checklist.
+See `docs/teensy_drivetrain_bringup.md` for the tested four-motor Teensy,
+Sabertooth, encoder and Jetson bridge bring-up record.
 
 ---
 
@@ -148,7 +148,7 @@ bench wiring and the right-side wiring checklist.
 |------|-------|
 | ROS 2 Package | `lunabot_drivetrain` |
 | Command topic | `/cmd_vel_safe` (`geometry_msgs/msg/Twist`) |
-| Encoder feedback | Jetson GPIO (quadrature, via level shifter) |
+| Encoder feedback | Teensy quadrature counting, reported to the Jetson over USB serial |
 | Launch file | `drivetrain_bench.launch.py` |
 
 ```bash
@@ -157,7 +157,10 @@ cd ~/innex1-rover
 source /opt/ros/humble/setup.bash
 colcon build
 source install/setup.bash
-ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
+ros2 launch lunabot_drivetrain drivetrain_bench.launch.py \
+  serial_port:=/dev/ttyACM0 \
+  serial_protocol:=teensy_line \
+  max_throttle:=0.2
 
 # Send a test velocity command
 ros2 topic pub --once /cmd_vel_safe geometry_msgs/msg/Twist \

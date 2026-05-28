@@ -328,6 +328,10 @@ Observed: angular and forward commands reached /cmd_vel_gated; final telemetry
 ```
 
 For immediate bench teleop, plug the Xbox controller into the Jetson. For the
-competition-shaped setup, the controller can live on the operator laptop and send
-ROS commands over the router to the Jetson; the Jetson still sends the final
-serial commands to the Teensy.
+competition-shaped setup, the controller can live on the operator laptop and use
+the browser Gamepad bridge served by the Jetson. The browser sends HTTPS
+commands over rover Wi-Fi to the Jetson, the Jetson publishes `/cmd_vel_safe`,
+and the normal velocity gate and drivetrain bridge still own the ROS side.
+
+See `docs/foxglove/README.md` for the browser Gamepad bridge launch command,
+HTTPS certificate note, and operator URL.

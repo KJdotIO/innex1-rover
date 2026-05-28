@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Any, Optional
+from typing import Any
 
 import rclpy
 from geometry_msgs.msg import Twist
@@ -207,15 +207,15 @@ class DrivetrainBridge(Node):
         self._fault_code = DrivetrainStatus.FAULT_NONE
         self._motion_inhibited = False
         self._estop_active = False
-        self._last_cmd_time: Optional[float] = None
+        self._last_cmd_time: float | None = None
         self._last_twist = Twist()
         self._encoder_ticks = [0, 0, 0, 0]
         self._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
-        self._last_teensy_ticks: Optional[list[int]] = None
-        self._last_teensy_sample_time: Optional[float] = None
+        self._last_teensy_ticks: list[int] | None = None
+        self._last_teensy_sample_time: float | None = None
         self._controller_online = [False, False]
-        self._stall_start_time: Optional[float] = None
-        self._estop_clear_time: Optional[float] = None
+        self._stall_start_time: float | None = None
+        self._estop_clear_time: float | None = None
         self._odom_x = 0.0
         self._odom_y = 0.0
         self._odom_yaw = 0.0
@@ -559,11 +559,26 @@ class DrivetrainBridge(Node):
                     / dt
                     for i in range(4)
                 ]
+                self._integrate_wheel_odom(dt)
 
         self._encoder_ticks = ticks
         self._last_teensy_ticks = list(ticks)
         self._last_teensy_sample_time = now
         self._controller_online = [True, True]
+
+    def _integrate_wheel_odom(self, dt: float) -> None:
+        """Integrate differential-drive odometry from wheel encoder velocity."""
+        fl, fr, rl, rr = self._wheel_velocity_rps
+        left_rps = (fl + rl) / 2.0
+        right_rps = (fr + rr) / 2.0
+        left_mps = left_rps * 2.0 * math.pi * self._wheel_radius
+        right_mps = right_rps * 2.0 * math.pi * self._wheel_radius
+        linear_mps = (left_mps + right_mps) / 2.0
+        angular_rps = (right_mps - left_mps) / self._track_width
+
+        self._odom_yaw += angular_rps * dt
+        self._odom_x += math.cos(self._odom_yaw) * linear_mps * dt
+        self._odom_y += math.sin(self._odom_yaw) * linear_mps * dt
 
     def _transition_to(self, new_state: int) -> None:
         """Update the state machine, only logging on actual transitions."""
@@ -594,7 +609,29 @@ class DrivetrainBridge(Node):
         telem.fault_code = self._fault_code
         self._telem_pub.publish(telem)
 
+        self._publish_odom(now)
         self._publish_joint_state(now)
+
+    def _publish_odom(self, stamp) -> None:
+        """Publish approximate wheel odometry from integrated encoder ticks."""
+        odom = Odometry()
+        odom.header.stamp = stamp
+        odom.header.frame_id = "odom"
+        odom.child_frame_id = "base_footprint"
+        odom.pose.pose.position.x = self._odom_x
+        odom.pose.pose.position.y = self._odom_y
+        odom.pose.pose.position.z = 0.0
+        odom.pose.pose.orientation.z = math.sin(self._odom_yaw / 2.0)
+        odom.pose.pose.orientation.w = math.cos(self._odom_yaw / 2.0)
+
+        fl, fr, rl, rr = self._wheel_velocity_rps
+        left_rps = (fl + rl) / 2.0
+        right_rps = (fr + rr) / 2.0
+        left_mps = left_rps * 2.0 * math.pi * self._wheel_radius
+        right_mps = right_rps * 2.0 * math.pi * self._wheel_radius
+        odom.twist.twist.linear.x = (left_mps + right_mps) / 2.0
+        odom.twist.twist.angular.z = (right_mps - left_mps) / self._track_width
+        self._odom_pub.publish(odom)
 
     def _publish_joint_state(self, stamp) -> None:
         """Publish wheel joint states for robot_state_publisher."""

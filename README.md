@@ -189,7 +189,7 @@ src/
 ├── lunabot_bringup/         # Top-level launch files and mission manager
 ├── lunabot_control/         # Deposition bridge (Cytron linear actuators)
 ├── lunabot_description/     # URDF/xacro robot model and sensor frames
-├── lunabot_drivetrain/      # Sabertooth motor bridge, velocity gate, stall detection
+├── lunabot_drivetrain/      # Teensy/Sabertooth drivetrain bridge, velocity gate, stall detection
 ├── lunabot_excavation/      # Excavation action server
 ├── lunabot_interfaces/      # Custom ROS messages and actions
 ├── lunabot_localisation/    # EKF + RTAB-Map SLAM + AprilTag localisation
@@ -197,7 +197,7 @@ src/
 ├── lunabot_perception/      # Crater detection feeding Nav2 costmaps
 ├── lunabot_safety/          # E-stop to motion-inhibit bridge
 ├── lunabot_simulation/      # Gazebo Fortress worlds and ros_gz bridges
-└── lunabot_teleop/          # Manual control
+└── lunabot_teleop/          # Joystick and browser Gamepad manual control
 ```
 
 ## Interface contracts in CI

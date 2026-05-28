@@ -227,15 +227,6 @@
         border-bottom: 10px solid var(--blue);
       }
 
-      .obstacle {
-        position: absolute;
-        width: 38px;
-        height: 38px;
-        border: 1px solid var(--warn);
-        border-radius: 50%;
-        background: rgba(241, 199, 91, 0.18);
-      }
-
       .log {
         height: 126px;
         overflow: auto;
@@ -316,7 +307,7 @@
               <div class="control">
                 <label>actions</label>
                 <strong id="serverLimits">loading</strong>
-                <button id="resetPose">Reset 2D Pose</button>
+                <button id="resetPose">Reset Preview</button>
               </div>
             </div>
           </section>
@@ -326,6 +317,8 @@
             <div class="telemetry">
               <div class="metric"><span>drivetrain</span><strong id="driveState">unknown</strong></div>
               <div class="metric"><span>fault</span><strong id="faultState">unknown</strong></div>
+              <div class="metric"><span>e-stop</span><strong id="estopState">unknown</strong></div>
+              <div class="metric"><span>motion inhibit</span><strong id="inhibitState">unknown</strong></div>
               <div class="metric"><span>encoder ticks</span><strong id="ticksText">-</strong></div>
               <div class="metric"><span>wheel rps</span><strong id="rpsText">-</strong></div>
             </div>
@@ -337,8 +330,6 @@
             <h2>2D Command Plane</h2>
             <div id="map" class="map">
               <svg id="trail" class="trail"></svg>
-              <div class="obstacle" style="left: 68%; top: 30%"></div>
-              <div class="obstacle" style="left: 24%; top: 65%"></div>
               <div id="rover" class="rover"></div>
             </div>
           </section>
@@ -362,6 +353,7 @@
 
     <script>
       const SEND_HZ = 20;
+      const AUTH_TOKEN = "__LUNABOT_AUTH_TOKEN__";
       const ENABLE_BUTTON = 4;
       const LINEAR_AXIS = 1;
       const ANGULAR_AXIS = 2;
@@ -417,7 +409,10 @@
       async function sendCommand(command) {
         const res = await fetch("/api/command", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Lunabot-Operator-Token": AUTH_TOKEN,
+          },
           body: JSON.stringify(command),
           cache: "no-store",
         });
@@ -430,7 +425,10 @@
       async function sendConfig() {
         const res = await fetch("/api/config", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Lunabot-Operator-Token": AUTH_TOKEN,
+          },
           body: JSON.stringify({
             max_linear_mps: Number($("maxLinear").value) / 100,
             max_angular_radps: Number($("maxAngular").value) / 100,
@@ -463,6 +461,8 @@
         const telemetry = data.drivetrain_telemetry || {};
         $("driveState").textContent = stateName(status.state);
         $("faultState").textContent = faultName(status.fault_code);
+        $("estopState").textContent = status.estop_active ? "active" : "clear";
+        $("inhibitState").textContent = status.motion_inhibited ? "active" : "clear";
         $("ticksText").textContent = compactArray(telemetry.encoder_ticks);
         $("rpsText").textContent = compactArray(telemetry.wheel_velocity_rps, 2);
       }

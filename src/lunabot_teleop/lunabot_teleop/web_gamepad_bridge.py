@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import ssl
 import threading
 import time
@@ -101,16 +102,28 @@ def command_to_twist(
     return msg
 
 
+def all_interface_bind_requires_tls(
+    bind_host: str,
+    tls_cert_file: str,
+    tls_key_file: str,
+) -> bool:
+    """Return true when a public bind address lacks a complete TLS pair."""
+    return bind_host in {"0.0.0.0", "::"} and not (
+        tls_cert_file and tls_key_file
+    )
+
+
 class WebGamepadBridge(Node):
     """Serve a controller page and publish fresh browser gamepad commands."""
 
     def __init__(self) -> None:
         """Initialise ROS publishers and the HTTP server."""
         super().__init__("web_gamepad_bridge")
-        self.declare_parameter("bind_host", "0.0.0.0")
+        self.declare_parameter("bind_host", "127.0.0.1")
         self.declare_parameter("port", 8080)
         self.declare_parameter("tls_cert_file", "")
         self.declare_parameter("tls_key_file", "")
+        self.declare_parameter("auth_token", "")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_safe")
         self.declare_parameter("max_linear_mps", 0.30)
         self.declare_parameter("max_angular_radps", 0.80)
@@ -121,6 +134,8 @@ class WebGamepadBridge(Node):
         self._port = int(self.get_parameter("port").value)
         self._tls_cert_file = str(self.get_parameter("tls_cert_file").value)
         self._tls_key_file = str(self.get_parameter("tls_key_file").value)
+        configured_token = str(self.get_parameter("auth_token").value)
+        self._auth_token = configured_token or secrets.token_urlsafe(24)
         self._max_linear = float(self.get_parameter("max_linear_mps").value)
         self._max_angular = float(self.get_parameter("max_angular_radps").value)
         self._timeout_s = float(self.get_parameter("command_timeout_s").value)
@@ -135,6 +150,15 @@ class WebGamepadBridge(Node):
             )
         if publish_hz <= 0.0:
             raise ValueError(f"publish_hz must be positive: {publish_hz}")
+        if all_interface_bind_requires_tls(
+            self._bind_host,
+            self._tls_cert_file,
+            self._tls_key_file,
+        ):
+            raise ValueError(
+                "Refusing to expose web gamepad bridge on all interfaces "
+                "without TLS"
+            )
 
         self._lock = threading.Lock()
         self._last_command = GamepadCommand(0.0, 0.0, False)
@@ -249,8 +273,8 @@ class WebGamepadBridge(Node):
         class Handler(BaseHTTPRequestHandler):
             """HTTP handler bound to this bridge instance."""
 
-            def log_message(self, format, *args):  # noqa: A002
-                node.get_logger().debug(format % args)
+            def log_message(self, fmt, *args):
+                node.get_logger().debug(fmt % args)
 
             def do_GET(self) -> None:
                 if self.path == "/api/state":
@@ -259,7 +283,7 @@ class WebGamepadBridge(Node):
                 if self.path not in {"/", "/index.html"}:
                     self.send_error(HTTPStatus.NOT_FOUND)
                     return
-                self._send_file(web_root / "index.html", "text/html")
+                self._send_index(web_root / "index.html")
 
             def do_HEAD(self) -> None:
                 if self.path not in {"/", "/index.html"}:
@@ -271,6 +295,9 @@ class WebGamepadBridge(Node):
                 self.end_headers()
 
             def do_POST(self) -> None:
+                if not self._has_valid_operator_token():
+                    self.send_error(HTTPStatus.FORBIDDEN)
+                    return
                 if self.path == "/api/config":
                     self._handle_config()
                     return
@@ -307,12 +334,20 @@ class WebGamepadBridge(Node):
                     return
                 self._send_json(node.state_snapshot()["limits"])
 
-            def _send_file(self, path: Path, content_type: str) -> None:
+            def _has_valid_operator_token(self) -> bool:
+                token = self.headers.get("X-Lunabot-Operator-Token", "")
+                return secrets.compare_digest(token, node._auth_token)
+
+            def _send_index(self, path: Path) -> None:
                 try:
-                    content = path.read_bytes()
+                    content = path.read_text(encoding="utf-8")
                 except OSError:
                     self.send_error(HTTPStatus.NOT_FOUND)
                     return
+                content = content.replace("__LUNABOT_AUTH_TOKEN__", node._auth_token)
+                self._send_bytes(content.encode("utf-8"), "text/html")
+
+            def _send_bytes(self, content: bytes, content_type: str) -> None:
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", f"{content_type}; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")

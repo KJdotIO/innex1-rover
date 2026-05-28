@@ -14,13 +14,13 @@
 
 """Unit tests for the Sabertooth serial encoders."""
 
+import importlib.util
 import sys
 import types
 
-import pytest
-
 import lunabot_drivetrain.sabertooth_serial as sabertooth_serial
 import lunabot_drivetrain.teensy_serial as teensy_serial
+import pytest
 from lunabot_drivetrain.sabertooth_serial import (
     _pack_command,
     simplified_throttle_to_bytes,
@@ -64,18 +64,26 @@ for name, value in {
         setattr(DrivetrainStatus, name, value)
 
 
+def _module_available(module_name):
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ModuleNotFoundError, ValueError):
+        return module_name in sys.modules
+
+
 def _install_ros_fakes():
     """Install tiny ROS message/module fakes for non-ROS unit test hosts."""
-    try:
-        import rclpy as _rclpy  # noqa: F401
-        from geometry_msgs.msg import Twist as _Twist  # noqa: F401
-        from nav_msgs.msg import Odometry as _Odometry  # noqa: F401
-        from sensor_msgs.msg import JointState as _JointState  # noqa: F401
-        from std_msgs.msg import Bool as _Bool  # noqa: F401
-
+    if all(
+        _module_available(module_name)
+        for module_name in (
+            "rclpy",
+            "geometry_msgs.msg",
+            "nav_msgs.msg",
+            "sensor_msgs.msg",
+            "std_msgs.msg",
+        )
+    ):
         return
-    except ModuleNotFoundError:
-        pass
 
     class _Vector:
         x = 0.0
@@ -154,7 +162,7 @@ class TestPackCommand:
 
     def test_checksum_calculation(self):
         frame = _pack_command(128, 0, 64)
-        address, command, data, checksum = frame
+        *_, checksum = frame
         assert checksum == (128 + 0 + 64) & 0x7F
 
     def test_frame_length(self):
@@ -255,12 +263,12 @@ class TestTeensySerial:
 
     def test_parse_telemetry_reorders_ticks_to_ros_wheel_order(self):
         telemetry = teensy_serial.parse_telemetry_line(
-            b"T 1234 RUN 0 0 30 30 28 29 10 20 30 40\n"
+            b"T 1234 1 0 0 30 30 28 29 10 20 30 40\n"
         )
 
         assert telemetry is not None
         assert telemetry.millis == 1234
-        assert telemetry.state == "RUN"
+        assert telemetry.state == "1"
         assert telemetry.estop_active is False
         assert telemetry.motion_inhibited is False
         assert telemetry.encoder_ticks == [10, 30, 20, 40]
@@ -461,8 +469,8 @@ class TestDrivetrainBridgeSerialDispatch:
         class FakeSerial:
             def __init__(self):
                 self.lines = [
-                    b"T 100 READY 0 0 0 0 0 0 0 0 0 0\n",
-                    b"T 200 RUN 0 0 30 30 30 30 72 72 144 144\n",
+                    b"T 100 0 0 0 0 0 0 0 0 0 0 0\n",
+                    b"T 200 1 0 0 30 30 30 30 72 72 144 144\n",
                 ]
 
             @property
@@ -476,6 +484,11 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._serial = FakeSerial()
         bridge._serial_protocol = "teensy_line"
         bridge._encoder_cpr = 720
+        bridge._wheel_radius = 0.065
+        bridge._track_width = 0.44
+        bridge._odom_x = 0.0
+        bridge._odom_y = 0.0
+        bridge._odom_yaw = 0.0
         bridge._encoder_ticks = [0, 0, 0, 0]
         bridge._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
         bridge._last_teensy_ticks = None
@@ -485,7 +498,7 @@ class TestDrivetrainBridgeSerialDispatch:
 
         bridge._read_teensy_feedback(10.0)
         bridge._serial.lines = [
-            b"T 300 RUN 0 0 30 30 30 30 72 72 144 144\n"
+            b"T 300 1 0 0 30 30 30 30 72 72 144 144\n"
         ]
         bridge._read_teensy_feedback(11.0)
 

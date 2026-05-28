@@ -12,7 +12,7 @@ Teensy pins 15-22 <- FL/RL/FR/RR quadrature encoders
 ```
 
 See `docs/teensy_drivetrain_bringup.md` for the wiring tables, safety notes,
-captured encoder counts, and tomorrow's Jetson handoff plan.
+captured encoder counts, Jetson handoff, and ROS bridge results.
 
 ## Sketches
 

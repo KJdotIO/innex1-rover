@@ -13,7 +13,7 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument(
                 "bind_host",
-                default_value="0.0.0.0",
+                default_value="127.0.0.1",
                 description="HTTP bind address for the browser controller page.",
             ),
             DeclareLaunchArgument(
@@ -35,6 +35,14 @@ def generate_launch_description() -> LaunchDescription:
                 "tls_key_file",
                 default_value="",
                 description="Optional TLS key file for HTTPS.",
+            ),
+            DeclareLaunchArgument(
+                "auth_token",
+                default_value="",
+                description=(
+                    "Optional operator token for POST requests. Leave empty to "
+                    "generate a per-run token embedded in the served page."
+                ),
             ),
             DeclareLaunchArgument(
                 "max_linear_mps",
@@ -66,6 +74,7 @@ def generate_launch_description() -> LaunchDescription:
                         "cmd_vel_topic": LaunchConfiguration("cmd_vel_topic"),
                         "tls_cert_file": LaunchConfiguration("tls_cert_file"),
                         "tls_key_file": LaunchConfiguration("tls_key_file"),
+                        "auth_token": LaunchConfiguration("auth_token"),
                         "max_linear_mps": ParameterValue(
                             LaunchConfiguration("max_linear_mps"),
                             value_type=float,

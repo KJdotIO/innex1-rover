@@ -94,11 +94,15 @@ The useful telemetry set is:
 /mission/last_failure_reason
 /safety/estop
 /safety/motion_inhibit
+/cmd_vel_gated
 /drivetrain/status
+/drivetrain/telemetry
 /excavation/status
 /localisation/start_zone_status
 /diagnostics
 /power/telemetry
+/camera_front/image/compressed
+/camera_front/camera_info
 ```
 
 Check bandwidth at the network edge as well as in ROS:

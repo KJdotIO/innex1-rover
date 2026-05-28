@@ -126,7 +126,15 @@ For Mac-based Mission Control, do not run ROS 2 on macOS just to read the Xbox
 controller. Start the Jetson-hosted web bridge instead:
 
 ```bash
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout /tmp/lunabot_web_gamepad.key \
+  -out /tmp/lunabot_web_gamepad.crt \
+  -days 7 \
+  -subj "/CN=innex1-web-gamepad" \
+  -addext "subjectAltName=IP:192.168.8.20,DNS:innex1-desktop"
+
 ros2 launch lunabot_teleop web_gamepad_bridge.launch.py \
+  bind_host:=0.0.0.0 \
   port:=9443 \
   tls_cert_file:=/tmp/lunabot_web_gamepad.crt \
   tls_key_file:=/tmp/lunabot_web_gamepad.key
@@ -141,6 +149,11 @@ https://192.168.8.20:9443
 The browser will warn about the self-signed lab certificate. Accept the warning
 for this rover address. The HTTPS page matters because the browser Gamepad API
 is restricted to secure contexts in some browsers.
+
+The bridge defaults to loopback. Exposing it with `bind_host:=0.0.0.0` is only
+for a controlled rover LAN. POST requests require a per-run operator token
+embedded in the served page, but this is still a motion command surface: do not
+put it on an untrusted network.
 
 The browser reads the controller through the Gamepad API and sends small command
 packets to the Jetson. The Jetson publishes `/cmd_vel_safe`, so the normal

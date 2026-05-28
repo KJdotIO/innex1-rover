@@ -76,10 +76,12 @@
 
 **~25 pins used — ~30 pins spare on Teensy 4.1**
 
-Bench validation on 2026-05-27 confirmed the left drivetrain mapping:
-Teensy pin `1` to the left Sabertooth `S1`, FL encoder on `15/16`, and RL
-encoder on `17/18`. A left-side command drove both motors with matching encoder
-counts after rear-left motor polarity was corrected at the Sabertooth output.
+Bench validation on 2026-05-27 and 2026-05-28 confirmed the full drivetrain
+mapping: Teensy pin `1` to the left Sabertooth `S1`, Teensy pin `8` to the
+right Sabertooth `S1`, and all four encoders on pins `15` through `22`.
+Left-only, right-only, arc, pivot and Xbox/browser teleop tests moved the
+expected motors and produced matching encoder signs after rear encoder phase
+corrections.
 
 ---
 

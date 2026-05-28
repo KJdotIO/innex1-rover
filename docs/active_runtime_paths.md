@@ -88,6 +88,8 @@ ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.2
 - `lunabot_drivetrain/drivetrain_bridge`
 - `lunabot_drivetrain/velocity_gate`
 - optional joystick teleop through `twist_mux`
+- optional browser Gamepad teleop through
+  `lunabot_teleop/web_gamepad_bridge.launch.py`
 
 The command path is:
 
@@ -103,6 +105,10 @@ The command path is:
 Keep the velocity gate in this path for hardware work. Do not command the
 drivetrain directly unless you are running a controlled bench test and have a
 stop plan.
+
+The current Wi-Fi bench teleop path uses the Jetson-hosted browser Gamepad
+bridge. An operator laptop joins the rover network, opens the HTTPS controller
+page served by the Jetson, and sends bounded commands into `/cmd_vel_safe`.
 
 ## Excavation And Deposition Bring-Up
 
@@ -122,13 +128,16 @@ of manually composing these pieces.
 Use Foxglove for ground-control state and RViz for navigation debugging.
 
 ```bash
-ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+ros2 launch lunabot_bringup foxglove_ground_control.launch.py \
+  profile:=hardware_competition
 ros2 run rviz2 rviz2
 ```
 
 Foxglove should show the low-bandwidth operator topics from
-`runtime_profiles.yaml`. RViz should be opened when checking TF, robot model,
-costmaps, point clouds, and Nav2 behaviour.
+`runtime_profiles.yaml`. Use the project launch rather than launching
+`foxglove_bridge` directly so the topic allowlist, compressed camera
+republishers, and publish-disable settings stay in force. RViz should be opened
+when checking TF, robot model, costmaps, point clouds, and Nav2 behaviour.
 
 The Foxglove Bridge is the expected live ROS 2 bridge because it supports ROS 2
 message definitions, graph introspection, and low-overhead WebSocket transport.

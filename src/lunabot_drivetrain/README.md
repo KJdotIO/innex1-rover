@@ -121,14 +121,14 @@ ros2 topic echo /drivetrain/status
 ros2 topic echo /drivetrain/telemetry
 ```
 
-For controller testing, plug in the gamepad and start the same launch file with
-teleop enabled:
+For wired Jetson bench teleop, plug the gamepad into the Jetson and start the
+same launch file with teleop enabled:
 
 ```bash
 ros2 launch lunabot_drivetrain drivetrain_bench.launch.py enable_teleop:=true max_throttle:=0.25
 ```
 
-The historical direct-Sabertooth joystick path is:
+The wired Jetson joystick path is:
 
 `game_controller_node` → `/joy` → `teleop_twist_joy` → `/cmd_vel_teleop` →
 `twist_mux` → `/cmd_vel_safe` → `velocity_gate` → `/cmd_vel_gated` →
@@ -145,6 +145,21 @@ or match it by SDL name:
 ```bash
 ros2 launch lunabot_drivetrain drivetrain_bench.launch.py enable_teleop:=true joy_device_name:="Xbox Wireless Controller"
 ```
+
+For operator-laptop teleop over rover Wi-Fi, keep the drivetrain launch running
+on the Jetson with `enable_teleop:=false`, then start the browser Gamepad
+bridge:
+
+```bash
+ros2 launch lunabot_teleop web_gamepad_bridge.launch.py \
+  bind_host:=0.0.0.0 \
+  port:=9443 \
+  tls_cert_file:=/tmp/lunabot_web_gamepad.crt \
+  tls_key_file:=/tmp/lunabot_web_gamepad.key
+```
+
+The laptop opens `https://<jetson-ip>:9443`, reads the Xbox controller through
+the browser Gamepad API, and sends bounded commands into `/cmd_vel_safe`.
 
 ## micro-ROS?
 

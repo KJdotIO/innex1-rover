@@ -1,18 +1,22 @@
 """Unit tests for the browser gamepad bridge helpers."""
 
+import importlib
+import importlib.util
 import sys
 import types
 
 
+def _module_available(module_name):
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ModuleNotFoundError, ValueError):
+        return module_name in sys.modules
+
+
 def _install_ros_fakes():
     """Install small ROS module fakes for helper-only tests on non-ROS hosts."""
-    try:
-        import rclpy as _rclpy  # noqa: F401
-        from geometry_msgs.msg import Twist as _Twist  # noqa: F401
-
+    if all(_module_available(name) for name in ("rclpy", "geometry_msgs.msg")):
         return
-    except ModuleNotFoundError:
-        pass
 
     class _Vector:
         def __init__(self):
@@ -62,13 +66,13 @@ def _install_ros_fakes():
 
 _install_ros_fakes()
 
-from lunabot_teleop.web_gamepad_bridge import (  # noqa: E402
-    GamepadCommand,
-    SpeedLimits,
-    command_to_twist,
-    parse_command,
-    parse_speed_limits,
-)
+web_gamepad_bridge = importlib.import_module("lunabot_teleop.web_gamepad_bridge")
+GamepadCommand = web_gamepad_bridge.GamepadCommand
+SpeedLimits = web_gamepad_bridge.SpeedLimits
+all_interface_bind_requires_tls = web_gamepad_bridge.all_interface_bind_requires_tls
+command_to_twist = web_gamepad_bridge.command_to_twist
+parse_command = web_gamepad_bridge.parse_command
+parse_speed_limits = web_gamepad_bridge.parse_speed_limits
 
 
 def test_parse_command_clamps_untrusted_values():
@@ -119,3 +123,14 @@ def test_parse_speed_limits_keeps_current_values_when_omitted():
     )
 
     assert limits == SpeedLimits(max_linear_mps=0.3, max_angular_radps=0.8)
+
+
+def test_public_bind_requires_tls_pair():
+    assert all_interface_bind_requires_tls("0.0.0.0", "", "")
+    assert all_interface_bind_requires_tls("::", "/tmp/cert.pem", "")
+    assert not all_interface_bind_requires_tls(
+        "0.0.0.0",
+        "/tmp/cert.pem",
+        "/tmp/key.pem",
+    )
+    assert not all_interface_bind_requires_tls("127.0.0.1", "", "")
