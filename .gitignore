@@ -14,6 +14,9 @@ __pycache__/
 research/
 .firecrawl/
 wiki/
+node_modules/
+dist/
+*.tsbuildinfo
 codex-pr.diff
 codex-pr.json
 codex-review.json

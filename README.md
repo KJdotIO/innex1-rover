@@ -184,6 +184,9 @@ pkill -9 -f "gz sim"
 ## Repository layout
 
 ```text
+apps/
+└── mission-control/         # Local web dashboard spike for rover operations
+
 src/
 ├── external/                # Vendored third-party packages (Leo Rover)
 ├── lunabot_bringup/         # Top-level launch files and mission manager
