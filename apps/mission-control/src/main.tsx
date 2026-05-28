@@ -1,33 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Activity,
   AlertTriangle,
-  BatteryCharging,
   Camera,
   Check,
-  CircleGauge,
-  Compass,
-  Disc3,
-  Flag,
+  CircleStop,
   Gauge,
   HardDrive,
-  Joystick,
-  MapPinned,
   Pause,
   Play,
-  Power,
-  Radio,
   RotateCcw,
-  ShieldAlert,
+  ShieldCheck,
   Square,
-  Timer,
   Wifi,
   X
 } from "lucide-react";
 import "./styles.css";
 
-type Health = "nominal" | "warning" | "fault" | "offline";
+type Health = "ok" | "warn" | "bad" | "off";
 type ActionName =
   | "start-mission"
   | "abort-mission"
@@ -36,13 +26,12 @@ type ActionName =
   | "reset-motion-inhibit"
   | "zero-command";
 
-interface MissionControlState {
+interface DashboardState {
   connection: {
     route: "mock" | "tailscale" | "rover-wifi";
     jetsonOnline: boolean;
     rosOnline: boolean;
     latencyMs: number;
-    lastUpdateIso: string;
   };
   safety: {
     estopActive: boolean;
@@ -53,7 +42,7 @@ interface MissionControlState {
   };
   mission: {
     phase: string;
-    autonomyMode: string;
+    mode: string;
     timeRemainingS: number;
     cycleCount: number;
     lastFailureReason: string;
@@ -70,14 +59,13 @@ interface MissionControlState {
   };
   localisation: {
     ready: boolean;
-    pose: { x: number; y: number; yawDeg: number };
-    aprilTags: number;
     tfHealthy: boolean;
+    aprilTags: number;
+    pose: { x: number; y: number; yawDeg: number };
   };
   power: {
     batteryV: number;
     currentA: number;
-    estimatedRemainingMin: number;
   };
   cameras: {
     frontFps: number;
@@ -86,151 +74,122 @@ interface MissionControlState {
     rearStale: boolean;
   };
   preflight: Array<{ label: string; ok: boolean; detail: string }>;
-  events: Array<{ time: string; level: Health; text: string }>;
+  events: Array<{ level: Health; text: string }>;
 }
 
 const API_BASE = import.meta.env.VITE_ROVER_API_BASE ?? "";
 
-const nowLabel = () =>
-  new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  }).format(new Date());
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(max, value));
-
-function makeMockState(seed: number, recording = true): MissionControlState {
-  const phase = seed % 70 < 36 ? "Manual bench checkout" : "Autonomy standby";
-  const safeLinear = Math.sin(seed / 9) * 0.18;
-  const safeAngular = Math.cos(seed / 13) * 0.42;
-  const gateOpen = seed % 90 < 76;
-  const inhibited = seed % 90 >= 76 && seed % 90 < 84;
-  const fault = seed % 90 >= 84;
-  const frontTicks = Math.round(14192 + seed * 12);
+function makeMockState(tick: number, recording = false): DashboardState {
+  const gateOpen = tick % 70 < 58;
+  const inhibited = tick % 70 >= 58 && tick % 70 < 64;
+  const fault = tick % 70 >= 64;
+  const safeLinear = Math.sin(tick / 8) * 0.12;
+  const safeAngular = Math.cos(tick / 11) * 0.36;
 
   return {
     connection: {
       route: "mock",
       jetsonOnline: true,
       rosOnline: true,
-      latencyMs: 34 + Math.round(Math.sin(seed / 8) * 12),
-      lastUpdateIso: new Date().toISOString()
+      latencyMs: 28 + Math.round(Math.abs(Math.sin(tick / 6)) * 18)
     },
     safety: {
       estopActive: false,
       motionInhibited: inhibited,
       gateOpen,
       canMove: gateOpen && !inhibited && !fault,
-      faultText: fault ? "Drivetrain fault simulation" : "No active faults"
+      faultText: fault ? "Encoder stall simulated" : "No active faults"
     },
     mission: {
-      phase,
-      autonomyMode: "manual",
-      timeRemainingS: Math.max(0, 900 - seed * 3),
+      phase: "Manual checkout",
+      mode: "manual",
+      timeRemainingS: Math.max(0, 900 - tick * 2),
       cycleCount: 2,
-      lastFailureReason: fault ? "Encoder velocity below threshold" : "None",
+      lastFailureReason: fault ? "Wheel velocity below threshold" : "None",
       rosbagRecording: recording
     },
     drivetrain: {
       state: fault ? "FAULT" : gateOpen ? "READY" : "INHIBITED",
       faultCode: fault ? 3 : 0,
-      commandAgeS: 0.06 + Math.abs(Math.sin(seed / 7)) * 0.12,
+      commandAgeS: 0.05 + Math.abs(Math.sin(tick / 5)) * 0.1,
       safeCommand: { linear: safeLinear, angular: safeAngular },
       gatedCommand: {
         linear: gateOpen ? safeLinear : 0,
         angular: gateOpen ? safeAngular : 0
       },
-      encoderTicks: [
-        frontTicks,
-        frontTicks + 44,
-        frontTicks - 108,
-        frontTicks - 82
-      ],
-      wheelRps: [0.42, 0.44, 0.41, 0.43].map(
-        (value, index) => value + Math.sin(seed / (6 + index)) * 0.05
+      encoderTicks: [14020, 14082, 13984, 13991].map(
+        (value, index) => value + tick * (index + 3)
+      ),
+      wheelRps: [0.32, 0.33, 0.31, 0.32].map(
+        (value, index) => value + Math.sin(tick / (7 + index)) * 0.04
       )
     },
     localisation: {
-      ready: seed % 50 < 42,
+      ready: tick % 40 < 34,
+      tfHealthy: tick % 54 < 50,
+      aprilTags: tick % 40 < 34 ? 3 : 1,
       pose: {
-        x: 1.8 + Math.sin(seed / 18) * 0.4,
-        y: -0.7 + Math.cos(seed / 20) * 0.35,
-        yawDeg: (seed * 3) % 360
-      },
-      aprilTags: seed % 40 < 28 ? 3 : 1,
-      tfHealthy: seed % 60 < 55
+        x: 1.82 + Math.sin(tick / 18) * 0.2,
+        y: -0.42 + Math.cos(tick / 18) * 0.2,
+        yawDeg: (tick * 2) % 360
+      }
     },
     power: {
-      batteryV: 24.7 - Math.sin(seed / 14) * 0.3,
-      currentA: 6.8 + Math.abs(Math.sin(seed / 5)) * 8,
-      estimatedRemainingMin: 48
+      batteryV: 24.6 - Math.sin(tick / 14) * 0.2,
+      currentA: 5.8 + Math.abs(Math.sin(tick / 6)) * 5.2
     },
     cameras: {
-      frontFps: 8.8 + Math.sin(seed / 8) * 0.6,
-      rearFps: 3.2 + Math.cos(seed / 11) * 0.4,
+      frontFps: 8.6 + Math.sin(tick / 9) * 0.4,
+      rearFps: 3.0 + Math.cos(tick / 10) * 0.3,
       frontStale: false,
-      rearStale: seed % 80 > 72
+      rearStale: tick % 80 > 73
     },
     preflight: [
-      { label: "Jetson reachable", ok: true, detail: "Tailscale route alive" },
-      { label: "ROS graph alive", ok: true, detail: "Core topics fresh" },
+      { label: "Jetson", ok: true, detail: "Reachable" },
+      { label: "ROS graph", ok: true, detail: "Core topics fresh" },
       {
-        label: "Motion gate",
+        label: "Safety gate",
         ok: gateOpen,
-        detail: gateOpen ? "Gate open" : "Gate is holding zero"
+        detail: gateOpen ? "Open" : "Holding zero"
       },
       {
-        label: "Teensy telemetry",
+        label: "Teensy",
         ok: !fault,
-        detail: fault ? "Stall fault simulated" : "Four encoders fresh"
+        detail: fault ? "Fault active" : "Telemetry fresh"
       },
       {
-        label: "Camera streams",
-        ok: seed % 80 <= 72,
-        detail: seed % 80 <= 72 ? "Front/rear within budget" : "Rear stale"
+        label: "Cameras",
+        ok: tick % 80 <= 73,
+        detail: tick % 80 <= 73 ? "Fresh" : "Rear stale"
       },
       {
         label: "Localisation",
-        ok: seed % 50 < 42,
-        detail: seed % 50 < 42 ? "Start-zone status ready" : "Waiting for tags"
+        ok: tick % 40 < 34,
+        detail: tick % 40 < 34 ? "Ready" : "Waiting"
       }
     ],
     events: [
       {
-        time: nowLabel(),
-        level: fault ? "fault" : "nominal",
-        text: fault ? "Velocity gate commanded zero" : "Telemetry refresh accepted"
+        level: fault ? "bad" : "ok",
+        text: fault ? "Gate closed after drivetrain fault" : "Telemetry fresh"
       },
-      {
-        time: "T-00:12",
-        level: "nominal",
-        text: "Browser dashboard running in mock mode"
-      },
-      {
-        time: "T-02:04",
-        level: "warning",
-        text: "Remote controls remain read-only until lab arming"
-      }
+      { level: "warn", text: "Remote controls should stay read-only from home" },
+      { level: "ok", text: "Dashboard running with mock data" }
     ]
   };
 }
 
-async function fetchState(seed: number, recording: boolean) {
-  if (!API_BASE) return makeMockState(seed, recording);
-
+async function fetchState(tick: number, recording: boolean) {
+  if (!API_BASE) return makeMockState(tick, recording);
   const response = await fetch(`${API_BASE}/api/state`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`State request failed with HTTP ${response.status}`);
-  }
-  return (await response.json()) as MissionControlState;
+  if (!response.ok) throw new Error(`State request failed: ${response.status}`);
+  return (await response.json()) as DashboardState;
 }
 
 async function sendAction(action: ActionName) {
   if (!API_BASE) {
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
-    return { ok: true, mock: true };
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    return;
   }
 
   const response = await fetch(`${API_BASE}/api/actions/${action}`, {
@@ -238,527 +197,328 @@ async function sendAction(action: ActionName) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source: "mission-control" })
   });
-  if (!response.ok) {
-    throw new Error(`${action} failed with HTTP ${response.status}`);
-  }
-  return response.json();
+  if (!response.ok) throw new Error(`${action} failed: ${response.status}`);
 }
 
 function formatSeconds(seconds: number) {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
 
-function healthLabel(health: Health) {
-  if (health === "nominal") return "nominal";
-  if (health === "warning") return "watch";
-  if (health === "fault") return "fault";
-  return "offline";
+function statusFromBoolean(ok: boolean): Health {
+  return ok ? "ok" : "warn";
 }
 
-function StatusPill({
-  health,
-  label
-}: {
-  health: Health;
-  label: string;
-}) {
+function Status({ value, label }: { value: Health; label: string }) {
   return (
-    <span className={`status-pill ${health}`}>
+    <span className={`status ${value}`}>
       <span />
       {label}
     </span>
   );
 }
 
-function Metric({
+function Stat({
   label,
   value,
-  detail
+  muted
 }: {
   label: string;
   value: string;
-  detail?: string;
+  muted?: string;
 }) {
   return (
-    <div className="metric">
+    <div className="stat">
       <span>{label}</span>
       <strong>{value}</strong>
-      {detail ? <small>{detail}</small> : null}
+      {muted ? <small>{muted}</small> : null}
     </div>
   );
 }
 
-function CommandButton({
-  icon,
-  label,
+function ActionButton({
   action,
-  variant = "secondary",
-  onAction,
-  busy
+  label,
+  icon,
+  danger,
+  busy,
+  onAction
 }: {
-  icon: React.ReactNode;
-  label: string;
   action: ActionName;
-  variant?: "primary" | "secondary" | "danger";
-  onAction: (action: ActionName, label: string) => void;
+  label: string;
+  icon: React.ReactNode;
+  danger?: boolean;
   busy?: boolean;
+  onAction: (action: ActionName, label: string) => void;
 }) {
   return (
     <button
-      className={`command-button ${variant}`}
-      type="button"
+      className={`action ${danger ? "danger" : ""}`}
       disabled={busy}
+      type="button"
       onClick={() => onAction(action, label)}
     >
       {icon}
-      <span>{busy ? "Sending" : label}</span>
+      {busy ? "Sending" : label}
     </button>
   );
 }
 
-function CameraFeed({
-  title,
+function CameraView({
+  label,
   fps,
-  stale,
-  rear
+  stale
 }: {
-  title: string;
+  label: string;
   fps: number;
   stale: boolean;
-  rear?: boolean;
 }) {
   return (
-    <div className={`camera-feed ${rear ? "rear" : ""}`}>
-      <div className="camera-grid" />
-      <div className="camera-horizon" />
-      <div className="camera-crosshair" />
-      <div className="camera-label">
-        <span>{title}</span>
-        <strong>{fps.toFixed(1)} FPS</strong>
+    <div className="camera-view">
+      <div className="camera-rule horizontal" />
+      <div className="camera-rule vertical" />
+      <div className="camera-meta">
+        <strong>{label}</strong>
+        <span>{stale ? "stale" : `${fps.toFixed(1)} fps`}</span>
       </div>
-      <StatusPill health={stale ? "warning" : "nominal"} label={stale ? "stale" : "live"} />
     </div>
   );
 }
 
-function RoverPlane({ state }: { state: MissionControlState }) {
-  const x = clamp(50 + state.drivetrain.gatedCommand.angular * 35, 14, 86);
-  const y = clamp(50 - state.drivetrain.gatedCommand.linear * 130, 14, 86);
+function Panel({
+  title,
+  icon,
+  children
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rover-plane">
-      <div className="plane-axis horizontal" />
-      <div className="plane-axis vertical" />
-      <div
-        className="rover-marker"
-        style={{
-          left: `${x}%`,
-          top: `${y}%`,
-          transform: `translate(-50%, -50%) rotate(${state.localisation.pose.yawDeg}deg)`
-        }}
-      >
-        <span />
-      </div>
-      <div className="plane-readout">
-        <span>pose</span>
-        <strong>
-          {state.localisation.pose.x.toFixed(2)}, {state.localisation.pose.y.toFixed(2)}
-        </strong>
-      </div>
-    </div>
+    <section className="panel">
+      <header className="panel-header">
+        <h2>{title}</h2>
+        {icon}
+      </header>
+      {children}
+    </section>
   );
 }
 
 function App() {
-  const [seed, setSeed] = useState(1);
+  const [tick, setTick] = useState(1);
   const [state, setState] = useState(() => makeMockState(1));
-  const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<ActionName | null>(null);
-  const [operatorLog, setOperatorLog] = useState<string[]>([
-    "Dashboard initialised in local mock mode."
-  ]);
+  const [error, setError] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>(["Dashboard started in mock mode."]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setSeed((value) => value + 1);
-    }, 1200);
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1200);
     return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    fetchState(seed, state.mission.rosbagRecording)
+    fetchState(tick, state.mission.rosbagRecording)
       .then((nextState) => {
         if (cancelled) return;
         setState(nextState);
         setError(null);
       })
       .catch((err: Error) => {
-        if (cancelled) return;
-        setError(err.message);
+        if (!cancelled) setError(err.message);
       });
     return () => {
       cancelled = true;
     };
-  }, [seed, state.mission.rosbagRecording]);
-
-  const routeLabel = API_BASE ? state.connection.route : "mock";
-  const canMoveHealth: Health = state.safety.canMove
-    ? "nominal"
-    : state.safety.estopActive || state.drivetrain.faultCode
-      ? "fault"
-      : "warning";
+  }, [tick, state.mission.rosbagRecording]);
 
   const runAction = useCallback(async (action: ActionName, label: string) => {
     setBusyAction(action);
     try {
       await sendAction(action);
-      setOperatorLog((items) => [
-        `${nowLabel()} ${label} accepted${API_BASE ? "" : " (mock)"}`,
-        ...items
-      ].slice(0, 5));
+      setLog((items) => [`${label} accepted${API_BASE ? "" : " (mock)"}`, ...items].slice(0, 5));
       if (action === "start-rosbag" || action === "stop-rosbag") {
         setState((current) => ({
           ...current,
-          mission: {
-            ...current.mission,
-            rosbagRecording: action === "start-rosbag"
-          }
+          mission: { ...current.mission, rosbagRecording: action === "start-rosbag" }
         }));
       }
     } catch (err) {
-      setOperatorLog((items) => [
-        `${nowLabel()} ${label} failed: ${(err as Error).message}`,
-        ...items
-      ].slice(0, 5));
+      setLog((items) => [`${label} failed: ${(err as Error).message}`, ...items].slice(0, 5));
     } finally {
       setBusyAction(null);
     }
   }, []);
 
-  const wheelSummary = useMemo(
+  const wheelRows = useMemo(
     () =>
-      state.drivetrain.wheelRps
-        .map((value, index) => `${["FL", "FR", "RL", "RR"][index]} ${value.toFixed(2)}`)
-        .join("  /  "),
-    [state.drivetrain.wheelRps]
+      ["FL", "FR", "RL", "RR"].map((name, index) => ({
+        name,
+        ticks: state.drivetrain.encoderTicks[index],
+        rps: state.drivetrain.wheelRps[index]
+      })),
+    [state.drivetrain.encoderTicks, state.drivetrain.wheelRps]
   );
 
+  const route = API_BASE ? state.connection.route : "mock";
+  const canMoveState: Health = state.safety.canMove
+    ? "ok"
+    : state.safety.estopActive || state.drivetrain.faultCode
+      ? "bad"
+      : "warn";
+
   return (
-    <main className="mission-shell">
-      <div className="video-sheen" />
-      <div className="grid-overlay" />
+    <main className="dashboard">
       <header className="topbar">
-        <div className="brand-lockup">
-          <span className="brand-mark">INX</span>
-          <div>
-            <p>INNEX-1</p>
-            <h1>Mission Control</h1>
-          </div>
+        <div>
+          <h1>INNEX Mission Control</h1>
+          <p>Local dashboard spike</p>
         </div>
-        <nav aria-label="Dashboard sections">
-          <a href="#overview">Overview</a>
-          <a href="#drivetrain">Drive</a>
-          <a href="#preflight">Pre-flight</a>
-          <a href="#actions">Actions</a>
-        </nav>
-        <div className="connection-strip">
-          <StatusPill
-            health={state.connection.jetsonOnline ? "nominal" : "offline"}
-            label={routeLabel}
-          />
+        <div className="top-status">
+          <Status value={state.connection.jetsonOnline ? "ok" : "off"} label={`Jetson ${route}`} />
+          <Status value={state.connection.rosOnline ? "ok" : "off"} label="ROS" />
           <span>{state.connection.latencyMs} ms</span>
         </div>
       </header>
 
-      <section className="hero-console" id="overview">
-        <div className="hero-copy">
-          <span className="eyebrow">Rover operations // local console</span>
-          <h2>One screen for the things that decide whether the rover moves.</h2>
-          <p>
-            A curated dashboard for safety, drivetrain, mission state, cameras,
-            power and evidence capture. Foxglove stays the microscope; this is
-            the operator console.
-          </p>
-          <div className="hero-actions">
-            <CommandButton
-              icon={<Play size={16} />}
-              label="Start mission"
-              action="start-mission"
-              variant="primary"
-              onAction={runAction}
-              busy={busyAction === "start-mission"}
-            />
-            <CommandButton
-              icon={<Disc3 size={16} />}
-              label={state.mission.rosbagRecording ? "Stop rosbag" : "Start rosbag"}
+      {error ? (
+        <div className="alert">
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      ) : null}
+
+      <section className="summary">
+        <Stat label="Can move" value={state.safety.canMove ? "Yes" : "No"} muted={state.safety.faultText} />
+        <Stat label="Mission" value={state.mission.phase} muted={`${state.mission.mode} · ${formatSeconds(state.mission.timeRemainingS)}`} />
+        <Stat label="Drivetrain" value={state.drivetrain.state} muted={`fault ${state.drivetrain.faultCode}`} />
+        <Stat label="Power" value={`${state.power.batteryV.toFixed(1)} V`} muted={`${state.power.currentA.toFixed(1)} A`} />
+        <Stat label="Localisation" value={state.localisation.ready ? "Ready" : "Waiting"} muted={`${state.localisation.aprilTags} tags`} />
+      </section>
+
+      <section className="grid">
+        <Panel title="Camera" icon={<Camera size={18} />}>
+          <div className="camera-grid">
+            <CameraView label="Front" fps={state.cameras.frontFps} stale={state.cameras.frontStale} />
+            <CameraView label="Rear" fps={state.cameras.rearFps} stale={state.cameras.rearStale} />
+          </div>
+        </Panel>
+
+        <Panel title="Safety" icon={<ShieldCheck size={18} />}>
+          <div className="rows">
+            <div><span>E-stop</span><Status value={state.safety.estopActive ? "bad" : "ok"} label={state.safety.estopActive ? "active" : "clear"} /></div>
+            <div><span>Motion inhibit</span><Status value={state.safety.motionInhibited ? "warn" : "ok"} label={state.safety.motionInhibited ? "active" : "clear"} /></div>
+            <div><span>Velocity gate</span><Status value={state.safety.gateOpen ? "ok" : "warn"} label={state.safety.gateOpen ? "open" : "zero"} /></div>
+            <div><span>Movement</span><Status value={canMoveState} label={state.safety.canMove ? "allowed" : "blocked"} /></div>
+          </div>
+        </Panel>
+
+        <Panel title="Actions" icon={<CircleStop size={18} />}>
+          <div className="actions">
+            <ActionButton action="start-mission" label="Start mission" icon={<Play size={15} />} onAction={runAction} busy={busyAction === "start-mission"} />
+            <ActionButton action="abort-mission" label="Abort mission" icon={<Square size={15} />} danger onAction={runAction} busy={busyAction === "abort-mission"} />
+            <ActionButton
               action={state.mission.rosbagRecording ? "stop-rosbag" : "start-rosbag"}
+              label={state.mission.rosbagRecording ? "Stop rosbag" : "Start rosbag"}
+              icon={<HardDrive size={15} />}
               onAction={runAction}
               busy={busyAction === "start-rosbag" || busyAction === "stop-rosbag"}
             />
-            <CommandButton
-              icon={<Square size={16} />}
-              label="Abort mission"
-              action="abort-mission"
-              variant="danger"
-              onAction={runAction}
-              busy={busyAction === "abort-mission"}
-            />
+            <ActionButton action="zero-command" label="Zero command" icon={<Pause size={15} />} onAction={runAction} busy={busyAction === "zero-command"} />
+            <ActionButton action="reset-motion-inhibit" label="Reset inhibit" icon={<RotateCcw size={15} />} onAction={runAction} busy={busyAction === "reset-motion-inhibit"} />
           </div>
-        </div>
+        </Panel>
 
-        <div className="mission-clock">
-          <span>Mission timer</span>
-          <strong>{formatSeconds(state.mission.timeRemainingS)}</strong>
-          <p>{state.mission.phase}</p>
-          <StatusPill
-            health={state.mission.rosbagRecording ? "nominal" : "warning"}
-            label={state.mission.rosbagRecording ? "rosbag recording" : "rosbag idle"}
-          />
-        </div>
-      </section>
-
-      {error ? (
-        <section className="error-banner">
-          <AlertTriangle size={18} />
-          <span>{error}</span>
-        </section>
-      ) : null}
-
-      <section className="status-grid">
-        <Metric
-          label="Can rover move?"
-          value={state.safety.canMove ? "YES" : "NO"}
-          detail={state.safety.faultText}
-        />
-        <Metric
-          label="Gate"
-          value={state.safety.gateOpen ? "OPEN" : "ZERO"}
-          detail="/cmd_vel_safe -> /cmd_vel_gated"
-        />
-        <Metric
-          label="Battery"
-          value={`${state.power.batteryV.toFixed(1)} V`}
-          detail={`${state.power.currentA.toFixed(1)} A draw`}
-        />
-        <Metric
-          label="Localisation"
-          value={state.localisation.ready ? "READY" : "WAIT"}
-          detail={`${state.localisation.aprilTags} AprilTags`}
-        />
-      </section>
-
-      <section className="console-grid">
-        <article className="panel safety-panel">
-          <div className="panel-heading">
+        <Panel title="Drivetrain" icon={<Gauge size={18} />}>
+          <div className="command-table">
             <div>
-              <span className="eyebrow">Safety</span>
-              <h3>Motion authority</h3>
-            </div>
-            <StatusPill health={canMoveHealth} label={healthLabel(canMoveHealth)} />
-          </div>
-          <div className="safety-stack">
-            <div>
-              <ShieldAlert size={18} />
-              <span>E-stop</span>
-              <strong>{state.safety.estopActive ? "ACTIVE" : "CLEAR"}</strong>
+              <span>/cmd_vel_safe</span>
+              <strong>{state.drivetrain.safeCommand.linear.toFixed(2)} m/s · {state.drivetrain.safeCommand.angular.toFixed(2)} rad/s</strong>
             </div>
             <div>
-              <Power size={18} />
-              <span>Motion inhibit</span>
-              <strong>{state.safety.motionInhibited ? "ACTIVE" : "CLEAR"}</strong>
+              <span>/cmd_vel_gated</span>
+              <strong>{state.drivetrain.gatedCommand.linear.toFixed(2)} m/s · {state.drivetrain.gatedCommand.angular.toFixed(2)} rad/s</strong>
             </div>
             <div>
-              <Gauge size={18} />
-              <span>Drivetrain</span>
-              <strong>{state.drivetrain.state}</strong>
-            </div>
-          </div>
-          <div className="button-row">
-            <CommandButton
-              icon={<RotateCcw size={16} />}
-              label="Reset inhibit"
-              action="reset-motion-inhibit"
-              onAction={runAction}
-              busy={busyAction === "reset-motion-inhibit"}
-            />
-            <CommandButton
-              icon={<Pause size={16} />}
-              label="Zero command"
-              action="zero-command"
-              onAction={runAction}
-              busy={busyAction === "zero-command"}
-            />
-          </div>
-        </article>
-
-        <article className="panel drive-panel" id="drivetrain">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Drivetrain</span>
-              <h3>Command path</h3>
-            </div>
-            <CircleGauge size={22} />
-          </div>
-          <div className="command-path">
-            <div>
-              <span>safe</span>
-              <strong>
-                {state.drivetrain.safeCommand.linear.toFixed(2)} /{" "}
-                {state.drivetrain.safeCommand.angular.toFixed(2)}
-              </strong>
-            </div>
-            <div>
-              <span>gated</span>
-              <strong>
-                {state.drivetrain.gatedCommand.linear.toFixed(2)} /{" "}
-                {state.drivetrain.gatedCommand.angular.toFixed(2)}
-              </strong>
-            </div>
-            <div>
-              <span>age</span>
+              <span>Command age</span>
               <strong>{state.drivetrain.commandAgeS.toFixed(2)} s</strong>
             </div>
           </div>
-          <RoverPlane state={state} />
-          <p className="fine-print">{wheelSummary}</p>
-        </article>
+          <table>
+            <thead>
+              <tr><th>Wheel</th><th>Ticks</th><th>RPS</th></tr>
+            </thead>
+            <tbody>
+              {wheelRows.map((wheel) => (
+                <tr key={wheel.name}>
+                  <td>{wheel.name}</td>
+                  <td>{wheel.ticks}</td>
+                  <td>{wheel.rps.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
 
-        <article className="panel camera-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Vision</span>
-              <h3>Camera streams</h3>
-            </div>
-            <Camera size={22} />
+        <Panel title="Mission">
+          <div className="rows">
+            <div><span>Mode</span><strong>{state.mission.mode}</strong></div>
+            <div><span>Timer</span><strong>{formatSeconds(state.mission.timeRemainingS)}</strong></div>
+            <div><span>Cycles</span><strong>{state.mission.cycleCount}</strong></div>
+            <div><span>Rosbag</span><Status value={state.mission.rosbagRecording ? "ok" : "warn"} label={state.mission.rosbagRecording ? "recording" : "idle"} /></div>
+            <div><span>Last failure</span><strong>{state.mission.lastFailureReason}</strong></div>
           </div>
-          <div className="camera-stack">
-            <CameraFeed
-              title="Front OAK"
-              fps={state.cameras.frontFps}
-              stale={state.cameras.frontStale}
-            />
-            <CameraFeed
-              title="Rear OAK"
-              fps={state.cameras.rearFps}
-              stale={state.cameras.rearStale}
-              rear
-            />
-          </div>
-        </article>
+        </Panel>
 
-        <article className="panel mission-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Mission</span>
-              <h3>Autonomy state</h3>
-            </div>
-            <Flag size={22} />
+        <Panel title="Localisation">
+          <div className="rows">
+            <div><span>Start zone</span><Status value={statusFromBoolean(state.localisation.ready)} label={state.localisation.ready ? "ready" : "waiting"} /></div>
+            <div><span>TF</span><Status value={statusFromBoolean(state.localisation.tfHealthy)} label={state.localisation.tfHealthy ? "healthy" : "check"} /></div>
+            <div><span>Pose</span><strong>{state.localisation.pose.x.toFixed(2)}, {state.localisation.pose.y.toFixed(2)}, {Math.round(state.localisation.pose.yawDeg)}°</strong></div>
           </div>
-          <div className="mission-list">
-            <Metric label="Mode" value={state.mission.autonomyMode.toUpperCase()} />
-            <Metric label="Cycles" value={state.mission.cycleCount.toString()} />
-            <Metric label="Failure" value={state.mission.lastFailureReason} />
-          </div>
-        </article>
+        </Panel>
 
-        <article className="panel nav-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Navigation</span>
-              <h3>Pose and graph</h3>
-            </div>
-            <MapPinned size={22} />
-          </div>
-          <div className="nav-radar">
-            <Compass className="compass" size={42} />
-            <div className="radar-ring one" />
-            <div className="radar-ring two" />
-            <div className="pose-chip">
-              yaw {Math.round(state.localisation.pose.yawDeg)} deg
-            </div>
-          </div>
-          <div className="split-readout">
-            <StatusPill health={state.localisation.tfHealthy ? "nominal" : "warning"} label="TF" />
-            <StatusPill health={state.localisation.ready ? "nominal" : "warning"} label="start-zone" />
-          </div>
-        </article>
-
-        <article className="panel preflight-panel" id="preflight">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Pre-flight</span>
-              <h3>Readiness checklist</h3>
-            </div>
-            <Activity size={22} />
-          </div>
-          <div className="checklist">
+        <Panel title="Pre-flight">
+          <div className="checks">
             {state.preflight.map((item) => (
-              <div className="check-row" key={item.label}>
-                {item.ok ? <Check size={16} /> : <X size={16} />}
-                <div>
-                  <strong>{item.label}</strong>
-                  <span>{item.detail}</span>
-                </div>
+              <div className="check" key={item.label}>
+                {item.ok ? <Check size={15} /> : <X size={15} />}
+                <span>{item.label}</span>
+                <strong>{item.detail}</strong>
               </div>
             ))}
           </div>
-        </article>
-      </section>
+        </Panel>
 
-      <section className="lower-grid" id="actions">
-        <article className="panel operator-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Operator log</span>
-              <h3>Recent actions</h3>
-            </div>
-            <HardDrive size={22} />
-          </div>
-          <div className="event-log">
-            {operatorLog.map((item) => (
-              <p key={item}>{item}</p>
+        <Panel title="Event log">
+          <div className="events">
+            {state.events.map((item, index) => (
+              <div className="event" key={`${item.text}-${index}`}>
+                <Status value={item.level} label={item.level} />
+                <span>{item.text}</span>
+              </div>
+            ))}
+            {log.map((item) => (
+              <div className="event" key={item}>
+                <Status value="ok" label="local" />
+                <span>{item}</span>
+              </div>
             ))}
           </div>
-        </article>
+        </Panel>
 
-        <article className="panel telemetry-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Telemetry</span>
-              <h3>Live channels</h3>
-            </div>
-            <Radio size={22} />
-          </div>
-          <div className="channel-grid">
-            <StatusPill health="nominal" label="/drivetrain/status" />
-            <StatusPill health="nominal" label="/drivetrain/telemetry" />
-            <StatusPill health="nominal" label="/mission/state" />
-            <StatusPill health="nominal" label="/power/telemetry" />
-            <StatusPill health={state.cameras.rearStale ? "warning" : "nominal"} label="/camera_rear" />
-            <StatusPill health={state.localisation.ready ? "nominal" : "warning"} label="/localisation" />
-          </div>
-        </article>
-
-        <article className="panel remote-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">Remote mode</span>
-              <h3>Tailscale safe view</h3>
-            </div>
-            <Wifi size={22} />
-          </div>
-          <p>
-            Remote access should stay read-only unless somebody in the lab has
-            armed the rover and can see the physical machine. Motion buttons are
-            wired as explicit bridge actions, not raw ROS graph access.
+        <Panel title="Remote access" icon={<Wifi size={18} />}>
+          <p className="note">
+            Tailscale is fine for monitoring. Keep motion controls disabled from
+            home unless somebody in the lab has armed the rover and can see it.
           </p>
-          <div className="split-readout">
-            <span><Joystick size={14} /> Controller read-only</span>
-            <span><Timer size={14} /> Last update {nowLabel()}</span>
-          </div>
-        </article>
+          <p className="note">
+            Future Jetson bridge should expose curated state and explicit actions,
+            not raw ROS graph access.
+          </p>
+        </Panel>
       </section>
     </main>
   );
