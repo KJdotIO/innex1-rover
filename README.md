@@ -235,6 +235,7 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Local inspection packet: [docs/competition_inspection_packet.md](docs/competition_inspection_packet.md)
 - Competition remote support: [docs/competition_remote_support.md](docs/competition_remote_support.md)
 - Remote support workflow: [docs/remote_support_workflow.md](docs/remote_support_workflow.md)
+- Repo-local robotics skills: [skills/README.md](skills/README.md)
 - Docker workflow: [docs/docker_workflow.md](docs/docker_workflow.md)
 
 ## Contributing and licence

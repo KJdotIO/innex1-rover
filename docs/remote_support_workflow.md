@@ -13,6 +13,7 @@ Start every serious remote-support task with these files:
 - `README.md`
 - `ROVER_CODING_STANDARD.md`
 - `.github/contracts/interface_contracts.json`
+- `skills/README.md`
 - `docs/active_runtime_paths.md`
 - `docs/hardware_week_runbook.md`
 - `docs/competition_remote_support.md`
@@ -22,25 +23,34 @@ If a local `wiki/` checkout exists, include the relevant wiki page too. If the
 wiki is not checked out, say so in the task prompt rather than pretending the
 context is available.
 
-## Installed Robotics Skills
+## Repo-Local Robotics Skills
 
-If local robotics skills are available, use the matching skill before editing or
-reviewing. This repo does not include the skill files.
+Use the matching skill in `skills/*/SKILL.md` before editing or reviewing. If
+your tool auto-discovers project skills, it should load them from there.
+Otherwise, read the relevant file directly.
 
-- `ros2-development` for ROS 2 Humble, `colcon`, launch files, parameters,
+- `skills/ros2/SKILL.md` for ROS 2 Humble, `colcon`, launch files, parameters,
   QoS, actions, Nav2, DDS, package metadata and build issues.
-- `robotics-design-patterns` for fail-closed behaviour, watchdogs, safety
+- `skills/docker-ros2-development/SKILL.md` for Docker, devcontainers, ROS 2 CI
+  images, DDS networking in containers, GPU passthrough and device passthrough.
+- `skills/robot-bringup/SKILL.md` for Jetson bring-up, systemd services, launch
+  composition, startup ordering, udev rules, watchdogs and long-running robot
+  services.
+- `skills/robotics-design-patterns/SKILL.md` for fail-closed behaviour, watchdogs, safety
   architecture, hardware abstraction, state machines and sim-to-real choices.
-- `robotics-software-principles` for robotics code reviews, module boundaries,
-  hardware interfaces, configuration and risky refactors.
-- `robotics-testing` for ROS tests, launch tests, mock hardware, deterministic
-  replay, CI and hardware-in-the-loop planning.
-- `robot-perception` for OAK-D, depth, AprilTags, Ouster/LiDAR, point clouds,
-  TF/extrinsics, calibration and sensor timing.
-- `robotics-security` for SSH, router/network exposure, secrets, certificates,
-  Docker/devcontainer hardening, DDS security and E-stop security.
+- `skills/robotics-software-principles/SKILL.md` for robotics code reviews,
+  module boundaries, hardware interfaces, configuration and risky refactors.
+- `skills/robotics-testing/SKILL.md` for ROS tests, launch tests, mock hardware,
+  deterministic replay, CI and hardware-in-the-loop planning.
+- `skills/robot-perception/SKILL.md` for OAK-D, depth, AprilTags, Ouster/LiDAR,
+  point clouds, TF/extrinsics, calibration and sensor timing.
+- `skills/robotics-security/SKILL.md` for SSH, router/network exposure, secrets,
+  certificates, Docker/devcontainer hardening, DDS security and E-stop security.
+- `skills/ros2-web-integration/SKILL.md` for browser Gamepad, Foxglove-adjacent
+  web bridges, WebSockets, REST wrappers, MJPEG/WebRTC and web control surface
+  security.
 
-If a skill is missing, say so and continue from the repo docs.
+Do not use the upstream ROS 1 skill for this repo.
 
 ## Good Task Prompts
 
