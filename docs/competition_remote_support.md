@@ -249,6 +249,7 @@ constraints. Start with:
 - `README.md`;
 - `ROVER_CODING_STANDARD.md`;
 - `.github/contracts/interface_contracts.json`;
+- `skills/README.md`;
 - `docs/active_runtime_paths.md`;
 - `docs/hardware_week_runbook.md`;
 - package READMEs under `src/*/README.md`;
