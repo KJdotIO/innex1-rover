@@ -2,10 +2,10 @@
 
 from types import SimpleNamespace
 
-import lunabot_excavation.excavation_sim_proxy as sim_proxy_module
 from builtin_interfaces.msg import Time
-from lunabot_excavation.excavation_sim_proxy import ExcavationSimProxy
 
+import lunabot_excavation.excavation_sim_proxy as sim_proxy_module
+from lunabot_excavation.excavation_sim_proxy import ExcavationSimProxy
 from lunabot_interfaces.msg import ExcavationCommand, ExcavationTelemetry
 
 

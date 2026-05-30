@@ -16,8 +16,9 @@
 
 from unittest.mock import Mock
 
-from lunabot_localisation.camera_info_stamp_aligner import CameraInfoStampAligner
 from sensor_msgs.msg import CameraInfo, Image
+
+from lunabot_localisation.camera_info_stamp_aligner import CameraInfoStampAligner
 
 
 def _aligner_with_publisher() -> tuple[CameraInfoStampAligner, Mock]:

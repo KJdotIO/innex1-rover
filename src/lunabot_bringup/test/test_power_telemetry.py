@@ -6,7 +6,6 @@ from lunabot_bringup.power_telemetry import (
     classify_power_state,
     load_power_profiles,
 )
-
 from lunabot_interfaces.msg import PowerTelemetry
 
 

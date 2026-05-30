@@ -3,6 +3,8 @@
 from pathlib import Path
 
 import pytest
+from rosidl_runtime_py.utilities import get_message
+
 from lunabot_bringup.hardware_fault_injection import (
     _message_from_config,
     load_scenarios,
@@ -10,7 +12,6 @@ from lunabot_bringup.hardware_fault_injection import (
     validate_live_topic_ack,
 )
 from lunabot_bringup.message_fields import write_message_field
-from rosidl_runtime_py.utilities import get_message
 
 
 def _config_path() -> Path:

@@ -2,10 +2,10 @@
 
 from types import SimpleNamespace
 
-import lunabot_excavation.excavation_action_server as excavation_module
-from lunabot_excavation.excavation_action_server import ExcavationActionServer
 from rclpy.action import GoalResponse
 
+import lunabot_excavation.excavation_action_server as excavation_module
+from lunabot_excavation.excavation_action_server import ExcavationActionServer
 from lunabot_interfaces.action import Excavate
 from lunabot_interfaces.msg import ExcavationStatus, ExcavationTelemetry
 

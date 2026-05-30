@@ -1,5 +1,7 @@
 """Unit tests for rover diagnostics status mapping."""
 
+from std_msgs.msg import Bool
+
 from lunabot_bringup.rover_diagnostics import (
     LEVEL_ERROR,
     LEVEL_OK,
@@ -12,8 +14,6 @@ from lunabot_bringup.rover_diagnostics import (
     power_diagnostic,
     safety_diagnostic,
 )
-from std_msgs.msg import Bool
-
 from lunabot_interfaces.msg import (
     DrivetrainStatus,
     ExcavationStatus,

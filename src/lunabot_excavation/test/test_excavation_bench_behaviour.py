@@ -2,14 +2,14 @@
 
 from types import SimpleNamespace
 
-import lunabot_excavation.excavation_bench as bench_module
 import pytest
+
+import lunabot_excavation.excavation_bench as bench_module
 from lunabot_excavation.excavation_controller import (
     ActiveRun,
     ExcavationController,
     ExcavationState,
 )
-
 from lunabot_interfaces.msg import ExcavationCommand, ExcavationStatus
 from lunabot_interfaces.srv import ExcavationJog
 

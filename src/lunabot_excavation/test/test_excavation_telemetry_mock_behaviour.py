@@ -2,10 +2,10 @@
 
 from types import SimpleNamespace
 
-import lunabot_excavation.excavation_telemetry_mock as mock_module
 from builtin_interfaces.msg import Time
-from lunabot_excavation.excavation_telemetry_mock import ExcavationTelemetryMock
 
+import lunabot_excavation.excavation_telemetry_mock as mock_module
+from lunabot_excavation.excavation_telemetry_mock import ExcavationTelemetryMock
 from lunabot_interfaces.msg import ExcavationCommand, ExcavationTelemetry
 
 
