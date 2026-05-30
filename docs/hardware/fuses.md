@@ -32,24 +32,26 @@ Each power domain is protected by a single upstream fuse at the battery output. 
 > **⚠️ Software dependency:** The 40 A ANL only works safely if Sabertooth current limiting is
 > configured at startup (max 10 A per channel). If this is not set, the motive domain has no
 > overcurrent protection below 40 A and the 10 AWG wiring is at risk under sustained peak load.
-> See software-team-notes.md — this is a critical startup configuration.
+> See [software-team-notes.md](software-team-notes.md) — this is a critical startup configuration.
 
 ---
 
 ## Fuse Block — Branch Fusing (Motive Rail)
 
-The fuse block distributes the motive rail to individual controllers. The 60 A ANL upstream
+The fuse block distributes the motive rail to individual controllers. The 40 A ANL upstream
 is the domain protection. Branch fuses here provide per-device fault isolation.
 
 | Slot | Device | Fuse | Reasoning |
 |------|--------|------|-----------|
-| 1 | Sabertooth 2×32 #1 (Left: FL + RL) | **No fuse** | 2 motors × 13 A = 26 A peak. 60 A ANL is domain protection. No suitable blade fuse in kit; adds complexity for minimal gain |
+| 1 | Sabertooth 2×32 #1 (Left: FL + RL) | **No fuse** | 2 motors × 13 A = 26 A peak. The 40 A ANL is domain protection. No suitable blade fuse in kit; adds complexity for minimal gain |
 | 2 | Sabertooth 2×32 #2 (Right: FR + RR) | **No fuse** | Same as above |
 | 3 | Cytron MDD10A #1 (Actuators 1 & 2) | **15 A** | 10 A per channel × 2 = 20 A max. 15 A protects against a single-channel fault without nuisance tripping |
 | 4 | Cytron MDD10A #2 (Actuators 3 & 4) | **15 A** | Same as above |
 | 5 | BLD-510B (Excavation BLDC) | **10 A** | Driver rated 10 A, motor rated 5 A continuous. 10 A fuse catches a hard fault before wiring damage |
 
-**All fuses required are in the included kit — no additional orders needed for the fuse block.**
+**All branch fuses required in the fuse block are in the included blade kit.**
+The upstream 40 A ANL motive fuse and the compute 20 A inline fuse are separate
+from that branch-fuse kit and must be present before power testing.
 
 ---
 
@@ -58,16 +60,16 @@ is the domain protection. Branch fuses here provide per-device fault isolation.
 | Fuse Rating | Qty in Kit | Used | Where |
 |-------------|-----------|------|-------|
 | 5 A | 6 | 2 | Compute rail branches (LiDAR, cameras) via BD-02 |
-| 10 A | 6 | 3 | Compute 20 A inline (separate), BLD-510B slot, BD-01 input |
+| 10 A | 6 | 2 | BLD-510B slot, BD-01 input |
 | 15 A | 6 | 2 | Cytron MDD10A #1 and #2 slots |
-| 20 A | 6 | 0 | Not required in current design |
+| 20 A | 6 | 0 | Not used in the fuse block; compute 20 A inline is separate |
 
 ---
 
 ## Key Rules
 
 - Driving (drivetrain) and excavation must **never run simultaneously** — this is what keeps
-  peak motive demand within the 60 A ANL rating
+  peak motive demand within the 40 A ANL rating
 - The compute rail (20 A inline fuse) remains live through E-Stop by design — do not fuse it
   in a way that would cut it during a safety event
 - Motive main trunk is 10 AWG — ANL fuse must be **40 A** to match wire ampacity. This is safe
