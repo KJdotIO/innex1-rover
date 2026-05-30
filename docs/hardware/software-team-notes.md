@@ -1,5 +1,5 @@
 # INNEX-1 Software Team Notes
-*Electrical team handoff — hardware constraints and configuration requirements*
+*Electrical hardware constraints and configuration requirements*
 
 ---
 
@@ -270,6 +270,6 @@ device.setIrFloodLightIntensity(0.0)          # 0.0 = off (default)
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-05-23 | eniomecaj | Initial handoff document |
+| 2026-05-23 | eniomecaj | Initial hardware notes |
 | 2026-05-23 | eniomecaj | Clarified Sabertooth current limit to ≤ 10 A/channel; added fuse safety dependency note; updated TODO to required action with wiring safety context |
 | 2026-05-23 | eniomecaj | Fixed network topology: OS1 connects via router, not direct to Jetson (Jetson has one Ethernet port); corrected router band to 2.4 GHz |

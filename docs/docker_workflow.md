@@ -62,5 +62,5 @@ the image changes only when the environment changes.
 Docker does not replace the Jetson, the router, sensor USB/Ethernet checks,
 E-stop wiring, motor direction checks, fuse checks or any real motion test.
 
-Use it for repo work, agent handoff, cheap tests and consistent contributor
+Use it for repo work, remote support, cheap tests and consistent contributor
 setup. Use the actual rover for hardware truth.

@@ -153,8 +153,8 @@ The workflow is documented in
 For first-motion, ground-control, comms and evidence-capture procedure on the
 Jetson, use [`docs/hardware_week_runbook.md`](docs/hardware_week_runbook.md).
 
-For remote support after the lab handoff, use
-[`docs/remote_competition_handoff.md`](docs/remote_competition_handoff.md).
+For remote support before competition, use
+[`docs/competition_remote_support.md`](docs/competition_remote_support.md).
 
 ## Active runtime paths
 
@@ -164,7 +164,7 @@ and operator telemetry.
 
 ## Doctor and Docker
 
-Run the doctor before setup, handoff, or hardware work:
+Run the doctor before setup, competition readiness, or hardware work:
 
 ```bash
 python3 tools/doctor.py --profile developer
@@ -233,8 +233,8 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Operations: https://github.com/KJdotIO/innex1-rover/wiki/Operations
 - Contracts: https://github.com/KJdotIO/innex1-rover/wiki/Contracts
 - Local inspection packet: [docs/competition_inspection_packet.md](docs/competition_inspection_packet.md)
-- Remote competition handoff: [docs/remote_competition_handoff.md](docs/remote_competition_handoff.md)
-- Agent handoff: [docs/agent_handoff.md](docs/agent_handoff.md)
+- Competition remote support: [docs/competition_remote_support.md](docs/competition_remote_support.md)
+- Remote support workflow: [docs/remote_support_workflow.md](docs/remote_support_workflow.md)
 - Docker workflow: [docs/docker_workflow.md](docs/docker_workflow.md)
 
 ## Contributing and licence

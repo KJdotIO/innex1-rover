@@ -1,8 +1,8 @@
-# Remote Competition Handoff
+# Competition Remote Support
 
-This is the short handoff for the period after the main software lead leaves the
-lab. The target is to have the rover ready for competition use by 2026-06-15,
-with the competition on 2026-06-16 and 2026-06-17.
+Use this for the remote support period before competition. The target is to have
+the rover ready for competition use by 2026-06-15, with the competition on
+2026-06-16 and 2026-06-17.
 
 Assume the Friday 2026-05-29 lab checklist was not completed unless there is
 fresh evidence in Linear, a dated note, a rosbag, or a commit that says it was.
@@ -30,7 +30,7 @@ Can it be done with the repo, Linear, GitHub, simulation, or a shell on the Jets
 Do not commit passwords, private keys, Tailscale auth keys, or router admin
 credentials to this repo.
 
-Keep the actual values in the team's private handoff channel:
+Keep the actual values in the team's private channel:
 
 ```text
 Jetson SSH user:
@@ -235,15 +235,15 @@ Use a 2026-06-15 milestone with these tracks:
 - OAK-D and AprilTag validation;
 - Ouster mounting, TF and legal LiDAR path;
 - power telemetry and inspection evidence;
-- final docs, agent guidance, and runbook rehearsal.
+- final docs, review guidance, and runbook rehearsal.
 
 Every ticket should say whether it is remote-friendly or lab-required. If a
 ticket needs hands in the lab, name the physical action in the first paragraph.
 
-## Agent Use
+## Coding Assistance
 
-Agents are useful here, but only when they are given the rover's real constraints.
-Point them at:
+Coding assistants are useful here only when they are given the rover's real
+constraints. Start with:
 
 - `AGENTS.md`;
 - `README.md`;
@@ -254,6 +254,6 @@ Point them at:
 - package READMEs under `src/*/README.md`;
 - any checked-out wiki pages, if present.
 
-Before accepting an agent change that touches topics, TF, launch files, hardware
+Before accepting a change that touches topics, TF, launch files, hardware
 bridges, safety, power, or operator command paths, check the contracts, run the
 relevant tests, and make sure the change fails closed on real hardware.
