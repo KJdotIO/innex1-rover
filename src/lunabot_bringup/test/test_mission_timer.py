@@ -6,7 +6,6 @@ import time
 from unittest.mock import patch
 
 import pytest
-
 from lunabot_bringup.mission_timer import MissionTimer
 
 

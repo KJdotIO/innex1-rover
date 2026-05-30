@@ -17,7 +17,6 @@ from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, SetRemap
-
 from lunabot_bringup.launch_gate import select_preflight_config_path
 
 

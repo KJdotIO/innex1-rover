@@ -17,15 +17,14 @@
 from unittest.mock import Mock
 
 import numpy as np
-from rclpy.time import Time
-from sensor_msgs.msg import PointCloud2
-from tf2_ros import ExtrapolationException, LookupException
-
 from lunabot_perception.crater_detection import (
     CraterDetectionNode,
     _binary_dilation,
     _rotation_matrix_from_quaternion,
 )
+from rclpy.time import Time
+from sensor_msgs.msg import PointCloud2
+from tf2_ros import ExtrapolationException, LookupException
 
 
 def _node_with_buffer(tf_buffer: Mock) -> CraterDetectionNode:

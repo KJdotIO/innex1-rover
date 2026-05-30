@@ -153,11 +153,28 @@ The workflow is documented in
 For first-motion, ground-control, comms and evidence-capture procedure on the
 Jetson, use [`docs/hardware_week_runbook.md`](docs/hardware_week_runbook.md).
 
+For remote support after the lab handoff, use
+[`docs/remote_competition_handoff.md`](docs/remote_competition_handoff.md).
+
 ## Active runtime paths
 
 Use [`docs/active_runtime_paths.md`](docs/active_runtime_paths.md) to check
 which launch files are current for sim, hardware bring-up, mission evidence,
 and operator telemetry.
+
+## Doctor and Docker
+
+Run the doctor before setup, handoff, or hardware work:
+
+```bash
+python3 tools/doctor.py --profile developer
+python3 tools/doctor.py --profile operator
+python3 tools/doctor.py --profile jetson
+```
+
+For a repeatable ROS 2 Humble development shell, use
+[`docs/docker_workflow.md`](docs/docker_workflow.md). Docker is for repo work and
+cheap checks; hardware truth still comes from the Jetson and the rover.
 
 ## Visualisation options
 
@@ -184,9 +201,6 @@ pkill -9 -f "gz sim"
 ## Repository layout
 
 ```text
-apps/
-└── mission-control/         # Local web dashboard spike for rover operations
-
 src/
 ├── external/                # Vendored third-party packages (Leo Rover)
 ├── lunabot_bringup/         # Top-level launch files and mission manager
@@ -219,6 +233,9 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Operations: https://github.com/KJdotIO/innex1-rover/wiki/Operations
 - Contracts: https://github.com/KJdotIO/innex1-rover/wiki/Contracts
 - Local inspection packet: [docs/competition_inspection_packet.md](docs/competition_inspection_packet.md)
+- Remote competition handoff: [docs/remote_competition_handoff.md](docs/remote_competition_handoff.md)
+- Agent handoff: [docs/agent_handoff.md](docs/agent_handoff.md)
+- Docker workflow: [docs/docker_workflow.md](docs/docker_workflow.md)
 
 ## Contributing and licence
 

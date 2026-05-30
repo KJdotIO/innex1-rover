@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-
 from lunabot_localisation.legal_lidar_filter_core import (
     ArenaBounds,
     cloud_records,

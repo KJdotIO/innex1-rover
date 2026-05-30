@@ -3,9 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 import lunabot_bringup.mission_manager as mission_manager
+import pytest
 from lunabot_bringup.mission_manager import MissionManager, MissionState
 from lunabot_bringup.mission_timer import MissionTimer
 

@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from lunabot_bringup.mission_evidence import (
     DEFAULT_MAX_BAG_DURATION_S,
     EvidenceProfile,

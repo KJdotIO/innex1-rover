@@ -8,7 +8,6 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
-
 from lunabot_bringup.message_fields import read_message_field
 from lunabot_bringup.preflight_check import (
     ACTION_TYPE_MAP,

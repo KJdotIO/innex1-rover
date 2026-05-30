@@ -78,8 +78,8 @@ Set LAN subnet to e.g. `192.168.8.0/24` (GL.iNet default). Assign static IPs:
 | Device | Recommended Static IP | Notes |
 |--------|-----------------------|-------|
 | Router LAN gateway | 192.168.8.1 | GL.iNet default |
-| OS1-128 LiDAR | 192.168.8.50 | Configured via OS1 sensor web UI |
-| Jetson Orin Nano | 192.168.8.100 | Configured in Ubuntu netplan/nmcli |
+| OS1-128 LiDAR | 192.168.8.176 | Configured via OS1 sensor web UI; matches the current Slate/Ouster debug evidence |
+| Jetson Orin Nano | 192.168.8.20 | Configured in Ubuntu netplan/nmcli; matches the current Ouster debug config |
 | Ground station | 192.168.8.200 | DHCP reservation or static |
 
 > Static IPs prevent DHCP lookup delays during startup. The OS1 LiDAR requires a static IP to

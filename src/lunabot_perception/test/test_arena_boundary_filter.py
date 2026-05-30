@@ -2,14 +2,13 @@
 
 import numpy as np
 import pytest
-from sensor_msgs.msg import PointCloud2, PointField
-
 from lunabot_perception.arena_boundary_filter import (
     ArenaBounds,
     cloud_xyz,
     filter_points_to_arena,
     transform_points,
 )
+from sensor_msgs.msg import PointCloud2, PointField
 
 
 def test_arena_bounds_reject_invalid_margin():

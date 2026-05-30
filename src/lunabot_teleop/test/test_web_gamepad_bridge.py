@@ -76,9 +76,7 @@ parse_speed_limits = web_gamepad_bridge.parse_speed_limits
 
 
 def test_parse_command_clamps_untrusted_values():
-    command = parse_command(
-        {"linear_x": 4.0, "angular_z": -2.0, "enabled": True}
-    )
+    command = parse_command({"linear_x": 4.0, "angular_z": -2.0, "enabled": True})
 
     assert command == GamepadCommand(1.0, -1.0, True)
 
@@ -105,7 +103,7 @@ def test_enabled_command_scales_to_limits():
     assert twist.angular.z == -0.1
 
 
-def test_parse_speed_limits_clamps_dashboard_values():
+def test_parse_speed_limits_clamps_operator_values():
     limits = parse_speed_limits(
         {"max_linear_mps": 4.0, "max_angular_radps": -1.0},
         current_linear_mps=0.3,

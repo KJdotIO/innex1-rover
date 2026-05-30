@@ -46,7 +46,7 @@ class GamepadCommand:
 
 @dataclass(frozen=True)
 class SpeedLimits:
-    """Runtime speed limits accepted from the dashboard."""
+    """Runtime speed limits accepted from the operator page."""
 
     max_linear_mps: float
     max_angular_radps: float
@@ -72,7 +72,7 @@ def parse_speed_limits(
     current_linear_mps: float,
     current_angular_radps: float,
 ) -> SpeedLimits:
-    """Convert dashboard speed settings into bounded bridge limits."""
+    """Convert operator speed settings into bounded bridge limits."""
     return SpeedLimits(
         max_linear_mps=clamp(
             float(payload.get("max_linear_mps", current_linear_mps)),
@@ -108,9 +108,7 @@ def all_interface_bind_requires_tls(
     tls_key_file: str,
 ) -> bool:
     """Return true when a public bind address lacks a complete TLS pair."""
-    return bind_host in {"0.0.0.0", "::"} and not (
-        tls_cert_file and tls_key_file
-    )
+    return bind_host in {"0.0.0.0", "::"} and not (tls_cert_file and tls_key_file)
 
 
 class WebGamepadBridge(Node):
@@ -145,9 +143,7 @@ class WebGamepadBridge(Node):
         if self._port <= 0:
             raise ValueError(f"port must be positive: {self._port}")
         if self._timeout_s <= 0.0:
-            raise ValueError(
-                f"command_timeout_s must be positive: {self._timeout_s}"
-            )
+            raise ValueError(f"command_timeout_s must be positive: {self._timeout_s}")
         if publish_hz <= 0.0:
             raise ValueError(f"publish_hz must be positive: {publish_hz}")
         if all_interface_bind_requires_tls(
@@ -156,8 +152,7 @@ class WebGamepadBridge(Node):
             self._tls_key_file,
         ):
             raise ValueError(
-                "Refusing to expose web gamepad bridge on all interfaces "
-                "without TLS"
+                "Refusing to expose web gamepad bridge on all interfaces without TLS"
             )
 
         self._lock = threading.Lock()
@@ -193,13 +188,13 @@ class WebGamepadBridge(Node):
             self._last_command_time = time.monotonic()
 
     def update_speed_limits(self, limits: SpeedLimits) -> None:
-        """Apply dashboard speed limits without restarting the bridge."""
+        """Apply operator speed limits without restarting the bridge."""
         with self._lock:
             self._max_linear = limits.max_linear_mps
             self._max_angular = limits.max_angular_radps
 
     def state_snapshot(self) -> dict[str, Any]:
-        """Return current bridge and drivetrain state for the web dashboard."""
+        """Return current bridge and drivetrain state for the operator page."""
         with self._lock:
             command_age = time.monotonic() - self._last_command_time
             return {
@@ -239,7 +234,7 @@ class WebGamepadBridge(Node):
         )
 
     def _status_callback(self, msg: DrivetrainStatus) -> None:
-        """Store the latest drivetrain status for the dashboard."""
+        """Store the latest drivetrain status for the operator page."""
         with self._lock:
             self._drivetrain_status = {
                 "state": int(msg.state),
@@ -250,15 +245,13 @@ class WebGamepadBridge(Node):
             }
 
     def _telemetry_callback(self, msg: DrivetrainTelemetry) -> None:
-        """Store the latest drivetrain telemetry for the dashboard."""
+        """Store the latest drivetrain telemetry for the operator page."""
         with self._lock:
             self._drivetrain_telemetry = {
                 "wheel_velocity_rps": [
                     float(value) for value in msg.wheel_velocity_rps
                 ],
-                "encoder_ticks": [
-                    int(value) for value in msg.encoder_ticks
-                ],
+                "encoder_ticks": [int(value) for value in msg.encoder_ticks],
                 "controller_online": list(msg.controller_online),
                 "estop_active": bool(msg.estop_active),
                 "motion_inhibited": bool(msg.motion_inhibited),
@@ -324,9 +317,7 @@ class WebGamepadBridge(Node):
                     limits = parse_speed_limits(
                         payload,
                         current_linear_mps=float(snapshot["max_linear_mps"]),
-                        current_angular_radps=float(
-                            snapshot["max_angular_radps"]
-                        ),
+                        current_angular_radps=float(snapshot["max_angular_radps"]),
                     )
                     node.update_speed_limits(limits)
                 except (ValueError, TypeError, json.JSONDecodeError) as exc:

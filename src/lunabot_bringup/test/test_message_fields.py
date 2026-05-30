@@ -3,7 +3,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from lunabot_bringup.message_fields import (
     parse_field_path,
     read_message_field,
