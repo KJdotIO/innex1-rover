@@ -1,14 +1,13 @@
-# Agent Handoff
+# Remote Support Workflow
 
-Use this when asking Codex, Nexy, Claude Code, or another coding agent to work on
-the rover repo.
+Use this before remote repo work, review work, or competition-readiness changes.
 
-The short version: give the agent the rover context before asking it to be clever.
-Robots are quite good at punishing cleverness.
+The short version: start from the rover context, then make the change. Robots
+punish guesswork.
 
 ## Sources Of Truth
 
-Start every serious agent task with these files:
+Start every serious remote-support task with these files:
 
 - `AGENTS.md`
 - `README.md`
@@ -16,14 +15,34 @@ Start every serious agent task with these files:
 - `.github/contracts/interface_contracts.json`
 - `docs/active_runtime_paths.md`
 - `docs/hardware_week_runbook.md`
-- `docs/remote_competition_handoff.md`
+- `docs/competition_remote_support.md`
 - package READMEs under `src/*/README.md`
 
 If a local `wiki/` checkout exists, include the relevant wiki page too. If the
 wiki is not checked out, say so in the task prompt rather than pretending the
-agent can see it.
+context is available.
 
-## Good Agent Tasks
+## Installed Robotics Skills
+
+If local robotics skills are available, use the matching skill before editing or
+reviewing. This repo does not include the skill files.
+
+- `ros2-development` for ROS 2 Humble, `colcon`, launch files, parameters,
+  QoS, actions, Nav2, DDS, package metadata and build issues.
+- `robotics-design-patterns` for fail-closed behaviour, watchdogs, safety
+  architecture, hardware abstraction, state machines and sim-to-real choices.
+- `robotics-software-principles` for robotics code reviews, module boundaries,
+  hardware interfaces, configuration and risky refactors.
+- `robotics-testing` for ROS tests, launch tests, mock hardware, deterministic
+  replay, CI and hardware-in-the-loop planning.
+- `robot-perception` for OAK-D, depth, AprilTags, Ouster/LiDAR, point clouds,
+  TF/extrinsics, calibration and sensor timing.
+- `robotics-security` for SSH, router/network exposure, secrets, certificates,
+  Docker/devcontainer hardening, DDS security and E-stop security.
+
+If a skill is missing, say so and continue from the repo docs.
+
+## Good Task Prompts
 
 Good tasks are bounded and testable:
 
@@ -58,9 +77,9 @@ Fix the rover.
 Those are not impossible, but they invite guesswork at exactly the point where
 the rover needs boring, inspectable steps.
 
-## Hardware Rules For Agents
+## Hardware Rules
 
-Tell agents these constraints explicitly:
+Keep these constraints explicit:
 
 - real motion must fail closed;
 - the safety stack and E-stop path are not optional for hardware work;
@@ -71,9 +90,9 @@ Tell agents these constraints explicitly:
 - private SSH keys, router passwords, Tailscale keys, and tokens must not be
   committed.
 
-For remote support, the agent can change code and docs, but someone in the lab
-must handle plugs, power, E-stop tests, sensor placement, motor direction, and
-anything involving physical risk.
+Remote support can cover code and docs, but someone in the lab must handle
+plugs, power, E-stop tests, sensor placement, motor direction, and anything
+involving physical risk.
 
 ## Review Bar
 

@@ -525,7 +525,7 @@ def check_rover_lan_ip() -> CheckResult:
         "WARN",
         "Rover LAN IP",
         f"{ROVER_IP} not found on local interfaces",
-        "The current handoff and Ouster debug config expect the Jetson on 192.168.8.20.",
+        "The current router and Ouster debug config expect the Jetson on 192.168.8.20.",
     )
 
 
@@ -541,7 +541,7 @@ def check_router_config_consistency() -> CheckResult:
             "WARN",
             "Router IP docs",
             f"Skipped missing files: {', '.join(missing)}",
-            "Restore the router, Foxglove and Ouster config docs before final handoff.",
+            "Restore the router, Foxglove and Ouster config docs before competition readiness checks.",
         )
     stale = [
         name
@@ -556,7 +556,7 @@ def check_router_config_consistency() -> CheckResult:
         "WARN",
         "Router IP docs",
         f"{ROVER_IP} missing from: {', '.join(stale)}",
-        "Keep router docs, Foxglove docs and Ouster udp_dest aligned before lab handoff.",
+        "Keep router docs, Foxglove docs and Ouster udp_dest aligned before competition testing.",
     )
 
 
