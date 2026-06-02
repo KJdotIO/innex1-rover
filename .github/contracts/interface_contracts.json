@@ -77,6 +77,69 @@
       "phases": ["runtime", "hardware"]
     },
     {
+      "name": "/cmd_vel_safe",
+      "type": "geometry_msgs/msg/Twist",
+      "kind": "subscription",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/velocity_gate.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/cmd_vel_gated",
+      "type": "geometry_msgs/msg/Twist",
+      "kind": "publisher",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/velocity_gate.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/drivetrain/status",
+      "type": "lunabot_interfaces/msg/DrivetrainStatus",
+      "kind": "subscription",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/velocity_gate.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/drivetrain/status",
+      "type": "lunabot_interfaces/msg/DrivetrainStatus",
+      "kind": "publisher",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/drivetrain/telemetry",
+      "type": "lunabot_interfaces/msg/DrivetrainTelemetry",
+      "kind": "publisher",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/odom_wheels",
+      "type": "nav_msgs/msg/Odometry",
+      "kind": "publisher",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/joint_states_wheels",
+      "type": "sensor_msgs/msg/JointState",
+      "kind": "publisher",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/drivetrain/status",
+      "type": "lunabot_interfaces/msg/DrivetrainStatus",
+      "kind": "subscription",
+      "source": "src/lunabot_teleop/lunabot_teleop/web_gamepad_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/drivetrain/telemetry",
+      "type": "lunabot_interfaces/msg/DrivetrainTelemetry",
+      "kind": "subscription",
+      "source": "src/lunabot_teleop/lunabot_teleop/web_gamepad_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
       "name": "/power/telemetry",
       "type": "lunabot_interfaces/msg/PowerTelemetry",
       "kind": "subscription",
@@ -127,8 +190,9 @@
   ],
   "deferred_topics": [
     "/ouster/points",
-    "/drivetrain/command",
-    "/drivetrain/telemetry",
-    "/drivetrain/status"
+    "/ouster/imu",
+    "/ouster/scan",
+    "/localisation/lidar/points_legal",
+    "/localisation/lidar/odometry"
   ]
 }

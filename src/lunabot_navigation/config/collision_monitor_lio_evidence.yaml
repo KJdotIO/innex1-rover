@@ -1,0 +1,36 @@
+# Nav2 Collision Monitor profile for LiDAR-odometry mission evidence.
+#
+# The localisation dress rehearsal uses free-space Nav2 costmaps.  Keep the
+# collision monitor node in the lifecycle set, but disable intervention so
+# camera/LiDAR obstacle tuning does not decide the localisation evidence result.
+
+collision_monitor:
+  ros__parameters:
+    enabled: false
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel"
+    cmd_vel_out_topic: "cmd_vel_safe"
+    transform_tolerance: 0.2
+    source_timeout: 2.5
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    polygons: ["PolygonStop"]
+
+    PolygonStop:
+      type: "polygon"
+      points: [0.30, 0.22, 0.30, -0.22, -0.35, -0.22, -0.35, 0.22]
+      action_type: "stop"
+      max_points: 3
+      visualize: false
+      polygon_pub_topic: "polygon_stop"
+      enabled: false
+
+    observation_sources: ["front_camera"]
+
+    front_camera:
+      type: "pointcloud"
+      topic: "/perception/arena_boundary/camera_front/points"
+      min_height: 0.10
+      max_height: 0.60
+      enabled: false

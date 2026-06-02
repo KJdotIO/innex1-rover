@@ -47,8 +47,10 @@
 
 | Pin(s) | Signal | Direction | Device | Notes |
 |--------|--------|-----------|--------|-------|
-| **0** | UART1 TX | → | Sabertooth 2×32 #1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
-| **29** | UART7 TX | → | Sabertooth 2×32 #2 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128. Remapped from Pin 7 (dead) |
+| **1** | UART1 TX | → | Sabertooth 2×32 #1 S1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
+| **0** | UART1 RX | ← | Sabertooth 2×32 #1 S2 | Optional telemetry/readback |
+| **8** | UART2 TX | → | Sabertooth 2×32 #2 S1 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128 |
+| **7** | UART2 RX | ← | Sabertooth 2×32 #2 S2 | Optional telemetry/readback |
 | **2** | PWM ch1 | → | Cytron MDD10A #1 | Actuator 1 speed |
 | **3** | PWM ch2 | → | Cytron MDD10A #1 | Actuator 2 speed |
 | **9** | DIR ch1 | → | Cytron MDD10A #1 | Actuator 1 direction |
@@ -74,9 +76,12 @@
 
 **~25 pins used — ~30 pins spare on Teensy 4.1**
 
-> ⚠️ **Dead pins on this unit (hardware fault — cold solder):** 7, 8, 10, 35, 36, 40.
-> Do not assign any of these pins in firmware. Pins 7 and 10 have been remapped above.
-> Pins 8, 35, 36, 40 were unassigned and have no impact on functionality.
+Bench validation on 2026-05-27 and 2026-05-28 confirmed the full drivetrain
+mapping: Teensy pin `1` to the left Sabertooth `S1`, Teensy pin `8` to the
+right Sabertooth `S1`, and all four encoders on pins `15` through `22`.
+Left-only, right-only, arc, pivot and Xbox/browser teleop tests moved the
+expected motors and produced matching encoder signs after rear encoder phase
+corrections.
 
 ---
 
@@ -97,8 +102,8 @@
 | Interface | Protocol | Connected To |
 |-----------|----------|-------------|
 | USB (virtual COM) | Serial | Jetson Orin Nano — bidirectional |
-| UART1 (Pin 0) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
-| UART7 (Pin 29) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) — remapped from Pin 7 |
+| UART1 (Pin 1 TX, Pin 0 RX optional) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 |
+| UART2 (Pin 8 TX, Pin 7 RX optional) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 |
 | GPIO PWM (Pins 2–6) | PWM + DIR | Cytron MDD10A #1 and #2, BLD-510B SV |
 | GPIO (Pins 13–14) | Digital out, active-low | BLD-510B F/R and EN |
 | GPIO (Pins 15–22) | Quadrature encoder input | 4× GR-WM4-V3 drivetrain motor encoders |

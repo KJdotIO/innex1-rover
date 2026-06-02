@@ -109,7 +109,7 @@ def _launch_nodes(context):
                     value_type=int,
                 ),
                 "topic_whitelist": allowlist,
-                "capabilities": ["clientPublish"],
+                "capabilities": [],
             }
         ],
     )

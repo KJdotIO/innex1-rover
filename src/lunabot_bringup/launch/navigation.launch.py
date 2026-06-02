@@ -49,7 +49,11 @@ def _is_falsey(value):
 
 
 def _build_nav2_start_actions(
-    nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+    nav2_launch_path,
+    nav_params_path,
+    collision_monitor_params_path,
+    use_sim_time,
+    enable_teleop,
 ):
     """Return Nav2 start actions for direct or muxed operation."""
     nav2_launch = GroupAction(
@@ -59,6 +63,7 @@ def _build_nav2_start_actions(
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
+                    "collision_monitor_params_file": collision_monitor_params_path,
                     "autostart": "true",
                 }.items(),
             ),
@@ -75,6 +80,7 @@ def _build_nav2_start_actions(
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "params_file": nav_params_path,
+                    "collision_monitor_params_file": collision_monitor_params_path,
                     "autostart": "true",
                 }.items(),
             ),
@@ -125,13 +131,18 @@ def _handle_preflight_exit(
     _context,
     nav2_launch_path,
     nav_params_path,
+    collision_monitor_params_path,
     use_sim_time,
     enable_teleop,
 ):
     """Start Nav2 only when the launch-gate preflight passes."""
     if event.returncode == 0:
         return _build_nav2_start_actions(
-            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path,
+            nav_params_path,
+            collision_monitor_params_path,
+            use_sim_time,
+            enable_teleop,
         )
 
     return [
@@ -170,7 +181,12 @@ def generate_launch_description():
     teleop_launch_path = _share_path(
         "lunabot_teleop", "launch", "joystick_teleop.launch.py"
     )
-    nav_params_path = _share_path("lunabot_navigation", "config", "nav2_params.yaml")
+    default_nav_params_path = _share_path(
+        "lunabot_navigation", "config", "nav2_params.yaml"
+    )
+    default_collision_monitor_params_path = _share_path(
+        "lunabot_navigation", "config", "collision_monitor.yaml"
+    )
     rviz_config_path = _share_path("lunabot_bringup", "rviz", "navigation.rviz")
     twist_mux_params_path = _share_path("lunabot_bringup", "config", "twist_mux.yaml")
     preflight_config_path = _share_path(
@@ -194,6 +210,9 @@ def generate_launch_description():
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
     enable_apriltag_debug = LaunchConfiguration("enable_apriltag_debug")
+    lidar_odometry_backend = LaunchConfiguration("lidar_odometry_backend")
+    nav_params_path = LaunchConfiguration("nav_params_file")
+    collision_monitor_params_path = LaunchConfiguration("collision_monitor_params_file")
     camera_info_topic = LaunchConfiguration("camera_info_topic")
     sync_sim_camera_info = LaunchConfiguration("sync_sim_camera_info")
     enable_teleop = LaunchConfiguration("enable_teleop")
@@ -211,6 +230,7 @@ def generate_launch_description():
             "enable_visual_slam": enable_visual_slam,
             "use_sim_time": use_sim_time,
             "enable_apriltag_debug": enable_apriltag_debug,
+            "lidar_odometry_backend": lidar_odometry_backend,
             "cmd_vel_topic": localiser_cmd_vel_topic,
             "camera_info_topic": camera_info_topic,
             "sync_sim_camera_info": sync_sim_camera_info,
@@ -269,6 +289,7 @@ def generate_launch_description():
                     ]
                 ),
                 "readiness_timeout_s": 5.0,
+                "internal_action_wait_timeout_s": 30.0,
             },
         ],
     )
@@ -366,6 +387,7 @@ def generate_launch_description():
                 context,
                 nav2_launch_path,
                 nav_params_path,
+                collision_monitor_params_path,
                 use_sim_time,
                 enable_teleop,
             ),
@@ -381,6 +403,7 @@ def generate_launch_description():
                 context,
                 nav2_launch_path,
                 nav_params_path,
+                collision_monitor_params_path,
                 use_sim_time,
                 enable_teleop,
             ),
@@ -390,7 +413,11 @@ def generate_launch_description():
 
     direct_nav2_start = GroupAction(
         _build_nav2_start_actions(
-            nav2_launch_path, nav_params_path, use_sim_time, enable_teleop
+            nav2_launch_path,
+            nav_params_path,
+            collision_monitor_params_path,
+            use_sim_time,
+            enable_teleop,
         ),
         condition=IfCondition(_is_falsey(enforce_preflight)),
     )
@@ -432,6 +459,24 @@ def generate_launch_description():
                     "Launch the apriltag_draw overlay for annotated front "
                     "camera debugging."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "lidar_odometry_backend",
+                default_value="none",
+                description=(
+                    "Legal LiDAR odometry backend passed through to localisation: "
+                    "none, kiss_icp, or rko_lio."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "nav_params_file",
+                default_value=default_nav_params_path,
+                description="Nav2 parameter file.",
+            ),
+            DeclareLaunchArgument(
+                "collision_monitor_params_file",
+                default_value=default_collision_monitor_params_path,
+                description="Collision monitor parameter file.",
             ),
             DeclareLaunchArgument(
                 "camera_info_topic",

@@ -1,5 +1,5 @@
 # INNEX-1 Software Team Notes
-*Electrical team handoff — hardware constraints and configuration requirements*
+*Electrical hardware constraints and configuration requirements*
 
 ---
 
@@ -48,8 +48,10 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 
 | Pin(s) | Signal | Direction | Device |
 |--------|--------|-----------|--------|
-| 0 | UART1 TX | → | Sabertooth #1 (Left: FL + RL) |
-| 29 | UART7 TX | → | Sabertooth #2 (Right: FR + RR) — remapped from Pin 7 (dead) |
+| 1 | UART1 TX | → | Sabertooth #1 S1 (Left: FL + RL) |
+| 0 | UART1 RX | ← | Sabertooth #1 S2 (optional telemetry/readback) |
+| 8 | UART2 TX | → | Sabertooth #2 S1 (Right: FR + RR) |
+| 7 | UART2 RX | ← | Sabertooth #2 S2 (optional telemetry/readback) |
 | 2, 3 | PWM ch1 & ch2 | → | Cytron MDD10A #1 (Actuators 1 & 2) |
 | 9, 28 | DIR ch1 & ch2 | → | Cytron MDD10A #1 — Pin 28 remapped from Pin 10 (dead) |
 | 4, 5 | PWM ch1 & ch2 | → | Cytron MDD10A #2 (Actuators 3 & 4) |
@@ -75,8 +77,28 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 ## Sabertooth 2×32 — Drivetrain Controllers
 
 Two controllers used — skid-steer topology:
-- **Sabertooth #1** — Left side (FL + RL motors), Teensy Pin 0 (UART1 TX)
-- **Sabertooth #2** — Right side (FR + RR motors), Teensy Pin 29 (UART7 TX) — remapped from Pin 7 (dead)
+- **Sabertooth #1** — Left side (FL + RL motors), Teensy Pin 1 TX to S1
+- **Sabertooth #2** — Right side (FR + RR motors), Teensy Pin 8 TX to S1
+
+Motor channel assignment:
+
+| Controller | Channel | Motor |
+|------------|---------|-------|
+| Sabertooth #1 left | M1 | Front-left |
+| Sabertooth #1 left | M2 | Rear-left |
+| Sabertooth #2 right | M1 | Front-right |
+| Sabertooth #2 right | M2 | Rear-right |
+
+Bench result from 2026-05-27: all four drivetrain motors were tested through the
+Teensy serial firmware. Left-only and right-only commands moved only their
+respective sides, arc commands produced different left/right encoder distances,
+and a pivot command produced positive left counts with negative right counts.
+Use `docs/teensy_drivetrain_bringup.md` for the current wiring checklist and
+captured encoder results.
+
+Common wiring fault found during bench: both Sabertooth `S1` inputs were wired
+to Teensy pin `1`, causing all four motors to follow the left command. Correct
+mapping is left `S1` to pin `1`, right `S1` to pin `8`.
 
 ### DIP Switch Settings (both controllers)
 | Switch | Position | Reason |
@@ -86,7 +108,7 @@ Two controllers used — skid-steer topology:
 | SW3 | OFF | PSU mode (not battery) |
 | SW4 | ON | Packetised serial |
 | SW5 | ON | Address 128 |
-| SW6 | OFF | E-Stop enabled — A1/A2 pins act as hardware emergency stop inputs |
+| SW6 | ON | Sabertooth A1/A2 hardware E-stop disabled; Teensy software stop used during bench tests |
 
 ### Software Configuration at Startup
 ```cpp
@@ -241,7 +263,7 @@ device.setIrFloodLightIntensity(0.0)          # 0.0 = off (default)
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-05-23 | eniomecaj | Initial handoff document |
+| 2026-05-23 | eniomecaj | Initial hardware notes |
 | 2026-05-23 | eniomecaj | Clarified Sabertooth current limit to ≤ 10 A/channel; added fuse safety dependency note; updated TODO to required action with wiring safety context |
 | 2026-05-23 | eniomecaj | Fixed network topology: OS1 connects via router, not direct to Jetson (Jetson has one Ethernet port); corrected router band to 2.4 GHz |
 | 2026-06-02 | eniomecaj | Pin remaps: Sabertooth #2 Pin 7→29 (UART7), Cytron #1 DIR ch2 Pin 10→28. Dead pins added. RC filter removed from SV pin. PG/ALM pull-ups made optional. E-stop updated to 250A. SW6 corrected to OFF |

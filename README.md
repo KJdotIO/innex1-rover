@@ -153,11 +153,28 @@ The workflow is documented in
 For first-motion, ground-control, comms and evidence-capture procedure on the
 Jetson, use [`docs/hardware_week_runbook.md`](docs/hardware_week_runbook.md).
 
+For remote support before competition, use
+[`docs/competition_remote_support.md`](docs/competition_remote_support.md).
+
 ## Active runtime paths
 
 Use [`docs/active_runtime_paths.md`](docs/active_runtime_paths.md) to check
 which launch files are current for sim, hardware bring-up, mission evidence,
 and operator telemetry.
+
+## Doctor and Docker
+
+Run the doctor before setup, competition readiness, or hardware work:
+
+```bash
+python3 tools/doctor.py --profile developer
+python3 tools/doctor.py --profile operator
+python3 tools/doctor.py --profile jetson
+```
+
+For a repeatable ROS 2 Humble development shell, use
+[`docs/docker_workflow.md`](docs/docker_workflow.md). Docker is for repo work and
+cheap checks; hardware truth still comes from the Jetson and the rover.
 
 ## Visualisation options
 
@@ -189,7 +206,7 @@ src/
 ├── lunabot_bringup/         # Top-level launch files and mission manager
 ├── lunabot_control/         # Deposition bridge (Cytron linear actuators)
 ├── lunabot_description/     # URDF/xacro robot model and sensor frames
-├── lunabot_drivetrain/      # Sabertooth motor bridge, velocity gate, stall detection
+├── lunabot_drivetrain/      # Teensy/Sabertooth drivetrain bridge, velocity gate, stall detection
 ├── lunabot_excavation/      # Excavation action server
 ├── lunabot_interfaces/      # Custom ROS messages and actions
 ├── lunabot_localisation/    # EKF + RTAB-Map SLAM + AprilTag localisation
@@ -197,7 +214,7 @@ src/
 ├── lunabot_perception/      # Crater detection feeding Nav2 costmaps
 ├── lunabot_safety/          # E-stop to motion-inhibit bridge
 ├── lunabot_simulation/      # Gazebo Fortress worlds and ros_gz bridges
-└── lunabot_teleop/          # Manual control
+└── lunabot_teleop/          # Joystick and browser Gamepad manual control
 ```
 
 ## Interface contracts in CI
@@ -216,6 +233,10 @@ If you rename a topic, action, or TF link, update the contract JSON in the same 
 - Operations: https://github.com/KJdotIO/innex1-rover/wiki/Operations
 - Contracts: https://github.com/KJdotIO/innex1-rover/wiki/Contracts
 - Local inspection packet: [docs/competition_inspection_packet.md](docs/competition_inspection_packet.md)
+- Competition remote support: [docs/competition_remote_support.md](docs/competition_remote_support.md)
+- Remote support workflow: [docs/remote_support_workflow.md](docs/remote_support_workflow.md)
+- Repo-local robotics skills: [skills/README.md](skills/README.md)
+- Docker workflow: [docs/docker_workflow.md](docs/docker_workflow.md)
 
 ## Contributing and licence
 

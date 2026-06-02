@@ -12,6 +12,18 @@
       "synchronize": true,
       "zoom": 1
     },
+    "Image!rear_camera": {
+      "cameraTopic": "/camera_rear/image/compressed",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": true,
+      "zoom": 1
+    },
     "RawMessages!mission_state": {
       "diffEnabled": false,
       "diffMethod": "custom",
@@ -66,6 +78,24 @@
       "showFullMessageForDiff": false,
       "topicPath": "/drivetrain/status"
     },
+    "RawMessages!drivetrain_telemetry": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/drivetrain/telemetry"
+    },
+    "RawMessages!cmd_vel_gated": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/cmd_vel_gated"
+    },
+    "RawMessages!cmd_vel_safe": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "showFullMessageForDiff": false,
+      "topicPath": "/cmd_vel_safe"
+    },
     "RawMessages!diagnostics": {
       "diffEnabled": false,
       "diffMethod": "custom",
@@ -90,7 +120,12 @@
     "direction": "row",
     "first": {
       "direction": "column",
-      "first": "Image!front_camera",
+      "first": {
+        "direction": "row",
+        "first": "Image!front_camera",
+        "second": "Image!rear_camera",
+        "splitPercentage": 50
+      },
       "second": "RawMessages!diagnostics",
       "splitPercentage": 68
     },
@@ -129,9 +164,19 @@
             "splitPercentage": 50
           },
           "second": {
-            "direction": "row",
-            "first": "RawMessages!excavation",
-            "second": "RawMessages!localisation",
+            "direction": "column",
+            "first": {
+              "direction": "row",
+              "first": "RawMessages!drivetrain_telemetry",
+              "second": "RawMessages!cmd_vel_gated",
+              "splitPercentage": 50
+            },
+            "second": {
+              "direction": "row",
+              "first": "RawMessages!excavation",
+              "second": "RawMessages!localisation",
+              "splitPercentage": 50
+            },
             "splitPercentage": 50
           },
           "splitPercentage": 50

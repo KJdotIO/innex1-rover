@@ -38,7 +38,7 @@ setup(
     maintainer_email="ko129@student.le.ac.uk",
     description=(
         "Drivetrain bridge for the INNEX-1 four-wheel skid-steer rover. "
-        "Converts cmd_vel to Sabertooth Packetized Serial and publishes "
+        "Converts cmd_vel to Teensy or Sabertooth serial and publishes "
         "encoder-derived odometry and telemetry."
     ),
     license="Apache-2.0",

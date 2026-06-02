@@ -35,7 +35,7 @@ class NavigateToPoseGate(Node):
         self.declare_parameter("public_action_name", "/navigate_to_pose_gate")
         self.declare_parameter("internal_action_name", "/navigate_to_pose")
         self.declare_parameter("readiness_timeout_s", 5.0)
-        self.declare_parameter("internal_action_wait_timeout_s", 1.0)
+        self.declare_parameter("internal_action_wait_timeout_s", 30.0)
         self.declare_parameter("gate_enabled", True)
 
         self.status_topic = self.get_parameter("status_topic").value
