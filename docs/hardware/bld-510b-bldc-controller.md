@@ -92,9 +92,9 @@
 | SV | Speed PWM | **Pin 6** | 1–2 kHz PWM, 3.3 V amplitude (see note) |
 | F/R | Direction | **Pin 13** | LOW = CCW, HIGH/open = CW |
 | EN | Enable | **Pin 14** | HIGH = stop (V2.0 logic), LOW = run |
-| BK | Brake | **TBD** | LOW = brake; use GPIO output |
-| PG | Speed feedback | **Pin 31** | Open-collector — add 10 kΩ pull-up to 3.3 V |
-| ALM | Alarm | **Pin 32** | Open-collector — add 10 kΩ pull-up to 3.3 V |
+| BK | Brake | **Not connected** | Not used — EN provides sufficient stop control |
+| PG | Speed feedback | **Pin 31** | Connect via 10 kΩ pull-up to 3.3 V. Use dual-bus 2-in-4-out WAGO as T-junction: 3.3V → 10kΩ → WAGO orange bus → one wire to Pin 31, one wire to PG pin. |
+| ALM | Alarm | **Pin 32** | Connect via 10 kΩ pull-up to 3.3 V. Same WAGO blue bus: 3.3V → 10kΩ → WAGO blue bus → one wire to Pin 32, one wire to ALM pin. ALM LOW = fault → emergency stop. |
 
 > **SV PWM — no external RC filter needed:** The BLD-510B SV pin accepts PWM directly (1–2 kHz
 > from Teensy Pin 6). No external RC filter is required — the driver handles the PWM internally.
@@ -168,9 +168,7 @@ The ALM output goes LOW during any alarm — Teensy should monitor this pin.
 
 ## Key Rules & Notes
 
-- **PG and ALM are open-collector** — if you intend to monitor speed feedback (PG) or fault
-  alarms (ALM), fit 10 kΩ pull-up resistors to 3.3 V at Teensy Pins 31 and 32. If PG/ALM
-  monitoring is not used, pull-ups can be omitted and the pins left unconnected.
+- **PG and ALM are open-collector** — they only pull LOW; they never drive HIGH. Fit a **10 kΩ pull-up to Teensy 3.3 V** on each. The HIGH state will be 3.3 V (safe for Teensy GPIO). GND must be shared between BLD-510B signal ground and Teensy GND. No level shifter required.
 - **Check EN firmware version before first power-on** — wrong EN polarity causes motor to
   run immediately at power-up, before the Teensy asserts control.
 - **Never change F/R direction while motor is running** — always bring motor to stop first

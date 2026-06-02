@@ -48,8 +48,8 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 
 | Pin(s) | Signal | Direction | Device |
 |--------|--------|-----------|--------|
-| 0 | UART1 TX | → | Sabertooth #1 (Left: FL + RL) |
-| 29 | UART7 TX | → | Sabertooth #2 (Right: FR + RR) — remapped from Pin 7 (dead) |
+| 1 | Serial1 TX | → | Sabertooth #1 (Left: FL + RL) |
+| 29 | Serial7 TX | → | Sabertooth #2 (Right: FR + RR) — remapped from Pin 8 (dead on breakout board) |
 | 2, 3 | PWM ch1 & ch2 | → | Cytron MDD10A #1 (Actuators 1 & 2) |
 | 9, 28 | DIR ch1 & ch2 | → | Cytron MDD10A #1 — Pin 28 remapped from Pin 10 (dead) |
 | 4, 5 | PWM ch1 & ch2 | → | Cytron MDD10A #2 (Actuators 3 & 4) |
@@ -67,16 +67,29 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 
 **~25 pins used — ~30 spare on Teensy 4.1**
 
-> ⚠️ **Dead pins on physical unit (cold solder, hardware fault):** 7, 8, 10, 35, 36, 40.
-> Do NOT use these pins in firmware. Pins 7 and 10 have been remapped above. Pins 8, 35, 36, 40 were unassigned.
+> ⚠️ **Dead pins on breakout board (cold solder / pad fault):** 7, 8, 10, 35, 36, 40.
+> Do NOT use these pins in firmware. Pin 8 works on bare Teensy pins but is dead on the breakout board — bench tests by KJ used bare pins directly. For the actual build on the breakout board, Sabertooth #2 is remapped to Pin 29.
 
 ---
 
 ## Sabertooth 2×32 — Drivetrain Controllers
 
 Two controllers used — skid-steer topology:
-- **Sabertooth #1** — Left side (FL + RL motors), Teensy Pin 0 (UART1 TX)
-- **Sabertooth #2** — Right side (FR + RR motors), Teensy Pin 29 (UART7 TX) — remapped from Pin 7 (dead)
+- **Sabertooth #1** — Left side (FL + RL motors), Teensy Pin 1 (Serial1 TX)
+- **Sabertooth #2** — Right side (FR + RR motors), Teensy Pin 29 (Serial7 TX) — remapped from Pin 8 (dead on breakout board)
+
+Motor channel assignment:
+
+| Controller | Channel | Motor |
+|------------|---------|-------|
+| Sabertooth #1 left | M1 | Front-Left |
+| Sabertooth #1 left | M2 | Rear-Left |
+| Sabertooth #2 right | M1 | Front-Right |
+| Sabertooth #2 right | M2 | Rear-Right |
+
+> **Bench result (2026-05-27):** All four drivetrain motors tested via Teensy serial firmware using bare Teensy pins (before breakout board). Left/right commands moved correct sides, arc and pivot commands produced correct encoder direction results. See `docs/teensy_drivetrain_bringup.md` for wiring checklist and encoder results.
+
+> **Common wiring fault:** Both Sabertooth S1 inputs wired to Pin 1 causes all four motors to follow the left command. Correct mapping: left S1 → Pin 1, right S1 → Pin 29 (breakout board build).
 
 ### DIP Switch Settings (both controllers)
 | Switch | Position | Reason |
@@ -86,7 +99,7 @@ Two controllers used — skid-steer topology:
 | SW3 | OFF | PSU mode (not battery) |
 | SW4 | ON | Packetised serial |
 | SW5 | ON | Address 128 |
-| SW6 | OFF | E-Stop enabled — A1/A2 pins act as hardware emergency stop inputs |
+| SW6 | OFF (competition) / ON (bench) | OFF = hardware E-stop via A1/A2 enabled. ON = software stop only (used during bench tests). Must be OFF for competition. |
 
 ### Software Configuration at Startup
 ```cpp
@@ -122,19 +135,21 @@ setSaberRamping(20);         // Hardware ramping — smooth accel/decel on all s
 The SV pin accepts **1–2 kHz PWM directly** from Teensy Pin 6. No external RC filter is needed — the BLD-510B driver handles PWM internally. Duty cycle maps linearly to motor speed (0% = stop, 100% ≈ full speed at 3.3 V logic).
 
 ### Control Signal Logic
-- EN (Pin 14), F/R (Pin 13), BK — all **active-low**
-- Pull high to disable, pull low to enable/activate
+- EN (Pin 14), F/R (Pin 13) — active-low. Pull high to disable, pull low to enable/activate
+- BK (brake) — not connected. EN is sufficient for all stop commands including emergency stops
+- ⚠️ **Never call `Serial3.begin()`** — Serial3 TX = Pin 32, which is used for ALM input. Calling Serial3 will conflict with excavation fault monitoring
 
-### Feedback Signals (open-collector — pull-ups optional)
-PG and ALM are open-collector outputs. If monitoring these signals, fit **10 kΩ pull-up resistors to 3.3 V** at Pins 31 and 32. If unused, leave unconnected — no pull-ups needed.
+### Feedback Signals (open-collector — connect both)
+PG and ALM are open-collector outputs — they only pull LOW, never drive HIGH. Fit a **10 kΩ pull-up to Teensy 3.3 V** on each pin. The HIGH state will be 3.3 V, which is safe for Teensy GPIO. No level shifter needed.
 
 | Signal | Pin | Function |
 |--------|-----|----------|
-| PG | 31 | Speed pulse output — use for RPM calculation |
-| ALM | 32 | Fault alarm — trigger emergency stop immediately |
+| PG | 31 | Speed pulse output — use for RPM feedback from excavation motor |
+| ALM | 32 | Fault alarm — goes LOW on overcurrent, overheat, stall, or hall sensor fault. Treat as excavation emergency stop. |
 
-> The startup sequence in the mission manager should monitor ALM continuously. Any fault must
-> trigger an immediate safe shutdown of the excavation system.
+- GND must be shared between BLD-510B signal ground and Teensy GND (already the case)
+- ALM must be monitored continuously — any LOW triggers immediate excavation motor stop and fault report to ROS
+- PG available for RPM calculation when needed by software team
 
 ### RC Filter Note (Arduino conflict — not applicable to Teensy)
 The previous test setup used an Arduino powered from both USB and the driver's +5 V simultaneously,
@@ -245,3 +260,4 @@ device.setIrFloodLightIntensity(0.0)          # 0.0 = off (default)
 | 2026-05-23 | eniomecaj | Clarified Sabertooth current limit to ≤ 10 A/channel; added fuse safety dependency note; updated TODO to required action with wiring safety context |
 | 2026-05-23 | eniomecaj | Fixed network topology: OS1 connects via router, not direct to Jetson (Jetson has one Ethernet port); corrected router band to 2.4 GHz |
 | 2026-06-02 | eniomecaj | Pin remaps: Sabertooth #2 Pin 7→29 (UART7), Cytron #1 DIR ch2 Pin 10→28. Dead pins added. RC filter removed from SV pin. PG/ALM pull-ups made optional. E-stop updated to 250A. SW6 corrected to OFF |
+| 2026-06-02 | eniomecaj | Sabertooth #1 corrected to Pin 1 (Serial1 TX). PG/ALM wiring finalised: 10kΩ to 3.3V via dual-bus WAGO. BK removed (not connected). Serial3/Pin32 conflict warning added. |

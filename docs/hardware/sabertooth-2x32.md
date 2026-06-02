@@ -90,7 +90,7 @@ See `software-team-notes.md` and `fuses.md` for the full fuse rationale.
 | 0V | Common GND with Teensy / logic domain |
 
 **Teensy UART pin assignments (from `teensy-4.1-microcontroller.md`):**
-- Sabertooth #1: Teensy pin 0 (UART1 TX) — Left drivetrain (TX only)
+- Sabertooth #1: Teensy pin 1 (Serial1 TX) — Left drivetrain (TX only)
 - Sabertooth #2: Teensy pin 29 (UART7 TX) — Right drivetrain (TX only). Remapped from Pin 7 (dead on physical unit)
 
 ---

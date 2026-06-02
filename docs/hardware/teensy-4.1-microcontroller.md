@@ -47,7 +47,7 @@
 
 | Pin(s) | Signal | Direction | Device | Notes |
 |--------|--------|-----------|--------|-------|
-| **0** | UART1 TX | → | Sabertooth 2×32 #1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
+| **1** | Serial1 TX | → | Sabertooth 2×32 #1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
 | **29** | UART7 TX | → | Sabertooth 2×32 #2 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128. Remapped from Pin 7 (dead) |
 | **2** | PWM ch1 | → | Cytron MDD10A #1 | Actuator 1 speed |
 | **3** | PWM ch2 | → | Cytron MDD10A #1 | Actuator 2 speed |
@@ -68,8 +68,8 @@
 | **20** | Encoder B | ← | FR motor encoder | Front-Right quadrature CH-B |
 | **21** | Encoder A | ← | RR motor encoder | Rear-Right quadrature CH-A |
 | **22** | Encoder B | ← | RR motor encoder | Rear-Right quadrature CH-B |
-| **31** | PG pulse | ← | BLD-510B | BLDC speed pulse — 10 kΩ pull-up to 3.3 V if monitoring; omit if unused |
-| **32** | ALM | ← | BLD-510B | BLDC fault alarm — 10 kΩ pull-up to 3.3 V if monitoring; omit if unused |
+| **31** | PG pulse | ← | BLD-510B | RPM feedback. Fit 10 kΩ pull-up to 3.3 V — open-collector, safe at 3.3 V HIGH level |
+| **32** | ALM | ← | BLD-510B | Excavation fault alarm — goes LOW on driver fault. Fit 10 kΩ pull-up to 3.3 V. Treat as emergency stop trigger. ⚠️ Pin 32 = Serial3 TX — never call Serial3.begin() in firmware |
 | **USB** | Serial ↕ | ↕ | Jetson Orin Nano | USB virtual COM — bidirectional command/telemetry |
 
 **~25 pins used — ~30 pins spare on Teensy 4.1**
@@ -97,8 +97,8 @@
 | Interface | Protocol | Connected To |
 |-----------|----------|-------------|
 | USB (virtual COM) | Serial | Jetson Orin Nano — bidirectional |
-| UART1 (Pin 0) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
-| UART7 (Pin 29) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) — remapped from Pin 7 |
+| Serial1 (Pin 1) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
+| Serial7 (Pin 29) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) — remapped from Pin 8 (dead) |
 | GPIO PWM (Pins 2–6) | PWM + DIR | Cytron MDD10A #1 and #2, BLD-510B SV |
 | GPIO (Pins 13–14) | Digital out, active-low | BLD-510B F/R and EN |
 | GPIO (Pins 15–22) | Quadrature encoder input | 4× GR-WM4-V3 drivetrain motor encoders |
@@ -122,3 +122,4 @@
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from TEENSY41-L datasheet (joy-it.net, Feb 2025) and INNEX-1 pin allocation files |
 | 2026-05-24 | eniomecaj | Updated power source to Jetson USB; PG/ALM pull-ups made optional; RC filter removed from Pin 6; encoder current note added |
 | 2026-06-02 | eniomecaj | Remapped Pin 7→29 (Sabertooth #2, UART7 TX) and Pin 10→28 (Cytron #1 DIR ch2) — hardware fault on physical Teensy unit. Dead pins noted: 7, 8, 10, 35, 36, 40 |
+| 2026-06-02 | eniomecaj | Corrected Sabertooth #1 TX pin from 0 to 1 (Serial1 TX). Pin 0 is RX1, not TX. Sabertooth #2 remap note corrected to Pin 8 (dead Serial2 TX). Serial3/Pin32 conflict warning added. BK removed (not connected). |
