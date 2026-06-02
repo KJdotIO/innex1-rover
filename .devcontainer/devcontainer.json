@@ -1,0 +1,20 @@
+{
+  "name": "INNEX-1 Rover",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace/innex1-rover",
+  "remoteUser": "rover",
+  "updateRemoteUserUID": true,
+  "features": {},
+  "postCreateCommand": "python3 tools/doctor.py --profile ci",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-vscode.cpptools"
+      ]
+    }
+  }
+}

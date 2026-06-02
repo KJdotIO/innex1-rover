@@ -92,6 +92,28 @@ See `software-team-notes.md` and `fuses.md` for the full fuse rationale.
 **Teensy UART pin assignments (from `teensy-4.1-microcontroller.md`):**
 - Sabertooth #1: Teensy pin 1 (Serial1 TX) — Left drivetrain (TX only)
 - Sabertooth #2: Teensy pin 29 (UART7 TX) — Right drivetrain (TX only). Remapped from Pin 7 (dead on physical unit)
+**Motor channel assignment:**
+
+| Controller | Channel | Motor |
+|------------|---------|-------|
+| Sabertooth #1 left | M1A / M1B | Front-left |
+| Sabertooth #1 left | M2A / M2B | Rear-left |
+| Sabertooth #2 right | M1A / M1B | Front-right |
+| Sabertooth #2 right | M2A / M2B | Rear-right |
+
+The full drivetrain was bench-tested on 2026-05-27 with FL/RL on the left
+controller and FR/RR on the right controller. Final checks confirmed independent
+skid-steer control:
+
+```text
+V 35 0 -> only FL/RL moved
+V 0 35 -> only FR/RR moved
+V 30 60 -> right side moved about twice as far as left
+V 40 -40 -> left positive, right negative pivot
+```
+
+Do not tie the two `S1` inputs together. Left `S1` goes only to Teensy pin `1`;
+right `S1` goes only to Teensy pin `29`.
 
 ---
 

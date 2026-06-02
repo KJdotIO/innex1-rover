@@ -44,6 +44,25 @@ ros2 run lunabot_bringup mission_evidence \
     max_shuttle_cycles:=1
 ```
 
+For the legal LiDAR-odometry dress rehearsal, use the same launcher with two
+or three cycles and the RKO-LIO backend enabled:
+
+```bash
+ros2 run lunabot_bringup mission_evidence \
+  --profile debug \
+  --label lio-shuttle-3-cycle \
+  --use-sim-time \
+  -- ros2 launch lunabot_bringup mission_shuttle_evidence.launch.py \
+    launch_rviz:=false \
+    ouster_vertical_samples:=128 \
+    lidar_odometry_backend:=rko_lio \
+    max_shuttle_cycles:=3
+```
+
+That run is only credible if `/localisation/lidar/points_legal` is present,
+`/localisation/lidar/odometry` is active, and the legal LiDAR filter diagnostics
+show wall/out-of-field rejection before the odometry backend consumes the cloud.
+
 A complete pack lands under `~/innex1_mission_evidence/` and contains:
 
 - `bag/`
@@ -94,7 +113,8 @@ Use `minimal` for normal mission evidence. It records operator state, safety
 state, diagnostics, status topics, TF, and command topics.
 
 Use `debug` when a run failed and you need navigation state. It adds odometry,
-scan, map, costmaps, action status, and wall-excluded point-cloud topics.
+scan, map, costmaps, action status, LiDAR-odometry output, and wall-excluded
+point-cloud topics.
 
 Use `heavy` only for short perception investigations. It records raw image and
 point-cloud topics alongside the filtered autonomy inputs and can use disk
@@ -109,7 +129,8 @@ the run note:
 - autonomy used onboard sensor data and onboard software;
 - arena walls were not used for mapping, localisation, autonomous navigation or
   collision avoidance; wall-capable point clouds were filtered before Nav2,
-  collision monitor, and crater detection consumed them;
+  collision monitor, crater detection, and any LiDAR odometry backend consumed
+  them;
 - no GPS, compass heading, ultrasonic proximity sensing or touch sensing for
   obstacle avoidance was used;
 - no obstacle-location upload was made after seeing the arena;

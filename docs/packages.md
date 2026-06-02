@@ -12,7 +12,7 @@
 | `lunabot_navigation` | ament_python | Nav2 params, behavior trees — does NOT contain navigation nodes themselves |
 | `lunabot_description` | ament_cmake | URDF/Xacro assets only — robot model |
 | `lunabot_simulation` | ament_cmake | Gazebo worlds (`moon_yard.sdf`), sim launch |
-| `lunabot_teleop` | ament_python | Joystick control |
+| `lunabot_teleop` | ament_python | Wired joystick control and browser Gamepad bridge for operator-laptop teleop |
 | `lunabot_perception` | ament_python | `arena_boundary_filter` — publishes wall-excluded point clouds; `crater_detection` — publishes `/crater_grid` for Nav2 costmaps |
 | `lunabot_safety` | ament_python | `estop_node` — subscribes `/safety/estop` and `/safety/reset_motion_inhibit`, publishes `/safety/motion_inhibit` |
 

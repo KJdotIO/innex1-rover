@@ -112,19 +112,19 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "serial_port",
-                default_value="/dev/ttyTHS1",
-                description="Jetson UART device connected to the Sabertooth S1 pins.",
+                default_value="/dev/ttyACM0",
+                description="Serial device connected to the drivetrain controller.",
             ),
             DeclareLaunchArgument(
                 "baud_rate",
-                default_value="9600",
-                description="Sabertooth serial baud rate.",
+                default_value="115200",
+                description="Drivetrain serial baud rate.",
             ),
             DeclareLaunchArgument(
                 "serial_protocol",
-                default_value="legacy_simplified",
+                default_value="teensy_line",
                 description=(
-                    "Sabertooth protocol: legacy_simplified or packetized."
+                    "Serial backend: teensy_line, legacy_simplified, or packetized."
                 ),
             ),
             DeclareLaunchArgument(

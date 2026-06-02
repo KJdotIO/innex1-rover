@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 
+from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch_ros.actions import Node
 
@@ -22,8 +23,13 @@ def _load_launch_module():
     return module
 
 
-def test_mission_shuttle_evidence_launch_composes_one_cycle_stack():
+def test_mission_shuttle_evidence_launch_composes_one_cycle_stack(monkeypatch):
     module = _load_launch_module()
+    monkeypatch.setattr(
+        module,
+        "get_package_share_directory",
+        lambda package: f"/tmp/{package}",
+    )
     description = module.generate_launch_description()
 
     declared_arguments = [
@@ -45,8 +51,16 @@ def test_mission_shuttle_evidence_launch_composes_one_cycle_stack():
         "use_sim_time",
         "launch_rviz",
         "world",
+        "ouster_horizontal_samples",
+        "ouster_vertical_samples",
         "waypoints_file",
         "max_shuttle_cycles",
+        "mission_start_delay_s",
+        "nav_goal_timeout_s",
+        "lidar_costmap_phase",
+        "lidar_odometry_backend",
+        "nav_params_file",
+        "collision_monitor_params_file",
         "disable_nav_gate",
         "enforce_preflight",
         "force_overcurrent",
@@ -61,7 +75,9 @@ def test_mission_shuttle_evidence_launch_composes_one_cycle_stack():
         "movement_watchdog",
     ]
     assert len(timers) == 1
-    assert timers[0].period == 45.0
+    context = LaunchContext()
+    context.launch_configurations["mission_start_delay_s"] = "75.0"
+    assert timers[0].period[0].perform(context) == "75.0"
     assert [node.node_executable for node in timers[0].actions] == [
         "mission_manager",
     ]

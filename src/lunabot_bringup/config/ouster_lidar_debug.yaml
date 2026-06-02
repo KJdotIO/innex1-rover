@@ -1,7 +1,7 @@
 ouster/os_driver:
   ros__parameters:
     sensor_hostname: os-122610007923.local
-    udp_dest: 169.254.86.134
+    udp_dest: 192.168.8.20
     mtp_main: true
     lidar_mode: 1024x10
     timestamp_mode: TIME_FROM_ROS_TIME
@@ -25,4 +25,4 @@ ouster/os_driver:
     destagger: true
     min_range: 0.2
     max_range: 30.0
-    v_reduction: 1
+    v_reduction: 4

@@ -74,9 +74,12 @@
 
 **~25 pins used — ~30 pins spare on Teensy 4.1**
 
-> ⚠️ **Dead pins on this unit (hardware fault — cold solder):** 7, 8, 10, 35, 36, 40.
-> Do not assign any of these pins in firmware. Pins 7 and 10 have been remapped above.
-> Pins 8, 35, 36, 40 were unassigned and have no impact on functionality.
+Bench validation on 2026-05-27 and 2026-05-28 confirmed the full drivetrain
+mapping: Teensy pin `1` to the left Sabertooth `S1`, Teensy pin `8` to the
+right Sabertooth `S1`, and all four encoders on pins `15` through `22`.
+Left-only, right-only, arc, pivot and Xbox/browser teleop tests moved the
+expected motors and produced matching encoder signs after rear encoder phase
+corrections.
 
 ---
 

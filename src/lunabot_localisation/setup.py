@@ -43,6 +43,7 @@ setup(
             "lunabot_localisation.camera_info_stamp_aligner:main",
             "start_zone_localiser = lunabot_localisation.start_zone_localiser:main",
             "tag_pose_publisher = lunabot_localisation.tag_pose_publisher:main",
+            "legal_lidar_filter = lunabot_localisation.legal_lidar_filter:main",
         ],
     },
 )

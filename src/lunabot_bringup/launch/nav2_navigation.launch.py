@@ -30,6 +30,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     autostart = LaunchConfiguration("autostart")
     params_file = LaunchConfiguration("params_file")
+    collision_monitor_params_file = LaunchConfiguration("collision_monitor_params_file")
     use_composition = LaunchConfiguration("use_composition")
     container_name = LaunchConfiguration("container_name")
     container_name_full = (namespace, "/", container_name)
@@ -58,8 +59,6 @@ def generate_launch_description():
         "use_sim_time": use_sim_time,
         "autostart": autostart,
     }
-
-    collision_monitor_params = _nav_config_path("collision_monitor.yaml")
 
     configured_params = ParameterFile(
         RewrittenYaml(
@@ -91,6 +90,12 @@ def generate_launch_description():
         "params_file",
         default_value=_bringup_path("params", "nav2_params.yaml"),
         description="Full path to the ROS2 parameters file to use for all launched nodes",
+    )
+
+    declare_collision_monitor_params_file_cmd = DeclareLaunchArgument(
+        "collision_monitor_params_file",
+        default_value=_nav_config_path("collision_monitor.yaml"),
+        description="Full path to the collision monitor parameters file",
     )
 
     declare_autostart_cmd = DeclareLaunchArgument(
@@ -214,7 +219,7 @@ def generate_launch_description():
                 respawn=use_respawn,
                 respawn_delay=2.0,
                 parameters=[
-                    collision_monitor_params,
+                    collision_monitor_params_file,
                     {"use_sim_time": use_sim_time},
                 ],
                 arguments=["--ros-args", "--log-level", log_level],
@@ -297,7 +302,7 @@ def generate_launch_description():
                 plugin="nav2_collision_monitor::CollisionMonitor",
                 name="collision_monitor",
                 parameters=[
-                    collision_monitor_params,
+                    collision_monitor_params_file,
                     {"use_sim_time": use_sim_time},
                 ],
                 remappings=remappings,
@@ -322,6 +327,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
+    ld.add_action(declare_collision_monitor_params_file_cmd)
     ld.add_action(declare_autostart_cmd)
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_container_name_cmd)

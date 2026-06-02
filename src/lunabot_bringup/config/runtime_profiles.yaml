@@ -32,7 +32,9 @@ profiles:
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
+      - /cmd_vel_gated
       - /drivetrain/status
+      - /drivetrain/telemetry
       - /excavation/status
       - /localisation/start_zone_status
       - /power/telemetry
@@ -108,13 +110,18 @@ profiles:
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
+      - /cmd_vel_safe
+      - /cmd_vel_gated
       - /drivetrain/status
+      - /drivetrain/telemetry
       - /excavation/status
       - /localisation/start_zone_status
       - /diagnostics
       - /power/telemetry
       - /camera_front/image/compressed
+      - /camera_rear/image/compressed
       - /camera_front/camera_info
+      - /camera_rear/camera_info
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0
@@ -143,6 +150,15 @@ profiles:
       - name: /drivetrain/status
         max_hz: 5.0
         estimated_bytes: 128
+      - name: /drivetrain/telemetry
+        max_hz: 5.0
+        estimated_bytes: 192
+      - name: /cmd_vel_safe
+        max_hz: 10.0
+        estimated_bytes: 96
+      - name: /cmd_vel_gated
+        max_hz: 10.0
+        estimated_bytes: 96
       - name: /excavation/status
         max_hz: 5.0
         estimated_bytes: 128
@@ -201,6 +217,10 @@ profiles:
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
+      - /joy
+      - /cmd_vel_teleop
+      - /cmd_vel_safe
+      - /cmd_vel_gated
       - /drivetrain/status
       - /drivetrain/telemetry
       - /excavation/status
@@ -219,6 +239,12 @@ profiles:
       - name: /drivetrain/telemetry
         max_hz: 5.0
         estimated_bytes: 192
+      - name: /cmd_vel_safe
+        max_hz: 10.0
+        estimated_bytes: 96
+      - name: /cmd_vel_gated
+        max_hz: 10.0
+        estimated_bytes: 96
       - name: /excavation/status
         max_hz: 5.0
         estimated_bytes: 128
@@ -326,13 +352,18 @@ profiles:
       - /safety/estop
       - /safety/motion_inhibit
       - /safety/reset_motion_inhibit
+      - /cmd_vel_safe
+      - /cmd_vel_gated
       - /drivetrain/status
+      - /drivetrain/telemetry
       - /excavation/status
       - /localisation/start_zone_status
       - /diagnostics
       - /power/telemetry
       - /camera_front/image/compressed
+      - /camera_rear/image/compressed
       - /camera_front/camera_info
+      - /camera_rear/camera_info
     telemetry_topics:
       - name: /mission/state
         max_hz: 1.0
@@ -361,6 +392,9 @@ profiles:
       - name: /drivetrain/status
         max_hz: 2.0
         estimated_bytes: 128
+      - name: /drivetrain/telemetry
+        max_hz: 2.0
+        estimated_bytes: 192
       - name: /excavation/status
         max_hz: 2.0
         estimated_bytes: 128
@@ -377,5 +411,11 @@ profiles:
         max_hz: 5.0
         estimated_bytes: 37500
       - name: /camera_front/camera_info
+        max_hz: 1.0
+        estimated_bytes: 512
+      - name: /camera_rear/image/compressed
+        max_hz: 3.0
+        estimated_bytes: 37500
+      - name: /camera_rear/camera_info
         max_hz: 1.0
         estimated_bytes: 512

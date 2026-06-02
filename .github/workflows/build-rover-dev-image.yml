@@ -1,0 +1,122 @@
+name: Build Rover Dev Image
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/build-rover-dev-image.yml'
+      - '.github/requirements-preflight.txt'
+      - 'tools/doctor.py'
+  push:
+    branches: [main]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/build-rover-dev-image.yml'
+      - '.github/requirements-preflight.txt'
+      - 'tools/doctor.py'
+  workflow_dispatch:
+
+concurrency:
+  group: rover-dev-image-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Derive image metadata
+        id: image
+        run: |
+          owner_lower=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner_lower}/innex1-rover-dev" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "cache_scope=rover-dev-image-pr" >> "$GITHUB_OUTPUT"
+          else
+            echo "cache_scope=rover-dev-image-main" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish rover dev image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image }}:dev
+            ${{ steps.image.outputs.image }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=${{ steps.image.outputs.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ steps.image.outputs.cache_scope }}
+
+      - name: Smoke test published image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker run --rm "${{ steps.image.outputs.image }}:sha-${{ github.sha }}" bash -lc '
+            source /opt/ros/humble/setup.bash &&
+            test "$(whoami)" = rover &&
+            id rover >/dev/null &&
+            test -d /workspace/innex1-rover &&
+            python3 --version &&
+            colcon --help >/dev/null &&
+            rosdep --version >/dev/null &&
+            python3 -c "import yaml; print(yaml.__version__)"
+          '
+        shell: bash
+
+      - name: Build rover dev image for smoke testing with cache export
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          load: true
+          tags: innex1-rover-dev:test
+          cache-from: type=gha,scope=${{ steps.image.outputs.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ steps.image.outputs.cache_scope }}
+
+      - name: Build rover dev image for fork smoke testing
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          load: true
+          tags: innex1-rover-dev:test
+          cache-from: type=gha,scope=${{ steps.image.outputs.cache_scope }}
+
+      - name: Smoke test local image
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+        run: |
+          docker run --rm innex1-rover-dev:test bash -lc '
+            source /opt/ros/humble/setup.bash &&
+            test "$(whoami)" = rover &&
+            id rover >/dev/null &&
+            test -d /workspace/innex1-rover &&
+            python3 --version &&
+            colcon --help >/dev/null &&
+            rosdep --version >/dev/null &&
+            python3 -c "import yaml; print(yaml.__version__)"
+          '
+        shell: bash

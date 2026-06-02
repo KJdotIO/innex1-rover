@@ -2,9 +2,11 @@
 
 import numpy as np
 import pytest
+from sensor_msgs.msg import PointCloud2, PointField
 
 from lunabot_perception.arena_boundary_filter import (
     ArenaBounds,
+    cloud_xyz,
     filter_points_to_arena,
     transform_points,
 )
@@ -78,3 +80,45 @@ def test_transform_points_applies_translation_and_yaw():
     transformed = transform_points(points, (2.0, -1.0, 0.25), quaternion_xyzw)
 
     np.testing.assert_allclose(transformed, [[2.0, 0.0, 0.25]], atol=1e-6)
+
+
+def test_cloud_xyz_accepts_mixed_os1_style_fields():
+    """OS1 clouds mix float coordinates with integer ring/time fields."""
+    dtype = np.dtype(
+        {
+            "names": ["x", "y", "z", "intensity", "t", "ring"],
+            "formats": [
+                np.float32,
+                np.float32,
+                np.float32,
+                np.float32,
+                np.uint32,
+                np.uint16,
+            ],
+            "offsets": [0, 4, 8, 16, 20, 24],
+            "itemsize": 32,
+        }
+    )
+    records = np.zeros(2, dtype=dtype)
+    records["x"] = [1.0, 2.0]
+    records["y"] = [3.0, 4.0]
+    records["z"] = [5.0, 6.0]
+    records["t"] = [10, 20]
+    records["ring"] = [1, 2]
+
+    cloud = PointCloud2()
+    cloud.height = 1
+    cloud.width = 2
+    cloud.point_step = 32
+    cloud.row_step = 64
+    cloud.fields = [
+        PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
+        PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+        PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
+        PointField(name="intensity", offset=16, datatype=PointField.FLOAT32, count=1),
+        PointField(name="t", offset=20, datatype=PointField.UINT32, count=1),
+        PointField(name="ring", offset=24, datatype=PointField.UINT16, count=1),
+    ]
+    cloud.data = records.tobytes()
+
+    np.testing.assert_allclose(cloud_xyz(cloud), [[1, 3, 5], [2, 4, 6]])

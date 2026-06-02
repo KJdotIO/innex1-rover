@@ -1,22 +1,24 @@
 # Drivetrain bridge configuration for the INNEX-1 rover.
 #
-# Hardware: 4x GR-WM4-V4 brushed DC motors driven by 2x Sabertooth 2x32
-# motor controllers via Legacy Simplified Serial at 9600 baud.
-# Feedback: Hall-sensor quadrature encoders on Jetson GPIO pins.
+# Current bench-proven hardware: 4x GR-WM4-V3 brushed DC motors driven by 2x
+# Sabertooth 2x32 controllers through a Teensy 4.1. The Teensy reads the
+# encoders and exposes USB serial to the Jetson.
 #
 # Wheel order: [FL, FR, RL, RR]
 
 drivetrain_bridge:
   ros__parameters:
-    # --- UART ---
-    serial_port: "/dev/ttyTHS1"
-    baud_rate: 9600
+    # --- Serial ---
+    # Prefer the stable by-id path on the Jetson when udev exposes it:
+    # /dev/serial/by-id/usb-Teensyduino_USB_Serial_19852100-if00
+    serial_port: "/dev/ttyACM0"
+    baud_rate: 115200
 
-    # The CDR calls this Simplified Serial. In the Sabertooth 2x32 manual this
-    # byte protocol is Legacy Simplified Serial: Jetson UART TX to S1, with
-    # Jetson and Sabertooth sharing a logic ground.
-    # Use "packetized" only if the Sabertooths are set for Packet Serial.
-    serial_protocol: "legacy_simplified"
+    # Current path: ROS 2 on Jetson -> Teensy USB serial -> two Sabertooths.
+    # The older direct Sabertooth paths remain available as "legacy_simplified"
+    # and "packetized" for controlled bench tests.
+    serial_protocol: "teensy_line"
+    reset_encoders_on_start: true
 
     # Real hardware should fail closed if the serial controller is missing.
     # Set true only for explicit desktop/Jetson dry-runs with no motor output.
@@ -38,10 +40,8 @@ drivetrain_bridge:
     # --- Encoders ---
     # Counts per full revolution of the output shaft (after gearbox).
     encoder_counts_per_rev: 720
-    # Jetson GPIO pin numbers for encoder channels [A, B] per wheel.
-    # [FL_A, FL_B, FR_A, FR_B, RL_A, RL_B, RR_A, RR_B]
-    # Placeholder pins. Update to match the actual PCB wiring.
-    encoder_gpio_pins: [7, 11, 13, 15, 29, 31, 33, 35]
+    # Encoder counts arrive from the Teensy telemetry line as FL, RL, FR, RR.
+    # The ROS bridge reorders them to the package convention: FL, FR, RL, RR.
 
     # --- Safety ---
     # If no cmd_vel is received within this period, send a stop.

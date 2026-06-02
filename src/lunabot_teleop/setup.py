@@ -15,7 +15,7 @@ def _relative_matches(pattern: str) -> list[str]:
 
 setup(
     name=package_name,
-    version="0.0.0",
+    version="0.1.0",
     packages=find_packages(exclude=["test"]),
     data_files=[
         (
@@ -31,6 +31,10 @@ setup(
             f"share/{package_name}/config",
             _relative_matches("config/*.yaml"),
         ),
+        (
+            f"share/{package_name}/web",
+            _relative_matches("web/*"),
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -44,6 +48,8 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "web_gamepad_bridge = lunabot_teleop.web_gamepad_bridge:main",
+        ],
     },
 )
