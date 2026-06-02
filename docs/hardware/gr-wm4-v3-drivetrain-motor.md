@@ -113,7 +113,7 @@ one per side of the rover).
 | Controller | Sabertooth 2×32 |
 | Communication | Packetized serial (9600 baud, address 128) |
 | Sabertooth #1 (Left: FL + RL) | Teensy Pin 0 (UART1 TX) |
-| Sabertooth #2 (Right: FR + RR) | Teensy Pin 7 (UART2 TX) |
+| Sabertooth #2 (Right: FR + RR) | Teensy Pin 29 (UART7 TX) — remapped from Pin 7 (dead) |
 | Jetson role | High-level commands only — talks to Teensy over USB serial |
 | Hardware ramping | `setSaberRamping(20)` — configured once at startup |
 | Power-on sequence | Always power Jetson and Teensy before applying 22.2 V to Sabertooth |

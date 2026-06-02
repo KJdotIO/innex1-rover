@@ -28,7 +28,7 @@ component datasheets — just enough to know what each item is for and any key p
 
 ### WAGO 2-in-4-out (£9.89, Amazon)
 - **Role:** BD-01 12 V output distribution — Jetson (pigtail barrel jack) + LiDAR (pigtail barrel jack)
-- **Status:** ✅ Active — 2 outputs in use (Jetson + LiDAR)
+- **Status:** ✅ Active — 2 outputs in use (Jetson + LiDAR), 2 spare
 
 ---
 
@@ -37,8 +37,7 @@ component datasheets — just enough to know what each item is for and any key p
 ### XT90 Anti-Spark Connector (£7.49, eBay)
 - **Role:** Main battery disconnect on the motive domain (6S LiPo)
 - **Placement:** Between the 6S LiPo positive terminal and the 40 A ANL fuse holder
-- ⚠️ Anti-spark only works in one orientation — the resistor pre-charge pin must be on the battery side (male plug on battery, female on harness). Verify orientation before soldering.
-- ⚠️ Solder properly — XT90 carries full motive current. Use a temperature-controlled iron and heat the barrel, not the wire.
+- **Assembly:** The XT90 female comes as a pre-made pigtail with red and black wires already attached. Extend those two wires by soldering them to 10 AWG wire, then run straight to the ANL fuse holder (red/positive) and ground bus (black/negative).
 
 ### 10 AWG Wire Black and Red (£14.99, Amazon)
 - **Role:** Main battery cables — motive trunk from XT90 → ANL fuse → WUPP fuse block, and motor power runs to Sabertooth
@@ -149,7 +148,7 @@ component datasheets — just enough to know what each item is for and any key p
 | Item | Check |
 |------|-------|
 | Yellow Ring Terminal | Verify crimp barrel fits **10 AWG** wire — some "yellow" terminals are rated for 4–6 AWG only |
-| XT90 Anti-Spark | Confirm male/female orientation — resistor pre-charge pin must be on battery side |
+| XT90 Anti-Spark | Confirm male/female orientation before connecting — resistor pre-charge pin must be on battery (male) side |
 | DC Barrel Jack (5.5×2.5mm) | Confirm centre-positive, 12 V from BD-01 before plugging Jetson in |
 | E-Stop | Push-break (250 A, 80 V DC) — wire in series on motive domain positive rail |
 | Compute Switch | Confirm rating ≥ 12 A @ 16.8 V for compute domain arming switch |
