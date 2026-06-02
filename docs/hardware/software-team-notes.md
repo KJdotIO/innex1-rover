@@ -53,7 +53,7 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 | 8 | UART2 TX | → | Sabertooth #2 S1 (Right: FR + RR) |
 | 7 | UART2 RX | ← | Sabertooth #2 S2 (optional telemetry/readback) |
 | 2, 3 | PWM ch1 & ch2 | → | Cytron MDD10A #1 (Actuators 1 & 2) |
-| 9, 10 | DIR ch1 & ch2 | → | Cytron MDD10A #1 |
+| 9, 28 | DIR ch1 & ch2 | → | Cytron MDD10A #1 — Pin 28 remapped from Pin 10 (dead) |
 | 4, 5 | PWM ch1 & ch2 | → | Cytron MDD10A #2 (Actuators 3 & 4) |
 | 11, 12 | DIR ch1 & ch2 | → | Cytron MDD10A #2 |
 | 6 | PWM (SV) | → | BLD-510B — excavation motor speed |
@@ -68,6 +68,9 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 | USB | Serial ↕ | ↕ | Jetson Orin Nano |
 
 **~25 pins used — ~30 spare on Teensy 4.1**
+
+> ⚠️ **Dead pins on physical unit (cold solder, hardware fault):** 7, 8, 10, 35, 36, 40.
+> Do NOT use these pins in firmware. Pins 7 and 10 have been remapped above. Pins 8, 35, 36, 40 were unassigned.
 
 ---
 
@@ -138,24 +141,14 @@ setSaberRamping(20);         // Hardware ramping — smooth accel/decel on all s
 ## BLD-510B — BLDC Excavation Motor Controller
 
 ### Speed Control (SV pin)
-The SV pin accepts 0–5 V analog. Drive it with **PWM from Teensy Pin 6 through a 10 kΩ + 10 µF
-RC low-pass filter** to convert PWM to a smooth analog voltage.
-
-```
-Teensy Pin 6 (PWM) ── 10kΩ ──┬── BLD-510B SV pin
-                              │
-                             10µF
-                              │
-                             GND
-```
+The SV pin accepts **1–2 kHz PWM directly** from Teensy Pin 6. No external RC filter is needed — the BLD-510B driver handles PWM internally. Duty cycle maps linearly to motor speed (0% = stop, 100% ≈ full speed at 3.3 V logic).
 
 ### Control Signal Logic
 - EN (Pin 14), F/R (Pin 13), BK — all **active-low**
 - Pull high to disable, pull low to enable/activate
 
-### Feedback Signals (open-collector — pull-ups required)
-Both PG and ALM are open-collector outputs. Hardware **10 kΩ pull-up resistors to 3.3 V** must
-be fitted on the PCB/breadboard at Pins 31 and 32.
+### Feedback Signals (open-collector — pull-ups optional)
+PG and ALM are open-collector outputs. If monitoring these signals, fit **10 kΩ pull-up resistors to 3.3 V** at Pins 31 and 32. If unused, leave unconnected — no pull-ups needed.
 
 | Signal | Pin | Function |
 |--------|-----|----------|
@@ -249,7 +242,7 @@ device.setIrFloodLightIntensity(0.0)          # 0.0 = off (default)
 
 ## E-Stop Behaviour
 
-- The 125 A E-Stop cuts **motive power only** (22.2 V rail)
+- The 250 A E-Stop cuts **motive power only** (22.2 V rail)
 - The compute rail (14.8 V) remains live through E-Stop — Jetson, LiDAR, router, and cameras
   stay up for telemetry and video during a safety stop
 - Software must not assume the whole system is dead after E-Stop — autonomy stack keeps running
@@ -273,3 +266,4 @@ device.setIrFloodLightIntensity(0.0)          # 0.0 = off (default)
 | 2026-05-23 | eniomecaj | Initial hardware notes |
 | 2026-05-23 | eniomecaj | Clarified Sabertooth current limit to ≤ 10 A/channel; added fuse safety dependency note; updated TODO to required action with wiring safety context |
 | 2026-05-23 | eniomecaj | Fixed network topology: OS1 connects via router, not direct to Jetson (Jetson has one Ethernet port); corrected router band to 2.4 GHz |
+| 2026-06-02 | eniomecaj | Pin remaps: Sabertooth #2 Pin 7→29 (UART7), Cytron #1 DIR ch2 Pin 10→28. Dead pins added. RC filter removed from SV pin. PG/ALM pull-ups made optional. E-stop updated to 250A. SW6 corrected to OFF |

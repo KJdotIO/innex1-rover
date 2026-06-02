@@ -91,7 +91,7 @@ INNEX-1 uses **sign-magnitude PWM** mode: one PWM signal sets speed, one DIR sig
 | PWM1 | Teensy pin **2** |
 | DIR1 | Teensy pin **9** |
 | PWM2 | Teensy pin **3** |
-| DIR2 | Teensy pin **10** |
+| DIR2 | Teensy pin **28** (remapped from Pin 10 — dead on physical unit) |
 
 ### Cytron MDD10A #2 — 250mm Actuators (12 V via DollaTek buck)
 

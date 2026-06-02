@@ -54,7 +54,7 @@
 | **2** | PWM ch1 | → | Cytron MDD10A #1 | Actuator 1 speed |
 | **3** | PWM ch2 | → | Cytron MDD10A #1 | Actuator 2 speed |
 | **9** | DIR ch1 | → | Cytron MDD10A #1 | Actuator 1 direction |
-| **10** | DIR ch2 | → | Cytron MDD10A #1 | Actuator 2 direction |
+| **28** | DIR ch2 | → | Cytron MDD10A #1 | Actuator 2 direction. Remapped from Pin 10 (dead) |
 | **4** | PWM ch1 | → | Cytron MDD10A #2 | Actuator 3 speed |
 | **5** | PWM ch2 | → | Cytron MDD10A #2 | Actuator 4 speed |
 | **11** | DIR ch1 | → | Cytron MDD10A #2 | Actuator 3 direction |
@@ -126,3 +126,4 @@ corrections.
 |------|--------|--------|
 | 2026-05-24 | eniomecaj | Initial datasheet — sourced from TEENSY41-L datasheet (joy-it.net, Feb 2025) and INNEX-1 pin allocation files |
 | 2026-05-24 | eniomecaj | Updated power source to Jetson USB; PG/ALM pull-ups made optional; RC filter removed from Pin 6; encoder current note added |
+| 2026-06-02 | eniomecaj | Remapped Pin 7→29 (Sabertooth #2, UART7 TX) and Pin 10→28 (Cytron #1 DIR ch2) — hardware fault on physical Teensy unit. Dead pins noted: 7, 8, 10, 35, 36, 40 |

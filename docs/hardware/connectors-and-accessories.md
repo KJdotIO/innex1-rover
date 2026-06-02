@@ -28,7 +28,7 @@ component datasheets — just enough to know what each item is for and any key p
 
 ### WAGO 2-in-4-out (£9.89, Amazon)
 - **Role:** BD-01 12 V output distribution — Jetson (pigtail barrel jack) + LiDAR (pigtail barrel jack)
-- **Status:** ✅ Active — 2 outputs in use (Jetson + LiDAR)
+- **Status:** ✅ Active — 2 outputs in use (Jetson + LiDAR), 2 spare
 
 ---
 
@@ -148,7 +148,7 @@ component datasheets — just enough to know what each item is for and any key p
 | Item | Check |
 |------|-------|
 | Yellow Ring Terminal | Verify crimp barrel fits **10 AWG** wire — some "yellow" terminals are rated for 4–6 AWG only |
-| XT90 Anti-Spark | Confirm male/female orientation — resistor pre-charge pin must be on battery side |
+| XT90 Anti-Spark | Confirm male/female orientation before connecting — resistor pre-charge pin must be on battery (male) side |
 | DC Barrel Jack (5.5×2.5mm) | Confirm centre-positive, 12 V from BD-01 before plugging Jetson in |
 | E-Stop | Push-break (250 A, 80 V DC) — wire in series on motive domain positive rail |
 | Compute Switch | Confirm rating ≥ 12 A @ 16.8 V for compute domain arming switch |
