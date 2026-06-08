@@ -102,9 +102,9 @@ INNEX-1 uses **sign-magnitude PWM** mode: one PWM signal sets speed, one DIR sig
 | M1A / M1B | DCHOUSE 250mm Actuator #3 (Red +, Black −) |
 | M2A / M2B | DCHOUSE 250mm Actuator #4 (Red +, Black −) |
 | GND (header) | Teensy GND |
-| PWM1 | Teensy pin **4** |
+| PWM1 | Teensy pin **33** (remapped from Pin 4 after live deposition-door testing) |
 | DIR1 | Teensy pin **11** |
-| PWM2 | Teensy pin **5** |
+| PWM2 | Teensy pin **41** (remapped from Pin 5 after live deposition-door testing) |
 | DIR2 | Teensy pin **12** |
 
 ---

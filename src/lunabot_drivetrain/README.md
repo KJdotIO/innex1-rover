@@ -38,6 +38,7 @@ Teensy `T ...` telemetry line.
 | Direction | Topic | Type |
 |-----------|-------|------|
 | Subscribe | `/cmd_vel_gated` | `geometry_msgs/Twist` |
+| Subscribe | `/deposition/actuator/cmd` | `std_msgs/Int8MultiArray` |
 | Subscribe | `/safety/motion_inhibit` | `std_msgs/Bool` (transient-local) |
 | Subscribe | `/safety/estop` | `std_msgs/Bool` |
 | Publish | `/drivetrain/status` | `lunabot_interfaces/DrivetrainStatus` |

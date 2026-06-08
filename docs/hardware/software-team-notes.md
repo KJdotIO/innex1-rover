@@ -52,7 +52,7 @@ The Jetson handles **high-level autonomy only**. All low-level motor I/O goes th
 | 29 | Serial7 TX | → | Sabertooth #2 (Right: FR + RR) — remapped from Pin 8 (dead on breakout board) |
 | 2, 3 | PWM ch1 & ch2 | → | Cytron MDD10A #1 (Actuators 1 & 2) |
 | 9, 28 | DIR ch1 & ch2 | → | Cytron MDD10A #1 — Pin 28 remapped from Pin 10 (dead) |
-| 4, 5 | PWM ch1 & ch2 | → | Cytron MDD10A #2 (Actuators 3 & 4) |
+| 33, 41 | PWM ch1 & ch2 | → | Cytron MDD10A #2 (Actuators 3 & 4) — remapped from Pins 4 and 5 after live deposition-door testing |
 | 11, 12 | DIR ch1 & ch2 | → | Cytron MDD10A #2 |
 | 6 | PWM (SV) | → | BLD-510B — excavation motor speed |
 | 13 | GPIO (F/R) | → | BLD-510B — direction |

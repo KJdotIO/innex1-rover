@@ -2,8 +2,11 @@
 //
 // Jetson/Mac USB serial commands, 115200 baud:
 //   V <left> <right>   Set side throttle targets, -127..127.
+//   B <speed>          Set BLD-510B excavation motor speed, -127..127.
 //   C <dir1> <dir2> [duty1] [duty2]
 //                      Set Cytron MDD10A #1 directions and optional PWM duty, 0..255.
+//   D <dir1> <dir2> [duty1] [duty2]
+//                      Set Cytron MDD10A #2 directions and optional PWM duty, 0..255.
 //   X                  Immediate hard stop, keeps motion allowed.
 //   E                  Simulated/physical E-stop active: hard stop + latch inhibit.
 //   U                  E-stop released, restart still required.
@@ -22,14 +25,21 @@
 //   Encoder A/B pins: FL 15/16, RL 17/18, FR 19/20, RR 21/22
 //   Cytron MDD10A #1 Act1: PWM <- pin 2, DIR <- pin 9
 //   Cytron MDD10A #1 Act2: PWM <- pin 3, DIR <- pin 28
+//   Cytron MDD10A #2 Act1: PWM <- pin 33, DIR <- pin 11
+//   Cytron MDD10A #2 Act2: PWM <- pin 41, DIR <- pin 12
+//   BLD-510B: SV speed <- pin 6, F/R <- pin 13, EN <- pin 14
 
 constexpr uint8_t ENCODER_COUNT = 4;
 constexpr uint8_t ENC_A[ENCODER_COUNT] = {15, 17, 19, 21};
 constexpr uint8_t ENC_B[ENCODER_COUNT] = {16, 18, 20, 22};
 
-constexpr uint8_t CYTRON_PWM[2] = {2, 3};
-constexpr uint8_t CYTRON_DIR[2] = {9, 28};
+constexpr uint8_t CYTRON_COUNT = 4;
+constexpr uint8_t CYTRON_PWM[CYTRON_COUNT] = {2, 3, 33, 41};
+constexpr uint8_t CYTRON_DIR[CYTRON_COUNT] = {9, 28, 11, 12};
 constexpr uint8_t CYTRON_DEFAULT_DUTY = 255;
+constexpr uint8_t BLDC_PWM = 6;
+constexpr uint8_t BLDC_DIR = 13;
+constexpr uint8_t BLDC_EN = 14;
 constexpr uint8_t LEFT_ADDRESS = 128;
 constexpr uint8_t RIGHT_ADDRESS = 128;
 constexpr uint32_t USB_BAUD = 115200;
@@ -50,8 +60,17 @@ enum MotionState : uint8_t {
 volatile int32_t encoder_ticks[ENCODER_COUNT] = {0, 0, 0, 0};
 volatile uint8_t last_encoder_state[ENCODER_COUNT] = {0, 0, 0, 0};
 
-int8_t cytron_dir[2] = {0, 0};
-uint8_t cytron_duty[2] = {CYTRON_DEFAULT_DUTY, CYTRON_DEFAULT_DUTY};
+int8_t cytron_dir[CYTRON_COUNT] = {0, 0, 0, 0};
+uint8_t cytron_duty[CYTRON_COUNT] = {
+  CYTRON_DEFAULT_DUTY,
+  CYTRON_DEFAULT_DUTY,
+  CYTRON_DEFAULT_DUTY,
+  CYTRON_DEFAULT_DUTY,
+};
+// Actuator 4's M2A/M2B leads were swapped on Cytron #2 to keep the command
+// convention positive=extend and negative=retract.
+const bool CYTRON_DIR_INVERT[CYTRON_COUNT] = {false, false, false, false};
+int bldc_speed = 0;
 int target_left = 0;
 int target_right = 0;
 int command_left = 0;
@@ -60,6 +79,7 @@ bool estop_active = false;
 bool motion_inhibited = false;
 bool timed_out = false;
 uint32_t last_velocity_command_ms = 0;
+uint32_t last_bldc_command_ms = 0;
 uint32_t last_ramp_ms = 0;
 uint32_t last_telemetry_ms = 0;
 char line_buffer[80];
@@ -125,10 +145,17 @@ void writeMotorOutputs() {
 }
 
 void stopCytronOutputs() {
-  cytron_dir[0] = 0;
-  cytron_dir[1] = 0;
-  analogWrite(CYTRON_PWM[0], 0);
-  analogWrite(CYTRON_PWM[1], 0);
+  for (uint8_t i = 0; i < CYTRON_COUNT; ++i) {
+    cytron_dir[i] = 0;
+    analogWrite(CYTRON_PWM[i], 0);
+    digitalWrite(CYTRON_PWM[i], LOW);
+  }
+}
+
+void stopBldcOutput() {
+  bldc_speed = 0;
+  analogWrite(BLDC_PWM, 0);
+  digitalWrite(BLDC_EN, HIGH);
 }
 
 void hardStop() {
@@ -138,6 +165,7 @@ void hardStop() {
   command_right = 0;
   writeMotorOutputs();
   stopCytronOutputs();
+  stopBldcOutput();
 }
 
 void resetEncoders() {
@@ -231,7 +259,7 @@ void publishTelemetry(uint32_t now_ms) {
 }
 
 void printHelp() {
-  Serial.println("OK H V <left> <right> | C <d1> <d2> [duty1] [duty2] | X | E | U | R | Z");
+  Serial.println("OK H V <left> <right> | B <speed> | C <d1> <d2> [duty1] [duty2] | D <d1> <d2> [duty1] [duty2] | X | E | U | R | Z");
 }
 
 void engageEstop() {
@@ -283,8 +311,9 @@ void setVelocityTargets(char *args) {
   Serial.println(target_right);
 }
 
-void setCytronOutputs() {
-  for (uint8_t i = 0; i < 2; ++i) {
+void setCytronOutputs(uint8_t start_index) {
+  for (uint8_t offset = 0; offset < 2; ++offset) {
+    const uint8_t i = start_index + offset;
     pinMode(CYTRON_PWM[i], OUTPUT);
     pinMode(CYTRON_DIR[i], OUTPUT);
     if (cytron_dir[i] == 0) {
@@ -292,7 +321,9 @@ void setCytronOutputs() {
       digitalWrite(CYTRON_PWM[i], LOW);
       continue;
     }
-    digitalWrite(CYTRON_DIR[i], cytron_dir[i] > 0 ? HIGH : LOW);
+    const bool positive_dir = cytron_dir[i] > 0;
+    const bool output_high = CYTRON_DIR_INVERT[i] ? !positive_dir : positive_dir;
+    digitalWrite(CYTRON_DIR[i], output_high ? HIGH : LOW);
     if (cytron_duty[i] >= 255) {
       digitalWrite(CYTRON_PWM[i], HIGH);
     } else {
@@ -301,34 +332,68 @@ void setCytronOutputs() {
   }
 }
 
-void setCytronCommand(char *args) {
+void setCytronCommand(char *args, uint8_t start_index, char command_name) {
   char *dir1_text = strtok(args, " ");
   char *dir2_text = strtok(nullptr, " ");
   char *duty1_text = strtok(nullptr, " ");
   char *duty2_text = strtok(nullptr, " ");
   if (dir1_text == nullptr || dir2_text == nullptr) {
-    Serial.println("ERR C expected_dir1_dir2");
+    Serial.print("ERR ");
+    Serial.print(command_name);
+    Serial.println(" expected_dir1_dir2");
     return;
   }
 
-  cytron_dir[0] = constrain(atoi(dir1_text), -1, 1);
-  cytron_dir[1] = constrain(atoi(dir2_text), -1, 1);
-  cytron_duty[0] = duty1_text == nullptr
-                     ? CYTRON_DEFAULT_DUTY
-                     : static_cast<uint8_t>(constrain(atoi(duty1_text), 0, 255));
-  cytron_duty[1] = duty2_text == nullptr
-                     ? CYTRON_DEFAULT_DUTY
-                     : static_cast<uint8_t>(constrain(atoi(duty2_text), 0, 255));
-  setCytronOutputs();
+  cytron_dir[start_index] = constrain(atoi(dir1_text), -1, 1);
+  cytron_dir[start_index + 1] = constrain(atoi(dir2_text), -1, 1);
+  cytron_duty[start_index] = duty1_text == nullptr
+                               ? CYTRON_DEFAULT_DUTY
+                               : static_cast<uint8_t>(constrain(atoi(duty1_text), 0, 255));
+  cytron_duty[start_index + 1] = duty2_text == nullptr
+                                   ? CYTRON_DEFAULT_DUTY
+                                   : static_cast<uint8_t>(constrain(atoi(duty2_text), 0, 255));
+  setCytronOutputs(start_index);
 
-  Serial.print("OK C ");
-  Serial.print(cytron_dir[0]);
+  Serial.print("OK ");
+  Serial.print(command_name);
   Serial.print(' ');
-  Serial.print(cytron_dir[1]);
+  Serial.print(cytron_dir[start_index]);
+  Serial.print(' ');
+  Serial.print(cytron_dir[start_index + 1]);
   Serial.print(" duty ");
-  Serial.print(cytron_duty[0]);
+  Serial.print(cytron_duty[start_index]);
   Serial.print(' ');
-  Serial.println(cytron_duty[1]);
+  Serial.println(cytron_duty[start_index + 1]);
+}
+
+void setBldcCommand(char *args) {
+  if (estop_active || motion_inhibited) {
+    hardStop();
+    Serial.println("ERR B motion_inhibited");
+    return;
+  }
+
+  char *speed_text = strtok(args, " ");
+  if (speed_text == nullptr) {
+    Serial.println("ERR B expected_speed");
+    return;
+  }
+
+  bldc_speed = constrain(atoi(speed_text), -127, 127);
+  last_bldc_command_ms = millis();
+  timed_out = false;
+
+  if (bldc_speed == 0) {
+    stopBldcOutput();
+  } else {
+    const uint8_t duty = static_cast<uint8_t>((abs(bldc_speed) * 255) / 127);
+    digitalWrite(BLDC_DIR, bldc_speed > 0 ? LOW : HIGH);
+    analogWrite(BLDC_PWM, duty);
+    digitalWrite(BLDC_EN, LOW);
+  }
+
+  Serial.print("OK B ");
+  Serial.println(bldc_speed);
 }
 
 void handleLine(char *line) {
@@ -349,9 +414,17 @@ void handleLine(char *line) {
     case 'v':
       setVelocityTargets(line);
       break;
+    case 'B':
+    case 'b':
+      setBldcCommand(line);
+      break;
     case 'C':
     case 'c':
-      setCytronCommand(line);
+      setCytronCommand(line, 0, 'C');
+      break;
+    case 'D':
+    case 'd':
+      setCytronCommand(line, 2, 'D');
       break;
     case 'X':
     case 'x':
@@ -423,6 +496,18 @@ void updateWatchdog(uint32_t now_ms) {
   Serial.println("WARN command_timeout stopped");
 }
 
+void updateBldcWatchdog(uint32_t now_ms) {
+  if (estop_active || motion_inhibited || bldc_speed == 0) {
+    return;
+  }
+  if (now_ms - last_bldc_command_ms <= COMMAND_TIMEOUT_MS) {
+    return;
+  }
+  timed_out = true;
+  stopBldcOutput();
+  Serial.println("WARN bldc_timeout stopped");
+}
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   for (uint8_t i = 0; i < ENCODER_COUNT; ++i) {
@@ -440,12 +525,19 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENC_A[3]), updateEncoderRR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENC_B[3]), updateEncoderRR, CHANGE);
 
-  for (uint8_t i = 0; i < 2; ++i) {
+  for (uint8_t i = 0; i < CYTRON_COUNT; ++i) {
     pinMode(CYTRON_PWM[i], OUTPUT);
     pinMode(CYTRON_DIR[i], OUTPUT);
     analogWrite(CYTRON_PWM[i], 0);
     digitalWrite(CYTRON_DIR[i], LOW);
   }
+  pinMode(BLDC_PWM, OUTPUT);
+  pinMode(BLDC_DIR, OUTPUT);
+  pinMode(BLDC_EN, OUTPUT);
+  analogWriteFrequency(BLDC_PWM, 1000);
+  analogWrite(BLDC_PWM, 0);
+  digitalWrite(BLDC_DIR, HIGH);
+  digitalWrite(BLDC_EN, HIGH);
 
   Serial.begin(USB_BAUD);
   Serial1.begin(SABER_BAUD);
@@ -471,6 +563,7 @@ void loop() {
 
   readCommands();
   updateWatchdog(now_ms);
+  updateBldcWatchdog(now_ms);
   updateRamp(now_ms);
   publishTelemetry(now_ms);
 }
