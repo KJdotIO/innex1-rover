@@ -275,6 +275,16 @@ class TestTeensySerial:
             == b"C 1 -1 0 255\n"
         )
 
+    def test_deposition_actuator_command_uses_cytron_two(self):
+        assert (
+            teensy_serial.deposition_actuator_to_bytes(1, -1)
+            == b"D 1 -1 255 255\n"
+        )
+
+    def test_actuator_command_rejects_unknown_channel_command(self):
+        with pytest.raises(ValueError):
+            teensy_serial.actuator_to_bytes(1, 1, command="Q")
+
     def test_parse_telemetry_reorders_ticks_to_ros_wheel_order(self):
         telemetry = teensy_serial.parse_telemetry_line(
             b"T 1234 1 0 0 30 30 28 29 10 20 30 40\n"
@@ -430,6 +440,24 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._actuator_cmd_callback(msg)
 
         assert calls == [(bridge._serial, 1, 1)]
+
+    def test_deposition_actuator_topic_uses_teensy_cytron_two_path(self, monkeypatch):
+        from std_msgs.msg import Int8MultiArray
+
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_deposition_actuator_cmd",
+            lambda port, dir1, dir2: calls.append((port, dir1, dir2)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        msg = Int8MultiArray()
+        msg.data = [1, -1]
+        bridge._deposition_actuator_cmd_callback(msg)
+
+        assert calls == [(bridge._serial, 1, -1)]
 
     def test_legacy_simplified_stop_path(self, monkeypatch):
         calls = []

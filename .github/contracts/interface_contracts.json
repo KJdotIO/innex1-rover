@@ -126,6 +126,13 @@
       "phases": ["runtime", "hardware"]
     },
     {
+      "name": "/deposition/actuator/cmd",
+      "type": "std_msgs/msg/Int8MultiArray",
+      "kind": "subscription",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
       "name": "/drivetrain/status",
       "type": "lunabot_interfaces/msg/DrivetrainStatus",
       "kind": "subscription",

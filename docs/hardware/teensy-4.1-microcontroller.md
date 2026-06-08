@@ -53,8 +53,8 @@
 | **3** | PWM ch2 | → | Cytron MDD10A #1 | Actuator 2 speed |
 | **9** | DIR ch1 | → | Cytron MDD10A #1 | Actuator 1 direction |
 | **28** | DIR ch2 | → | Cytron MDD10A #1 | Actuator 2 direction. Remapped from Pin 10 (dead) |
-| **4** | PWM ch1 | → | Cytron MDD10A #2 | Actuator 3 speed |
-| **5** | PWM ch2 | → | Cytron MDD10A #2 | Actuator 4 speed |
+| **33** | PWM ch1 | → | Cytron MDD10A #2 | Actuator 3 speed. Remapped from Pin 4 after live deposition-door testing |
+| **41** | PWM ch2 | → | Cytron MDD10A #2 | Actuator 4 speed. Remapped from Pin 5 after live deposition-door testing |
 | **11** | DIR ch1 | → | Cytron MDD10A #2 | Actuator 3 direction |
 | **12** | DIR ch2 | → | Cytron MDD10A #2 | Actuator 4 direction |
 | **6** | PWM (SV) | → | BLD-510B | Excavation speed — direct 1–2 kHz PWM to SV pin (no external RC filter needed; driver accepts PWM directly) |
@@ -102,7 +102,7 @@ corrections.
 | USB (virtual COM) | Serial | Jetson Orin Nano — bidirectional |
 | Serial1 (Pin 1) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
 | Serial7 (Pin 29) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) — remapped from Pin 8 (dead) |
-| GPIO PWM (Pins 2–6) | PWM + DIR | Cytron MDD10A #1 and #2, BLD-510B SV |
+| GPIO PWM (Pins 2, 3, 6, 33, 41) | PWM + DIR | Cytron MDD10A #1 and #2, BLD-510B SV |
 | GPIO (Pins 13–14) | Digital out, active-low | BLD-510B F/R and EN |
 | GPIO (Pins 15–22) | Quadrature encoder input | 4× GR-WM4-V3 drivetrain motor encoders |
 | GPIO (Pins 31–32) | Open-collector input | BLD-510B PG and ALM |

@@ -77,7 +77,7 @@ This actuator has **2 wires only** — no encoder.
 | Supply to Cytron | 12 V from DollaTek buck converter (not direct motive rail) |
 | Actuators per controller | 2 (one per channel) |
 | Control type | **Open-loop — timed PWM commands, no position feedback** |
-| Teensy PWM pins | Pins 4, 5 (Actuators 3 & 4) |
+| Teensy PWM pins | Pins 33, 41 (Actuators 3 & 4) |
 | Teensy DIR pins | Pins 11, 12 (Actuators 3 & 4) |
 | Fuse (motive fuse block) | **15 A blade** — Cytron #2 slot (fuses the buck converter input) |
 

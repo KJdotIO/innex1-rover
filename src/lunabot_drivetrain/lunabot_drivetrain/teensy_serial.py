@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 MAX_COMMAND = 127
 ACTUATOR_1_DUTY = 230
 ACTUATOR_2_DUTY = 255
+DEPOSITION_ACTUATOR_DUTY = 255
 
 
 @dataclass(frozen=True)
@@ -149,14 +150,19 @@ def actuator_to_bytes(
     dir2: int,
     duty1: int = ACTUATOR_1_DUTY,
     duty2: int = ACTUATOR_2_DUTY,
+    command: str = "C",
 ) -> bytes:
     d1 = max(-1, min(1, int(dir1)))
     d2 = max(-1, min(1, int(dir2)))
     p1 = _clamp_actuator_duty(duty1)
     p2 = _clamp_actuator_duty(duty2)
+    command_name = command[:1].upper()
+    if command_name not in {"C", "D"}:
+        raise ValueError(f"unsupported actuator command: {command!r}")
     eol = chr(10)
     return (
-        "C "
+        command_name
+        + " "
         + str(d1)
         + " "
         + str(d2)
@@ -176,3 +182,22 @@ def send_actuator_cmd(
     duty2: int = ACTUATOR_2_DUTY,
 ) -> None:
     port.write(actuator_to_bytes(dir1, dir2, duty1, duty2))
+
+
+def deposition_actuator_to_bytes(
+    dir1: int,
+    dir2: int,
+    duty1: int = DEPOSITION_ACTUATOR_DUTY,
+    duty2: int = DEPOSITION_ACTUATOR_DUTY,
+) -> bytes:
+    return actuator_to_bytes(dir1, dir2, duty1, duty2, command="D")
+
+
+def send_deposition_actuator_cmd(
+    port,
+    dir1: int,
+    dir2: int,
+    duty1: int = DEPOSITION_ACTUATOR_DUTY,
+    duty2: int = DEPOSITION_ACTUATOR_DUTY,
+) -> None:
+    port.write(deposition_actuator_to_bytes(dir1, dir2, duty1, duty2))
