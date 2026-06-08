@@ -31,7 +31,7 @@ from rclpy.qos import (
     ReliabilityPolicy,
 )
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Int8MultiArray
 
 from lunabot_drivetrain import sabertooth_serial, teensy_serial
 from lunabot_interfaces.msg import (
@@ -307,6 +307,9 @@ class DrivetrainBridge(Node):
         self._estop_sub = self.create_subscription(
             Bool, "/safety/estop", self._estop_callback, 10
         )
+        self._actuator_sub = self.create_subscription(
+            Int8MultiArray, "/actuator/cmd", self._actuator_cmd_callback, 10
+        )
         self._status_pub = self.create_publisher(
             DrivetrainStatus, "/drivetrain/status", 10
         )
@@ -336,6 +339,20 @@ class DrivetrainBridge(Node):
     def _inhibit_callback(self, msg: Bool) -> None:
         """Update motion inhibit state from safety node."""
         self._motion_inhibited = msg.data
+
+    def _actuator_cmd_callback(self, msg: Int8MultiArray) -> None:
+        if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
+            return
+        if len(msg.data) < 2:
+            return
+        try:
+            teensy_serial.send_actuator_cmd(
+                self._serial,
+                int(msg.data[0]),
+                int(msg.data[1]),
+            )
+        except OSError as exc:
+            self._mark_controller_offline(f"Actuator serial write failed: {exc}")
 
     def _estop_callback(self, msg: Bool) -> None:
         """Update e-stop state."""

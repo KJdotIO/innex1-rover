@@ -105,6 +105,10 @@ def _install_ros_fakes():
         def __init__(self):
             self.data = False
 
+    class Int8MultiArray:
+        def __init__(self):
+            self.data = []
+
     class Node:
         pass
 
@@ -138,6 +142,7 @@ def _install_ros_fakes():
     std_msgs = types.ModuleType("std_msgs")
     std_msg = types.ModuleType("std_msgs.msg")
     std_msg.Bool = Bool
+    std_msg.Int8MultiArray = Int8MultiArray
     sys.modules["std_msgs"] = std_msgs
     sys.modules["std_msgs.msg"] = std_msg
 
@@ -260,6 +265,15 @@ class TestTeensySerial:
         assert teensy_serial.estop_to_bytes() == b"E\n"
         assert teensy_serial.release_estop_to_bytes() == b"U\n"
         assert teensy_serial.restart_to_bytes() == b"R\n"
+
+    def test_actuator_command_uses_tuned_default_duty(self):
+        assert teensy_serial.actuator_to_bytes(1, -1) == b"C 1 -1 230 255\n"
+
+    def test_actuator_command_clamps_direction_and_duty(self):
+        assert (
+            teensy_serial.actuator_to_bytes(3, -3, -10, 300)
+            == b"C 1 -1 0 255\n"
+        )
 
     def test_parse_telemetry_reorders_ticks_to_ros_wheel_order(self):
         telemetry = teensy_serial.parse_telemetry_line(
@@ -398,6 +412,24 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._send_wheel_throttles(0.2, -0.1)
 
         assert calls == [(bridge._serial, 0.2, -0.1)]
+
+    def test_actuator_topic_uses_teensy_cytron_path(self, monkeypatch):
+        from std_msgs.msg import Int8MultiArray
+
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_actuator_cmd",
+            lambda port, dir1, dir2: calls.append((port, dir1, dir2)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        msg = Int8MultiArray()
+        msg.data = [1, 1]
+        bridge._actuator_cmd_callback(msg)
+
+        assert calls == [(bridge._serial, 1, 1)]
 
     def test_legacy_simplified_stop_path(self, monkeypatch):
         calls = []
