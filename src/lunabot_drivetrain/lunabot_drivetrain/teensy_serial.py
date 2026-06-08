@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 
 MAX_COMMAND = 127
+ACTUATOR_1_DUTY = 230
+ACTUATOR_2_DUTY = 255
 
 
 @dataclass(frozen=True)
@@ -136,3 +138,41 @@ def parse_telemetry_line(line: bytes | str) -> TeensyTelemetry | None:
             int(fields[12]),
         ],
     )
+
+
+def _clamp_actuator_duty(value: int) -> int:
+    return max(0, min(255, int(value)))
+
+
+def actuator_to_bytes(
+    dir1: int,
+    dir2: int,
+    duty1: int = ACTUATOR_1_DUTY,
+    duty2: int = ACTUATOR_2_DUTY,
+) -> bytes:
+    d1 = max(-1, min(1, int(dir1)))
+    d2 = max(-1, min(1, int(dir2)))
+    p1 = _clamp_actuator_duty(duty1)
+    p2 = _clamp_actuator_duty(duty2)
+    eol = chr(10)
+    return (
+        "C "
+        + str(d1)
+        + " "
+        + str(d2)
+        + " "
+        + str(p1)
+        + " "
+        + str(p2)
+        + eol
+    ).encode("ascii")
+
+
+def send_actuator_cmd(
+    port,
+    dir1: int,
+    dir2: int,
+    duty1: int = ACTUATOR_1_DUTY,
+    duty2: int = ACTUATOR_2_DUTY,
+) -> None:
+    port.write(actuator_to_bytes(dir1, dir2, duty1, duty2))

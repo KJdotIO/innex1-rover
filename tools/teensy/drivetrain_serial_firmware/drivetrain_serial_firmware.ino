@@ -2,6 +2,8 @@
 //
 // Jetson/Mac USB serial commands, 115200 baud:
 //   V <left> <right>   Set side throttle targets, -127..127.
+//   C <dir1> <dir2> [duty1] [duty2]
+//                      Set Cytron MDD10A #1 directions and optional PWM duty, 0..255.
 //   X                  Immediate hard stop, keeps motion allowed.
 //   E                  Simulated/physical E-stop active: hard stop + latch inhibit.
 //   U                  E-stop released, restart still required.
@@ -14,15 +16,20 @@
 //
 // Wiring:
 //   Left Sabertooth S1  <- Teensy pin 1  (Serial1 TX)
-//   Right Sabertooth S1 <- Teensy pin 8  (Serial2 TX)
+//   Right Sabertooth S1 <- Teensy pin 29 (Serial7 TX)
 //   Sabertooth 0V       <-> Teensy GND
 //   Encoders red/black  -> Teensy 3.3V/GND
 //   Encoder A/B pins: FL 15/16, RL 17/18, FR 19/20, RR 21/22
+//   Cytron MDD10A #1 Act1: PWM <- pin 2, DIR <- pin 9
+//   Cytron MDD10A #1 Act2: PWM <- pin 3, DIR <- pin 28
 
 constexpr uint8_t ENCODER_COUNT = 4;
 constexpr uint8_t ENC_A[ENCODER_COUNT] = {15, 17, 19, 21};
 constexpr uint8_t ENC_B[ENCODER_COUNT] = {16, 18, 20, 22};
 
+constexpr uint8_t CYTRON_PWM[2] = {2, 3};
+constexpr uint8_t CYTRON_DIR[2] = {9, 28};
+constexpr uint8_t CYTRON_DEFAULT_DUTY = 255;
 constexpr uint8_t LEFT_ADDRESS = 128;
 constexpr uint8_t RIGHT_ADDRESS = 128;
 constexpr uint32_t USB_BAUD = 115200;
@@ -43,6 +50,8 @@ enum MotionState : uint8_t {
 volatile int32_t encoder_ticks[ENCODER_COUNT] = {0, 0, 0, 0};
 volatile uint8_t last_encoder_state[ENCODER_COUNT] = {0, 0, 0, 0};
 
+int8_t cytron_dir[2] = {0, 0};
+uint8_t cytron_duty[2] = {CYTRON_DEFAULT_DUTY, CYTRON_DEFAULT_DUTY};
 int target_left = 0;
 int target_right = 0;
 int command_left = 0;
@@ -109,10 +118,17 @@ void saberMotor(HardwareSerial &port, uint8_t address, bool motor2, int speed) {
 void writeMotorOutputs() {
   saberMotor(Serial1, LEFT_ADDRESS, false, command_left);
   saberMotor(Serial1, LEFT_ADDRESS, true, command_left);
-  saberMotor(Serial2, RIGHT_ADDRESS, false, command_right);
-  saberMotor(Serial2, RIGHT_ADDRESS, true, command_right);
+  saberMotor(Serial7, RIGHT_ADDRESS, false, command_right);
+  saberMotor(Serial7, RIGHT_ADDRESS, true, command_right);
   Serial1.flush();
-  Serial2.flush();
+  Serial7.flush();
+}
+
+void stopCytronOutputs() {
+  cytron_dir[0] = 0;
+  cytron_dir[1] = 0;
+  analogWrite(CYTRON_PWM[0], 0);
+  analogWrite(CYTRON_PWM[1], 0);
 }
 
 void hardStop() {
@@ -121,6 +137,7 @@ void hardStop() {
   command_left = 0;
   command_right = 0;
   writeMotorOutputs();
+  stopCytronOutputs();
 }
 
 void resetEncoders() {
@@ -214,7 +231,7 @@ void publishTelemetry(uint32_t now_ms) {
 }
 
 void printHelp() {
-  Serial.println("OK H V <left> <right> | X | E | U | R | Z");
+  Serial.println("OK H V <left> <right> | C <d1> <d2> [duty1] [duty2] | X | E | U | R | Z");
 }
 
 void engageEstop() {
@@ -266,6 +283,54 @@ void setVelocityTargets(char *args) {
   Serial.println(target_right);
 }
 
+void setCytronOutputs() {
+  for (uint8_t i = 0; i < 2; ++i) {
+    pinMode(CYTRON_PWM[i], OUTPUT);
+    pinMode(CYTRON_DIR[i], OUTPUT);
+    if (cytron_dir[i] == 0) {
+      analogWrite(CYTRON_PWM[i], 0);
+      digitalWrite(CYTRON_PWM[i], LOW);
+      continue;
+    }
+    digitalWrite(CYTRON_DIR[i], cytron_dir[i] > 0 ? HIGH : LOW);
+    if (cytron_duty[i] >= 255) {
+      digitalWrite(CYTRON_PWM[i], HIGH);
+    } else {
+      analogWrite(CYTRON_PWM[i], cytron_duty[i]);
+    }
+  }
+}
+
+void setCytronCommand(char *args) {
+  char *dir1_text = strtok(args, " ");
+  char *dir2_text = strtok(nullptr, " ");
+  char *duty1_text = strtok(nullptr, " ");
+  char *duty2_text = strtok(nullptr, " ");
+  if (dir1_text == nullptr || dir2_text == nullptr) {
+    Serial.println("ERR C expected_dir1_dir2");
+    return;
+  }
+
+  cytron_dir[0] = constrain(atoi(dir1_text), -1, 1);
+  cytron_dir[1] = constrain(atoi(dir2_text), -1, 1);
+  cytron_duty[0] = duty1_text == nullptr
+                     ? CYTRON_DEFAULT_DUTY
+                     : static_cast<uint8_t>(constrain(atoi(duty1_text), 0, 255));
+  cytron_duty[1] = duty2_text == nullptr
+                     ? CYTRON_DEFAULT_DUTY
+                     : static_cast<uint8_t>(constrain(atoi(duty2_text), 0, 255));
+  setCytronOutputs();
+
+  Serial.print("OK C ");
+  Serial.print(cytron_dir[0]);
+  Serial.print(' ');
+  Serial.print(cytron_dir[1]);
+  Serial.print(" duty ");
+  Serial.print(cytron_duty[0]);
+  Serial.print(' ');
+  Serial.println(cytron_duty[1]);
+}
+
 void handleLine(char *line) {
   while (*line == ' ') {
     ++line;
@@ -283,6 +348,10 @@ void handleLine(char *line) {
     case 'V':
     case 'v':
       setVelocityTargets(line);
+      break;
+    case 'C':
+    case 'c':
+      setCytronCommand(line);
       break;
     case 'X':
     case 'x':
@@ -371,14 +440,21 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENC_A[3]), updateEncoderRR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENC_B[3]), updateEncoderRR, CHANGE);
 
+  for (uint8_t i = 0; i < 2; ++i) {
+    pinMode(CYTRON_PWM[i], OUTPUT);
+    pinMode(CYTRON_DIR[i], OUTPUT);
+    analogWrite(CYTRON_PWM[i], 0);
+    digitalWrite(CYTRON_DIR[i], LOW);
+  }
+
   Serial.begin(USB_BAUD);
   Serial1.begin(SABER_BAUD);
-  Serial2.begin(SABER_BAUD);
+  Serial7.begin(SABER_BAUD);
   delay(1500);
 
   hardStop();
   saberSend(Serial1, LEFT_ADDRESS, 16, 20);
-  saberSend(Serial2, RIGHT_ADDRESS, 16, 20);
+  saberSend(Serial7, RIGHT_ADDRESS, 16, 20);
   last_velocity_command_ms = millis();
 
   Serial.println("BOOT innex1_teensy_drivetrain_serial v0");
