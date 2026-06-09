@@ -47,16 +47,16 @@
 
 | Pin(s) | Signal | Direction | Device | Notes |
 |--------|--------|-----------|--------|-------|
-| **0** | UART1 TX | → | Sabertooth 2×32 #1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
-| **7** | UART2 TX | → | Sabertooth 2×32 #2 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128 |
+| **1** | UART1 TX | → | Sabertooth 2×32 #1 | Left drivetrain (FL + RL). Packetised serial, 9600 baud, address 128 |
+| **29** | UART7 TX | → | Sabertooth 2×32 #2 | Right drivetrain (FR + RR). Packetised serial, 9600 baud, address 128 |
 | **2** | PWM ch1 | → | Cytron MDD10A #1 | Actuator 1 speed |
 | **3** | PWM ch2 | → | Cytron MDD10A #1 | Actuator 2 speed |
 | **9** | DIR ch1 | → | Cytron MDD10A #1 | Actuator 1 direction |
-| **10** | DIR ch2 | → | Cytron MDD10A #1 | Actuator 2 direction |
+| **28** | DIR ch2 | → | Cytron MDD10A #1 | Actuator 2 direction (relocated from pin 10 — solder fault) |
 | **4** | PWM ch1 | → | Cytron MDD10A #2 | Actuator 3 speed |
-| **5** | PWM ch2 | → | Cytron MDD10A #2 | Actuator 4 speed |
+| **7** | PWM ch2 | → | Cytron MDD10A #2 | Actuator 4 speed (relocated from pin 5 — solder fault) |
 | **11** | DIR ch1 | → | Cytron MDD10A #2 | Actuator 3 direction |
-| **12** | DIR ch2 | → | Cytron MDD10A #2 | Actuator 4 direction |
+| **8** | DIR ch2 | → | Cytron MDD10A #2 | Actuator 4 direction (relocated from pin 12 — solder fault) |
 | **6** | PWM (SV) | → | BLD-510B | Excavation speed — direct 1–2 kHz PWM to SV pin (no external RC filter needed; driver accepts PWM directly) |
 | **13** | GPIO (F/R) | → | BLD-510B | Excavation direction — active-low |
 | **14** | GPIO (EN) | → | BLD-510B | Excavation enable — active-low |
@@ -93,8 +93,8 @@
 | Interface | Protocol | Connected To |
 |-----------|----------|-------------|
 | USB (virtual COM) | Serial | Jetson Orin Nano — bidirectional |
-| UART1 (Pin 0) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
-| UART2 (Pin 7) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) |
+| UART1 (Pin 1) | Packetised serial, 9600 baud | Sabertooth 2×32 #1 (TX only) |
+| UART7 (Pin 29) | Packetised serial, 9600 baud | Sabertooth 2×32 #2 (TX only) |
 | GPIO PWM (Pins 2–6) | PWM + DIR | Cytron MDD10A #1 and #2, BLD-510B SV |
 | GPIO (Pins 13–14) | Digital out, active-low | BLD-510B F/R and EN |
 | GPIO (Pins 15–22) | Quadrature encoder input | 4× GR-WM4-V3 drivetrain motor encoders |
