@@ -108,10 +108,10 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ```
 
-Start the bridge with a low throttle cap:
+Start the bridge with the bench throttle cap:
 
 ```bash
-ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.25
+ros2 launch lunabot_drivetrain drivetrain_bench.launch.py max_throttle:=0.8
 ```
 
 In a second terminal, send a short forward command:

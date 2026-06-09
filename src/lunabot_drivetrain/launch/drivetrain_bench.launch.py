@@ -129,7 +129,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "max_throttle",
-                default_value="0.2",
+                default_value="0.8",
                 description="Temporary throttle cap for first-motion tests.",
             ),
             DeclareLaunchArgument(
