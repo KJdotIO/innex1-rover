@@ -42,6 +42,9 @@ class TeensyTelemetry:
     command_left: int
     command_right: int
     encoder_ticks: list[int]
+    bldc_speed: int = 0
+    bldc_pg_count: int = 0
+    bldc_alarm_active: bool = False
 
 
 def throttle_to_command(value: float) -> int:
@@ -112,14 +115,23 @@ def send_zero_encoders(port: serial.Serial) -> None:
     port.write(zero_encoders_to_bytes())
 
 
+def bldc_to_bytes(speed: int) -> bytes:
+    clamped = max(-MAX_COMMAND, min(MAX_COMMAND, int(speed)))
+    return f"B {clamped}\n".encode("ascii")
+
+
+def send_bldc_cmd(port: serial.Serial, speed: int) -> None:
+    port.write(bldc_to_bytes(speed))
+
+
 def parse_telemetry_line(line: bytes | str) -> TeensyTelemetry | None:
     """Parse a Teensy telemetry line, returning ``None`` for other log lines."""
     text = line.decode("ascii", errors="replace") if isinstance(line, bytes) else line
     fields = text.strip().split()
     if not fields or fields[0] != "T":
         return None
-    if len(fields) != 13:
-        raise ValueError(f"expected 13 telemetry fields, got {len(fields)}")
+    if len(fields) not in {13, 16}:
+        raise ValueError(f"expected 13 or 16 telemetry fields, got {len(fields)}")
 
     return TeensyTelemetry(
         millis=int(fields[1]),
@@ -138,6 +150,9 @@ def parse_telemetry_line(line: bytes | str) -> TeensyTelemetry | None:
             int(fields[10]),
             int(fields[12]),
         ],
+        bldc_speed=int(fields[13]) if len(fields) == 16 else 0,
+        bldc_pg_count=int(fields[14]) if len(fields) == 16 else 0,
+        bldc_alarm_active=bool(int(fields[15])) if len(fields) == 16 else False,
     )
 
 

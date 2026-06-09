@@ -161,7 +161,7 @@ class TeleopController:
             ros, "/deposition/actuator/cmd", "std_msgs/Int8MultiArray"
         )
         self._bldc_pub = roslibpy.Topic(
-            ros, "/bldc/cmd", "std_msgs/Int8"
+            ros, "/excavation/bldc/cmd", "std_msgs/Int8"
         )
         self._estop_pub = roslibpy.Topic(
             ros, "/safety/estop", "std_msgs/Bool"

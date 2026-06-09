@@ -31,7 +31,7 @@ from rclpy.qos import (
     ReliabilityPolicy,
 )
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool, Int8MultiArray
+from std_msgs.msg import Bool, Int8, Int8MultiArray, Int32MultiArray
 
 from lunabot_drivetrain import sabertooth_serial, teensy_serial
 from lunabot_interfaces.msg import (
@@ -88,6 +88,8 @@ class DrivetrainBridge(Node):
         self.declare_parameter("wheel_radius_m", 0.065)
         self.declare_parameter("encoder_counts_per_rev", 720)
         self.declare_parameter("command_timeout_s", 0.5)
+        self.declare_parameter("bldc_command_timeout_s", 1.0)
+        self.declare_parameter("bldc_feed_period_s", 0.1)
         self.declare_parameter("max_throttle", 1.0)
         self.declare_parameter("stall_throttle_threshold", 0.15)
         self.declare_parameter("stall_min_velocity_rps", 0.05)
@@ -119,6 +121,12 @@ class DrivetrainBridge(Node):
         ).value
         self._cmd_timeout = self.get_parameter(
             "command_timeout_s"
+        ).value
+        self._bldc_timeout = self.get_parameter(
+            "bldc_command_timeout_s"
+        ).value
+        self._bldc_feed_period = self.get_parameter(
+            "bldc_feed_period_s"
         ).value
         self._max_throttle = self.get_parameter("max_throttle").value
         self._stall_thresh = self.get_parameter(
@@ -178,6 +186,16 @@ class DrivetrainBridge(Node):
             raise ValueError(
                 f"command_timeout_s must be positive: {self._cmd_timeout}"
             )
+        if self._bldc_timeout <= 0.0:
+            raise ValueError(
+                "bldc_command_timeout_s must be positive: "
+                f"{self._bldc_timeout}"
+            )
+        if self._bldc_feed_period <= 0.0:
+            raise ValueError(
+                "bldc_feed_period_s must be positive: "
+                f"{self._bldc_feed_period}"
+            )
         if self._stall_thresh < 0.0:
             raise ValueError(
                 "stall_throttle_threshold must be zero or positive: "
@@ -208,11 +226,15 @@ class DrivetrainBridge(Node):
         self._motion_inhibited = False
         self._estop_active = False
         self._last_cmd_time: float | None = None
+        self._bldc_target = 0
+        self._last_bldc_cmd_time: float | None = None
+        self._last_bldc_feed_time: float | None = None
         self._last_twist = Twist()
         self._encoder_ticks = [0, 0, 0, 0]
         self._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
         self._last_teensy_ticks: list[int] | None = None
         self._last_teensy_sample_time: float | None = None
+        self._bldc_feedback = [0, 0, 0]
         self._controller_online = [False, False]
         self._stall_start_time: float | None = None
         self._estop_clear_time: float | None = None
@@ -316,11 +338,20 @@ class DrivetrainBridge(Node):
             self._deposition_actuator_cmd_callback,
             10,
         )
+        self._bldc_sub = self.create_subscription(
+            Int8,
+            "/excavation/bldc/cmd",
+            self._bldc_cmd_callback,
+            10,
+        )
         self._status_pub = self.create_publisher(
             DrivetrainStatus, "/drivetrain/status", 10
         )
         self._telem_pub = self.create_publisher(
             DrivetrainTelemetry, "/drivetrain/telemetry", 10
+        )
+        self._bldc_feedback_pub = self.create_publisher(
+            Int32MultiArray, "/excavation/bldc/feedback", 10
         )
         self._odom_pub = self.create_publisher(
             Odometry, "/odom_wheels", 10
@@ -376,6 +407,22 @@ class DrivetrainBridge(Node):
                 f"Deposition actuator serial write failed: {exc}"
             )
 
+    def _bldc_cmd_callback(self, msg: Int8) -> None:
+        if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
+            return
+        speed = max(
+            -teensy_serial.MAX_COMMAND,
+            min(teensy_serial.MAX_COMMAND, int(msg.data)),
+        )
+        now = time.monotonic()
+        self._bldc_target = speed
+        self._last_bldc_cmd_time = now if speed != 0 else None
+        self._last_bldc_feed_time = now
+        try:
+            teensy_serial.send_bldc_cmd(self._serial, speed)
+        except OSError as exc:
+            self._mark_controller_offline(f"BLDC serial write failed: {exc}")
+
     def _estop_callback(self, msg: Bool) -> None:
         """Update e-stop state."""
         prev = self._estop_active
@@ -426,15 +473,17 @@ class DrivetrainBridge(Node):
             or (now - self._last_cmd_time) > self._cmd_timeout
         )
         if cmd_stale:
-            self._send_stop()
+            self._send_drive_stop()
             if self._state == DrivetrainStatus.STATE_DRIVING:
                 self._transition_to(DrivetrainStatus.STATE_READY)
+            self._service_bldc(now)
             return
 
         linear_x = self._last_twist.linear.x
         angular_z = self._last_twist.angular.z
         left, right = self._twist_to_wheel_speeds(linear_x, angular_z)
         self._send_wheel_throttles(left, right)
+        self._service_bldc(now)
 
         if abs(left) > 0.01 or abs(right) > 0.01:
             self._transition_to(DrivetrainStatus.STATE_DRIVING)
@@ -532,6 +581,51 @@ class DrivetrainBridge(Node):
         except OSError as exc:
             self._mark_controller_offline(f"Serial stop failed: {exc}")
 
+    def _send_drive_stop(self) -> None:
+        if self._serial is None:
+            return
+        try:
+            if self._serial_protocol in _TEENSY_PROTOCOLS:
+                teensy_serial.send_throttle(self._serial, 0.0, 0.0)
+                return
+            self._send_stop()
+        except OSError as exc:
+            self._mark_controller_offline(f"Serial drive stop failed: {exc}")
+
+    def _service_bldc(self, now: float) -> None:
+        if (
+            self._serial is None
+            or self._serial_protocol not in _TEENSY_PROTOCOLS
+            or self._bldc_target == 0
+        ):
+            return
+        stale = (
+            self._last_bldc_cmd_time is None
+            or (now - self._last_bldc_cmd_time) > self._bldc_timeout
+        )
+        if stale:
+            self._bldc_target = 0
+            self._last_bldc_cmd_time = None
+            self._last_bldc_feed_time = now
+            try:
+                teensy_serial.send_bldc_cmd(self._serial, 0)
+            except OSError as exc:
+                self._mark_controller_offline(
+                    f"BLDC serial stop failed: {exc}"
+                )
+            return
+        should_feed = (
+            self._last_bldc_feed_time is None
+            or (now - self._last_bldc_feed_time) >= self._bldc_feed_period
+        )
+        if not should_feed:
+            return
+        self._last_bldc_feed_time = now
+        try:
+            teensy_serial.send_bldc_cmd(self._serial, self._bldc_target)
+        except OSError as exc:
+            self._mark_controller_offline(f"BLDC serial feed failed: {exc}")
+
     def _send_estop(self) -> None:
         """Send a software e-stop latch when the backend supports one."""
         if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
@@ -601,6 +695,11 @@ class DrivetrainBridge(Node):
                 self._integrate_wheel_odom(dt)
 
         self._encoder_ticks = ticks
+        self._bldc_feedback = [
+            int(telemetry.bldc_speed),
+            int(telemetry.bldc_pg_count),
+            1 if telemetry.bldc_alarm_active else 0,
+        ]
         self._last_teensy_ticks = list(ticks)
         self._last_teensy_sample_time = now
         self._controller_online = [True, True]
@@ -647,6 +746,10 @@ class DrivetrainBridge(Node):
         telem.motion_inhibited = self._motion_inhibited
         telem.fault_code = self._fault_code
         self._telem_pub.publish(telem)
+
+        bldc = Int32MultiArray()
+        bldc.data = list(self._bldc_feedback)
+        self._bldc_feedback_pub.publish(bldc)
 
         self._publish_odom(now)
         self._publish_joint_state(now)
