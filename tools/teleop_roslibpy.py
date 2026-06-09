@@ -46,7 +46,7 @@ import roslibpy
 AXIS_LINEAR = 1       # Left stick Y
 AXIS_ANGULAR = 2      # Right stick X
 DEADMAN_BUTTON = 4    # LB / Left Bumper
-ESTOP_BUTTON = 6      # Back button — emergency stop
+ESTOP_BUTTON = 6      # Back button — publishes to /safety/estop
 AXIS_LT        = 4   # Left trigger (released = -1, full = +1) — turbo
 
 # Cytron MDD10A #1 actuator buttons — both channels move together (deadman must also be held)
@@ -59,15 +59,10 @@ BTN_ACT_RETRACT = 0  # A
 BTN_ACT2_EXTEND  = 2  # X → extend doors  [1,  1]
 BTN_ACT2_RETRACT = 1  # B → retract doors [-1, -1]
 
-# BLDC (excavation) — deadman required
-# RB (button 5) = clockwise at fixed test speed
-# RT (axis 5)   = counter-clockwise, proportional to trigger depth
-BLDC_CW_BUTTON = 5   # RB — clockwise
-AXIS_RT        = 5   # Right trigger (released = -1, full = +1) — counter-clockwise
-
-# Slew-rate limit: max speed change per loop tick.
-# At 20 Hz, BLDC_RAMP_STEP=4 → ~1 s to reach full speed (80 units).
-BLDC_RAMP_STEP = 4
+# BLDC (excavation) — not yet wired: drivetrain_bridge has no /bldc/cmd subscriber.
+# Buttons reserved here for when the Jetson bridge gains BLDC topic support.
+# BLDC_CW_BUTTON = 5   # RB — clockwise
+# AXIS_RT        = 5   # Right trigger — counter-clockwise
 
 # Speed limits matching xbox_teleop.yaml
 SCALE_LINEAR = 0.35        # m/s normal
@@ -160,8 +155,8 @@ class TeleopController:
         self._deposition_pub = roslibpy.Topic(
             ros, "/deposition/actuator/cmd", "std_msgs/Int8MultiArray"
         )
-        self._bldc_pub = roslibpy.Topic(
-            ros, "/bldc/cmd", "std_msgs/Int8"
+        self._estop_pub = roslibpy.Topic(
+            ros, "/safety/estop", "std_msgs/Bool"
         )
         self._running = False
         self._lock = threading.Lock()
@@ -194,8 +189,7 @@ class TeleopController:
         print(f"  Right stick X (axis {AXIS_ANGULAR})  → turn left / right")
         print(f"  Button {self._deadman}               → DEADMAN (hold to drive)")
         print(f"  LT (axis {AXIS_LT})             → TURBO (hold for speed)")
-        print(f"  RB (button 5)             → BLDC clockwise")
-        print(f"  RT (axis {AXIS_RT})             → BLDC counter-clockwise")
+        print(f"  Back (button {ESTOP_BUTTON})           → E-STOP (publishes to /safety/estop)")
         print(f"  Ctrl+C                    → quit")
         print(f"──────────────────────────────────────────\n")
 
@@ -230,11 +224,10 @@ class TeleopController:
         self._publisher.advertise()
         self._actuator_pub.advertise()
         self._deposition_pub.advertise()
-        self._bldc_pub.advertise()
+        self._estop_pub.advertise()
         self._last_actuator   = [0, 0]
         self._last_deposition = [0, 0]
-        self._last_bldc       = 0
-        self._bldc_current    = 0   # ramped output, stepped towards target each tick
+        self._prev_estop_btn  = False
         period = 1.0 / PUBLISH_HZ
 
         print("[ACTIVE] Teleop running -- hold deadman button and move sticks to drive")
@@ -282,25 +275,13 @@ class TeleopController:
                     }))
                     self._last_deposition = [dep_dir, dep_dir]
 
-                # BLDC — deadman must be held; RB = clockwise, RT = counter-clockwise
-                # Target is computed from inputs; actual output ramps towards it
-                # at BLDC_RAMP_STEP per tick to prevent mechanical shock.
-                bldc_target = 0
-                if deadman_held:
-                    rb_held = self._js.get_button(BLDC_CW_BUTTON)
-                    rt_val = (self._js.get_axis(AXIS_RT) + 1.0) / 2.0  # 0..1
-                    if rb_held:
-                        bldc_target = 80
-                    elif rt_val > 0.05:
-                        bldc_target = -int(round(rt_val * 127))
-                bldc_target = max(-127, min(127, bldc_target))
-                # Slew toward target one step at a time
-                if self._bldc_current < bldc_target:
-                    self._bldc_current = min(bldc_target, self._bldc_current + BLDC_RAMP_STEP)
-                elif self._bldc_current > bldc_target:
-                    self._bldc_current = max(bldc_target, self._bldc_current - BLDC_RAMP_STEP)
-                self._bldc_pub.publish(roslibpy.Message({"data": self._bldc_current}))
-                self._last_bldc = self._bldc_current
+                # E-stop — Back button, edge-triggered: publish True on press.
+                # Release / restart is handled by the Jetson safety stack (U + R commands).
+                estop_btn = self._js.get_button(ESTOP_BUTTON)
+                if estop_btn and not self._prev_estop_btn:
+                    self._estop_pub.publish(roslibpy.Message({"data": True}))
+                    print("\n[E-STOP] Published to /safety/estop — motors latched off.")
+                self._prev_estop_btn = estop_btn
 
                 # Update the pygame window with current status
                 lin = twist["linear"]["x"]
@@ -329,13 +310,11 @@ class TeleopController:
                 "layout": {"dim": [], "data_offset": 0},
                 "data": [0, 0],
             }))
-            self._bldc_current = 0
-            self._bldc_pub.publish(roslibpy.Message({"data": 0}))
             time.sleep(0.05)
             self._publisher.unadvertise()
             self._actuator_pub.unadvertise()
             self._deposition_pub.unadvertise()
-            self._bldc_pub.unadvertise()
+            self._estop_pub.unadvertise()
             print("\n[STOPPED] Teleop stopped -- zero velocity sent.")
 
     def stop(self) -> None:
@@ -392,8 +371,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--topic",
-        default="/cmd_vel_teleop",
-        help="ROS topic to publish Twist on (default: /cmd_vel_teleop)",
+        default="/cmd_vel_safe",
+        help="ROS topic to publish Twist on (default: /cmd_vel_safe)",
     )
     parser.add_argument(
         "--joy-id", type=int, default=0,
