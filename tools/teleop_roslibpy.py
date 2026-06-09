@@ -302,7 +302,9 @@ class TeleopController:
                     elif rt_val > 0.05:
                         bldc_target = -int(round(rt_val * 127))
                 bldc_target = max(-127, min(127, bldc_target))
-                if self._bldc_current < bldc_target:
+                if not deadman_held:
+                    self._bldc_current = 0
+                elif self._bldc_current < bldc_target:
                     self._bldc_current = min(bldc_target, self._bldc_current + BLDC_RAMP_STEP)
                 elif self._bldc_current > bldc_target:
                     self._bldc_current = max(bldc_target, self._bldc_current - BLDC_RAMP_STEP)
