@@ -27,7 +27,7 @@
 //   Cytron MDD10A #1 Act2: PWM <- pin 3, DIR <- pin 28
 //   Cytron MDD10A #2 Act1: PWM <- pin 33, DIR <- pin 11
 //   Cytron MDD10A #2 Act2: PWM <- pin 41, DIR <- pin 12
-//   BLD-510B: SV speed <- pin 6, F/R <- pin 13, EN <- pin 14
+//   BLD-510B: SV speed <- pin 6, F/R <- pin 13, EN <- pin 14, PG <- pin 31, ALM <- pin 32
 
 constexpr uint8_t ENCODER_COUNT = 4;
 constexpr uint8_t ENC_A[ENCODER_COUNT] = {15, 17, 19, 21};
@@ -40,6 +40,8 @@ constexpr uint8_t CYTRON_DEFAULT_DUTY = 255;
 constexpr uint8_t BLDC_PWM = 6;
 constexpr uint8_t BLDC_DIR = 13;
 constexpr uint8_t BLDC_EN = 14;
+constexpr uint8_t BLDC_PG = 31;
+constexpr uint8_t BLDC_ALM = 32;
 constexpr uint8_t LEFT_ADDRESS = 128;
 constexpr uint8_t RIGHT_ADDRESS = 128;
 constexpr uint32_t USB_BAUD = 115200;
@@ -59,6 +61,7 @@ enum MotionState : uint8_t {
 
 volatile int32_t encoder_ticks[ENCODER_COUNT] = {0, 0, 0, 0};
 volatile uint8_t last_encoder_state[ENCODER_COUNT] = {0, 0, 0, 0};
+volatile uint32_t bldc_pg_count = 0;
 
 int8_t cytron_dir[CYTRON_COUNT] = {0, 0, 0, 0};
 uint8_t cytron_duty[CYTRON_COUNT] = {
@@ -115,6 +118,7 @@ void updateEncoderFL() { updateEncoder(0); }
 void updateEncoderRL() { updateEncoder(1); }
 void updateEncoderFR() { updateEncoder(2); }
 void updateEncoderRR() { updateEncoder(3); }
+void updateBldcPg() { ++bldc_pg_count; }
 
 void saberSend(HardwareSerial &port, uint8_t address, uint8_t command, uint8_t value) {
   const uint8_t checksum = (address + command + value) & 0x7F;
@@ -229,11 +233,14 @@ void publishTelemetry(uint32_t now_ms) {
   last_telemetry_ms = now_ms;
 
   int32_t ticks[ENCODER_COUNT];
+  uint32_t pg_count;
   noInterrupts();
   for (uint8_t i = 0; i < ENCODER_COUNT; ++i) {
     ticks[i] = encoder_ticks[i];
   }
+  pg_count = bldc_pg_count;
   interrupts();
+  const uint8_t alarm_active = digitalReadFast(BLDC_ALM) == LOW ? 1 : 0;
 
   Serial.print("T ");
   Serial.print(now_ms);
@@ -255,6 +262,12 @@ void publishTelemetry(uint32_t now_ms) {
     Serial.print(' ');
     Serial.print(ticks[i]);
   }
+  Serial.print(' ');
+  Serial.print(bldc_speed);
+  Serial.print(' ');
+  Serial.print(pg_count);
+  Serial.print(' ');
+  Serial.print(alarm_active);
   Serial.println();
 }
 
@@ -534,6 +547,9 @@ void setup() {
   pinMode(BLDC_PWM, OUTPUT);
   pinMode(BLDC_DIR, OUTPUT);
   pinMode(BLDC_EN, OUTPUT);
+  pinMode(BLDC_PG, INPUT_PULLUP);
+  pinMode(BLDC_ALM, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BLDC_PG), updateBldcPg, FALLING);
   analogWriteFrequency(BLDC_PWM, 1000);
   analogWrite(BLDC_PWM, 0);
   digitalWrite(BLDC_DIR, HIGH);

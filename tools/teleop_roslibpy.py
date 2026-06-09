@@ -326,9 +326,6 @@ class TeleopController:
                     f"Topic: {self._publisher.name}",
                 )
 
-                # Sleep only for the remaining time in this period so the loop
-                # runs at a steady PUBLISH_HZ regardless of processing overhead.
-                # This keeps the BLDC watchdog (500 ms) fed reliably.
                 elapsed = time.monotonic() - t_loop_start
                 time.sleep(max(0.0, period - elapsed))
         except KeyboardInterrupt:

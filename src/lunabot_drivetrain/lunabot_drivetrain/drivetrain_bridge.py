@@ -410,6 +410,15 @@ class DrivetrainBridge(Node):
     def _bldc_cmd_callback(self, msg: Int8) -> None:
         if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
             return
+        if (
+            self._state == DrivetrainStatus.STATE_FAULT
+            or self._estop_active
+            or self._motion_inhibited
+        ):
+            self._bldc_target = 0
+            self._last_bldc_cmd_time = None
+            self._last_bldc_feed_time = None
+            return
         speed = max(
             -teensy_serial.MAX_COMMAND,
             min(teensy_serial.MAX_COMMAND, int(msg.data)),
