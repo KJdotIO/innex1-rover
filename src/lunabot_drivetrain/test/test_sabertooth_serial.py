@@ -384,6 +384,11 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._state = DrivetrainStatus.STATE_READY
         bridge._estop_active = False
         bridge._motion_inhibited = False
+        bridge._actuator_target = [0, 0]
+        bridge._last_actuator_cmd_time = None
+        bridge._deposition_actuator_target = [0, 0]
+        bridge._last_deposition_actuator_cmd_time = None
+        bridge._actuator_timeout = 0.5
         bridge._bldc_target = 0
         bridge._last_bldc_cmd_time = None
         bridge._last_bldc_feed_time = None
@@ -476,6 +481,8 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._actuator_cmd_callback(msg)
 
         assert calls == [(bridge._serial, 1, 1)]
+        assert bridge._actuator_target == [1, 1]
+        assert bridge._last_actuator_cmd_time is not None
 
     def test_deposition_actuator_topic_uses_teensy_cytron_two_path(self, monkeypatch):
         from std_msgs.msg import Int8MultiArray
@@ -494,6 +501,67 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._deposition_actuator_cmd_callback(msg)
 
         assert calls == [(bridge._serial, 1, -1)]
+        assert bridge._deposition_actuator_target == [1, -1]
+        assert bridge._last_deposition_actuator_cmd_time is not None
+
+    def test_actuator_topic_drops_commands_while_motion_inhibited(self, monkeypatch):
+        from std_msgs.msg import Int8MultiArray
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_actuator_cmd",
+            lambda *_args: pytest.fail("unexpected actuator write"),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._motion_inhibited = True
+        bridge._actuator_target = [-1, -1]
+        bridge._last_actuator_cmd_time = 10.0
+        msg = Int8MultiArray()
+        msg.data = [-1, -1]
+
+        bridge._actuator_cmd_callback(msg)
+
+        assert bridge._actuator_target == [0, 0]
+        assert bridge._last_actuator_cmd_time is None
+
+    def test_actuator_service_stops_stale_command(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_actuator_cmd",
+            lambda port, dir1, dir2: calls.append((port, dir1, dir2)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._actuator_target = [-1, -1]
+        bridge._last_actuator_cmd_time = 10.0
+
+        bridge._service_actuators(10.6)
+
+        assert calls == [(bridge._serial, 0, 0)]
+        assert bridge._actuator_target == [0, 0]
+        assert bridge._last_actuator_cmd_time is None
+
+    def test_deposition_actuator_service_stops_stale_command(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_deposition_actuator_cmd",
+            lambda port, dir1, dir2: calls.append((port, dir1, dir2)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._deposition_actuator_target = [-1, -1]
+        bridge._last_deposition_actuator_cmd_time = 10.0
+
+        bridge._service_actuators(10.6)
+
+        assert calls == [(bridge._serial, 0, 0)]
+        assert bridge._deposition_actuator_target == [0, 0]
+        assert bridge._last_deposition_actuator_cmd_time is None
 
     def test_bldc_topic_uses_teensy_bldc_path(self, monkeypatch):
         from std_msgs.msg import Int8

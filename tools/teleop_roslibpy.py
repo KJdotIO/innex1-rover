@@ -267,12 +267,13 @@ class TeleopController:
                         act_dir = 1
                     elif self._js.get_button(BTN_ACT_RETRACT):
                         act_dir = -1
-                if [act_dir, act_dir] != self._last_actuator:
+                act_msg = [act_dir, act_dir]
+                if act_msg != [0, 0] or act_msg != self._last_actuator:
                     self._actuator_pub.publish(roslibpy.Message({
                         "layout": {"dim": [], "data_offset": 0},
-                        "data": [act_dir, act_dir],
+                        "data": act_msg,
                     }))
-                    self._last_actuator = [act_dir, act_dir]
+                    self._last_actuator = act_msg
 
                 # Deposition doors (X/B) — deadman must be held
                 dep_dir = 0
@@ -281,12 +282,13 @@ class TeleopController:
                         dep_dir = 1
                     elif self._js.get_button(BTN_ACT2_RETRACT):
                         dep_dir = -1
-                if [dep_dir, dep_dir] != self._last_deposition:
+                dep_msg = [dep_dir, dep_dir]
+                if dep_msg != [0, 0] or dep_msg != self._last_deposition:
                     self._deposition_pub.publish(roslibpy.Message({
                         "layout": {"dim": [], "data_offset": 0},
-                        "data": [dep_dir, dep_dir],
+                        "data": dep_msg,
                     }))
-                    self._last_deposition = [dep_dir, dep_dir]
+                    self._last_deposition = dep_msg
 
                 # BLDC — deadman must be held; RB = clockwise, RT = counter-clockwise.
                 # Target speed is computed from inputs; actual output ramps towards it

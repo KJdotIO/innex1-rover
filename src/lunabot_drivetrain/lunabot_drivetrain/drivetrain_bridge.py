@@ -88,6 +88,7 @@ class DrivetrainBridge(Node):
         self.declare_parameter("wheel_radius_m", 0.065)
         self.declare_parameter("encoder_counts_per_rev", 720)
         self.declare_parameter("command_timeout_s", 0.5)
+        self.declare_parameter("actuator_command_timeout_s", 0.5)
         self.declare_parameter("bldc_command_timeout_s", 1.0)
         self.declare_parameter("bldc_feed_period_s", 0.1)
         self.declare_parameter("max_throttle", 1.0)
@@ -121,6 +122,9 @@ class DrivetrainBridge(Node):
         ).value
         self._cmd_timeout = self.get_parameter(
             "command_timeout_s"
+        ).value
+        self._actuator_timeout = self.get_parameter(
+            "actuator_command_timeout_s"
         ).value
         self._bldc_timeout = self.get_parameter(
             "bldc_command_timeout_s"
@@ -186,6 +190,11 @@ class DrivetrainBridge(Node):
             raise ValueError(
                 f"command_timeout_s must be positive: {self._cmd_timeout}"
             )
+        if self._actuator_timeout <= 0.0:
+            raise ValueError(
+                "actuator_command_timeout_s must be positive: "
+                f"{self._actuator_timeout}"
+            )
         if self._bldc_timeout <= 0.0:
             raise ValueError(
                 "bldc_command_timeout_s must be positive: "
@@ -226,6 +235,10 @@ class DrivetrainBridge(Node):
         self._motion_inhibited = False
         self._estop_active = False
         self._last_cmd_time: float | None = None
+        self._actuator_target = [0, 0]
+        self._last_actuator_cmd_time: float | None = None
+        self._deposition_actuator_target = [0, 0]
+        self._last_deposition_actuator_cmd_time: float | None = None
         self._bldc_target = 0
         self._last_bldc_cmd_time: float | None = None
         self._last_bldc_feed_time: float | None = None
@@ -382,11 +395,21 @@ class DrivetrainBridge(Node):
             return
         if len(msg.data) < 2:
             return
+        if self._auxiliary_motion_inhibited():
+            self._actuator_target = [0, 0]
+            self._last_actuator_cmd_time = None
+            return
+        dir1 = int(msg.data[0])
+        dir2 = int(msg.data[1])
+        self._actuator_target = [dir1, dir2]
+        self._last_actuator_cmd_time = (
+            time.monotonic() if dir1 != 0 or dir2 != 0 else None
+        )
         try:
             teensy_serial.send_actuator_cmd(
                 self._serial,
-                int(msg.data[0]),
-                int(msg.data[1]),
+                dir1,
+                dir2,
             )
         except OSError as exc:
             self._mark_controller_offline(f"Actuator serial write failed: {exc}")
@@ -396,11 +419,21 @@ class DrivetrainBridge(Node):
             return
         if len(msg.data) < 2:
             return
+        if self._auxiliary_motion_inhibited():
+            self._deposition_actuator_target = [0, 0]
+            self._last_deposition_actuator_cmd_time = None
+            return
+        dir1 = int(msg.data[0])
+        dir2 = int(msg.data[1])
+        self._deposition_actuator_target = [dir1, dir2]
+        self._last_deposition_actuator_cmd_time = (
+            time.monotonic() if dir1 != 0 or dir2 != 0 else None
+        )
         try:
             teensy_serial.send_deposition_actuator_cmd(
                 self._serial,
-                int(msg.data[0]),
-                int(msg.data[1]),
+                dir1,
+                dir2,
             )
         except OSError as exc:
             self._mark_controller_offline(
@@ -410,11 +443,7 @@ class DrivetrainBridge(Node):
     def _bldc_cmd_callback(self, msg: Int8) -> None:
         if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
             return
-        if (
-            self._state == DrivetrainStatus.STATE_FAULT
-            or self._estop_active
-            or self._motion_inhibited
-        ):
+        if self._auxiliary_motion_inhibited():
             self._bldc_target = 0
             self._last_bldc_cmd_time = None
             self._last_bldc_feed_time = None
@@ -448,9 +477,11 @@ class DrivetrainBridge(Node):
 
         if self._state == DrivetrainStatus.STATE_FAULT:
             self._send_stop()
+            self._clear_auxiliary_targets()
             return
         if self._estop_active or self._motion_inhibited:
             self._send_stop()
+            self._clear_auxiliary_targets()
             if self._estop_active:
                 self._transition_to(DrivetrainStatus.STATE_ESTOP)
             return
@@ -475,8 +506,10 @@ class DrivetrainBridge(Node):
                     "Sabertooth re-init complete — READY"
                 )
             self._send_stop()
+            self._clear_auxiliary_targets()
             return
 
+        self._service_actuators(now)
         cmd_stale = (
             self._last_cmd_time is None
             or (now - self._last_cmd_time) > self._cmd_timeout
@@ -600,6 +633,66 @@ class DrivetrainBridge(Node):
             self._send_stop()
         except OSError as exc:
             self._mark_controller_offline(f"Serial drive stop failed: {exc}")
+
+    def _auxiliary_motion_inhibited(self) -> bool:
+        return (
+            self._state == DrivetrainStatus.STATE_FAULT
+            or self._estop_active
+            or self._motion_inhibited
+        )
+
+    def _clear_auxiliary_targets(self) -> None:
+        self._actuator_target = [0, 0]
+        self._last_actuator_cmd_time = None
+        self._deposition_actuator_target = [0, 0]
+        self._last_deposition_actuator_cmd_time = None
+        self._bldc_target = 0
+        self._last_bldc_cmd_time = None
+        self._last_bldc_feed_time = None
+
+    def _service_actuators(self, now: float) -> None:
+        self._service_actuator_pair(
+            now,
+            target_attr="_actuator_target",
+            timestamp_attr="_last_actuator_cmd_time",
+            send_stop=teensy_serial.send_actuator_cmd,
+            label="Bucket ladder actuator",
+        )
+        self._service_actuator_pair(
+            now,
+            target_attr="_deposition_actuator_target",
+            timestamp_attr="_last_deposition_actuator_cmd_time",
+            send_stop=teensy_serial.send_deposition_actuator_cmd,
+            label="Deposition actuator",
+        )
+
+    def _service_actuator_pair(
+        self,
+        now: float,
+        *,
+        target_attr: str,
+        timestamp_attr: str,
+        send_stop: Any,
+        label: str,
+    ) -> None:
+        if self._serial is None or self._serial_protocol not in _TEENSY_PROTOCOLS:
+            return
+        target = getattr(self, target_attr)
+        if target == [0, 0]:
+            return
+        last_cmd_time = getattr(self, timestamp_attr)
+        stale = (
+            last_cmd_time is None
+            or (now - last_cmd_time) > self._actuator_timeout
+        )
+        if not stale:
+            return
+        setattr(self, target_attr, [0, 0])
+        setattr(self, timestamp_attr, None)
+        try:
+            send_stop(self._serial, 0, 0)
+        except OSError as exc:
+            self._mark_controller_offline(f"{label} stop failed: {exc}")
 
     def _service_bldc(self, now: float) -> None:
         if (

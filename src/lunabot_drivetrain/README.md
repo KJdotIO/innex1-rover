@@ -56,6 +56,10 @@ State machine: `UNINITIALISED → READY ⇄ DRIVING → FAULT` and `ESTOP`.
   the Sabertooth to reboot before transitioning back to READY.
 - **Command timeout**: if no `cmd_vel` arrives within `command_timeout_s`, motors
   are stopped.
+- **Actuator timeout**: Cytron actuator outputs are hold-to-run. Non-zero
+  `/actuator/cmd` and `/deposition/actuator/cmd` commands must be refreshed
+  before `actuator_command_timeout_s`, otherwise the bridge sends `[0, 0]` to
+  the relevant Cytron so a missed stop message cannot leave an actuator latched.
 - **Excavation BLDC**: with `serial_protocol:=teensy_line`,
   `/excavation/bldc/cmd` forwards signed speed commands to the Teensy firmware
   `B <speed>` command. Valid values are clamped to `-127..127`; publish `0` to
