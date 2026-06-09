@@ -109,6 +109,14 @@ def _install_ros_fakes():
         def __init__(self):
             self.data = []
 
+    class Int32MultiArray:
+        def __init__(self):
+            self.data = []
+
+    class Int8:
+        def __init__(self):
+            self.data = 0
+
     class Node:
         pass
 
@@ -142,7 +150,9 @@ def _install_ros_fakes():
     std_msgs = types.ModuleType("std_msgs")
     std_msg = types.ModuleType("std_msgs.msg")
     std_msg.Bool = Bool
+    std_msg.Int8 = Int8
     std_msg.Int8MultiArray = Int8MultiArray
+    std_msg.Int32MultiArray = Int32MultiArray
     sys.modules["std_msgs"] = std_msgs
     sys.modules["std_msgs.msg"] = std_msg
 
@@ -281,6 +291,11 @@ class TestTeensySerial:
             == b"D 1 -1 255 255\n"
         )
 
+    def test_bldc_command_clamps_to_firmware_range(self):
+        assert teensy_serial.bldc_to_bytes(51) == b"B 51\n"
+        assert teensy_serial.bldc_to_bytes(200) == b"B 127\n"
+        assert teensy_serial.bldc_to_bytes(-200) == b"B -127\n"
+
     def test_actuator_command_rejects_unknown_channel_command(self):
         with pytest.raises(ValueError):
             teensy_serial.actuator_to_bytes(1, 1, command="Q")
@@ -296,6 +311,20 @@ class TestTeensySerial:
         assert telemetry.estop_active is False
         assert telemetry.motion_inhibited is False
         assert telemetry.encoder_ticks == [10, 30, 20, 40]
+        assert telemetry.bldc_speed == 0
+        assert telemetry.bldc_pg_count == 0
+        assert telemetry.bldc_alarm_active is False
+
+    def test_parse_telemetry_includes_bldc_feedback(self):
+        telemetry = teensy_serial.parse_telemetry_line(
+            b"T 1234 1 0 0 30 30 28 29 10 20 30 40 51 123 1\n"
+        )
+
+        assert telemetry is not None
+        assert telemetry.encoder_ticks == [10, 30, 20, 40]
+        assert telemetry.bldc_speed == 51
+        assert telemetry.bldc_pg_count == 123
+        assert telemetry.bldc_alarm_active is True
 
     def test_non_telemetry_line_is_ignored(self):
         assert teensy_serial.parse_telemetry_line(b"READY\n") is None
@@ -353,6 +382,13 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._controller_online = [True, True]
         bridge._fault_code = DrivetrainStatus.FAULT_NONE
         bridge._state = DrivetrainStatus.STATE_READY
+        bridge._estop_active = False
+        bridge._motion_inhibited = False
+        bridge._bldc_target = 0
+        bridge._last_bldc_cmd_time = None
+        bridge._last_bldc_feed_time = None
+        bridge._bldc_timeout = 1.0
+        bridge._bldc_feed_period = 0.1
         bridge.get_logger = MagicMock()
         return bridge
 
@@ -459,6 +495,86 @@ class TestDrivetrainBridgeSerialDispatch:
 
         assert calls == [(bridge._serial, 1, -1)]
 
+    def test_bldc_topic_uses_teensy_bldc_path(self, monkeypatch):
+        from std_msgs.msg import Int8
+
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_bldc_cmd",
+            lambda port, speed: calls.append((port, speed)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        msg = Int8()
+        msg.data = 51
+        bridge._bldc_cmd_callback(msg)
+
+        assert calls == [(bridge._serial, 51)]
+        assert bridge._bldc_target == 51
+
+    def test_bldc_topic_drops_commands_while_motion_inhibited(self, monkeypatch):
+        from std_msgs.msg import Int8
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_bldc_cmd",
+            lambda *_args: pytest.fail("unexpected BLDC write"),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._motion_inhibited = True
+        bridge._bldc_target = 51
+        bridge._last_bldc_cmd_time = 10.0
+        bridge._last_bldc_feed_time = 10.0
+        msg = Int8()
+        msg.data = 51
+
+        bridge._bldc_cmd_callback(msg)
+
+        assert bridge._bldc_target == 0
+        assert bridge._last_bldc_cmd_time is None
+        assert bridge._last_bldc_feed_time is None
+
+    def test_bldc_service_refreshes_active_command(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_bldc_cmd",
+            lambda port, speed: calls.append((port, speed)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._bldc_target = 51
+        bridge._last_bldc_cmd_time = 10.0
+        bridge._last_bldc_feed_time = 10.0
+
+        bridge._service_bldc(10.05)
+        bridge._service_bldc(10.11)
+
+        assert calls == [(bridge._serial, 51)]
+
+    def test_bldc_service_stops_stale_command(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_bldc_cmd",
+            lambda port, speed: calls.append((port, speed)),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._bldc_target = 51
+        bridge._last_bldc_cmd_time = 10.0
+        bridge._last_bldc_feed_time = 10.9
+
+        bridge._service_bldc(11.1)
+
+        assert calls == [(bridge._serial, 0)]
+        assert bridge._bldc_target == 0
+
     def test_legacy_simplified_stop_path(self, monkeypatch):
         calls = []
 
@@ -521,6 +637,25 @@ class TestDrivetrainBridgeSerialDispatch:
 
         assert calls == [bridge._serial]
 
+    def test_teensy_drive_stop_path_preserves_auxiliary_outputs(self, monkeypatch):
+        calls = []
+
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_throttle",
+            lambda port, left, right: calls.append((port, left, right)),
+        )
+        monkeypatch.setattr(
+            teensy_serial,
+            "send_stop",
+            lambda *args: pytest.fail(f"unexpected hard stop: {args}"),
+        )
+
+        bridge = self._make_bridge("teensy_line")
+        bridge._send_drive_stop()
+
+        assert calls == [(bridge._serial, 0.0, 0.0)]
+
     def test_teensy_feedback_updates_encoder_velocity(self):
         from unittest.mock import MagicMock
 
@@ -551,6 +686,7 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._odom_yaw = 0.0
         bridge._encoder_ticks = [0, 0, 0, 0]
         bridge._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
+        bridge._bldc_feedback = [0, 0, 0]
         bridge._last_teensy_ticks = None
         bridge._last_teensy_sample_time = None
         bridge._controller_online = [False, False]
@@ -563,10 +699,50 @@ class TestDrivetrainBridgeSerialDispatch:
         bridge._read_teensy_feedback(11.0)
 
         assert bridge._encoder_ticks == [72, 144, 72, 144]
+        assert bridge._bldc_feedback == [0, 0, 0]
         assert bridge._controller_online == [True, True]
         assert bridge._wheel_velocity_rps == pytest.approx(
             [0.0, 0.0, 0.0, 0.0]
         )
+
+    def test_teensy_feedback_updates_bldc_feedback(self):
+        from unittest.mock import MagicMock
+
+        from lunabot_drivetrain.drivetrain_bridge import DrivetrainBridge
+
+        class FakeSerial:
+            def __init__(self):
+                self.lines = [
+                    b"T 200 1 0 0 30 30 30 30 72 72 144 144 51 321 1\n",
+                ]
+
+            @property
+            def in_waiting(self):
+                return len(self.lines)
+
+            def readline(self):
+                return self.lines.pop(0)
+
+        bridge = object.__new__(DrivetrainBridge)
+        bridge._serial = FakeSerial()
+        bridge._serial_protocol = "teensy_line"
+        bridge._encoder_cpr = 720
+        bridge._wheel_radius = 0.065
+        bridge._track_width = 0.44
+        bridge._odom_x = 0.0
+        bridge._odom_y = 0.0
+        bridge._odom_yaw = 0.0
+        bridge._encoder_ticks = [0, 0, 0, 0]
+        bridge._wheel_velocity_rps = [0.0, 0.0, 0.0, 0.0]
+        bridge._bldc_feedback = [0, 0, 0]
+        bridge._last_teensy_ticks = None
+        bridge._last_teensy_sample_time = None
+        bridge._controller_online = [False, False]
+        bridge.get_logger = MagicMock()
+
+        bridge._read_teensy_feedback(10.0)
+
+        assert bridge._bldc_feedback == [51, 321, 1]
 
     def test_throttle_write_failure_faults_controller(self, monkeypatch):
         def raise_io_error(*_args):

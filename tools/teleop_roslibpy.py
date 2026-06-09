@@ -59,11 +59,6 @@ BTN_ACT_RETRACT = 0  # A
 BTN_ACT2_EXTEND  = 2  # X → extend doors  [1,  1]
 BTN_ACT2_RETRACT = 1  # B → retract doors [-1, -1]
 
-# BLDC (excavation) — not yet wired: drivetrain_bridge has no /bldc/cmd subscriber.
-# Buttons reserved here for when the Jetson bridge gains BLDC topic support.
-# BLDC_CW_BUTTON = 5   # RB — clockwise
-# AXIS_RT        = 5   # Right trigger — counter-clockwise
-
 # Speed limits matching xbox_teleop.yaml
 SCALE_LINEAR = 0.35        # m/s normal
 SCALE_LINEAR_TURBO = 0.6   # m/s turbo
@@ -292,9 +287,6 @@ class TeleopController:
                     f"Topic: {self._publisher.name}",
                 )
 
-                # Sleep only for the remaining time in this period so the loop
-                # runs at a steady PUBLISH_HZ regardless of processing overhead.
-                # This keeps the BLDC watchdog (500 ms) fed reliably.
                 elapsed = time.monotonic() - t_loop_start
                 time.sleep(max(0.0, period - elapsed))
         except KeyboardInterrupt:

@@ -39,8 +39,10 @@ Teensy `T ...` telemetry line.
 |-----------|-------|------|
 | Subscribe | `/cmd_vel_gated` | `geometry_msgs/Twist` |
 | Subscribe | `/deposition/actuator/cmd` | `std_msgs/Int8MultiArray` |
+| Subscribe | `/excavation/bldc/cmd` | `std_msgs/Int8` |
 | Subscribe | `/safety/motion_inhibit` | `std_msgs/Bool` (transient-local) |
 | Subscribe | `/safety/estop` | `std_msgs/Bool` |
+| Publish | `/excavation/bldc/feedback` | `std_msgs/Int32MultiArray` |
 | Publish | `/drivetrain/status` | `lunabot_interfaces/DrivetrainStatus` |
 | Publish | `/drivetrain/telemetry` | `lunabot_interfaces/DrivetrainTelemetry` |
 | Publish | `/odom_wheels` | `nav_msgs/Odometry` |
@@ -54,6 +56,14 @@ State machine: `UNINITIALISED → READY ⇄ DRIVING → FAULT` and `ESTOP`.
   the Sabertooth to reboot before transitioning back to READY.
 - **Command timeout**: if no `cmd_vel` arrives within `command_timeout_s`, motors
   are stopped.
+- **Excavation BLDC**: with `serial_protocol:=teensy_line`,
+  `/excavation/bldc/cmd` forwards signed speed commands to the Teensy firmware
+  `B <speed>` command. Valid values are clamped to `-127..127`; publish `0` to
+  stop the BLDC. The bridge refreshes the active non-zero BLDC command at a
+  bounded rate so the firmware watchdog remains fed, and sends `0` if the ROS
+  command becomes stale. `/excavation/bldc/feedback` publishes
+  `[commanded_speed, pg_pulse_count, alarm_active]`, where `alarm_active` is `1`
+  when the BLD-510B `ALM` line is pulled low.
 
 ## Jetson bench bring-up
 

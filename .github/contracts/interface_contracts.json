@@ -133,6 +133,20 @@
       "phases": ["runtime", "hardware"]
     },
     {
+      "name": "/excavation/bldc/cmd",
+      "type": "std_msgs/msg/Int8",
+      "kind": "subscription",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
+      "name": "/excavation/bldc/feedback",
+      "type": "std_msgs/msg/Int32MultiArray",
+      "kind": "publisher",
+      "source": "src/lunabot_drivetrain/lunabot_drivetrain/drivetrain_bridge.py",
+      "phases": ["runtime", "hardware"]
+    },
+    {
       "name": "/drivetrain/status",
       "type": "lunabot_interfaces/msg/DrivetrainStatus",
       "kind": "subscription",
